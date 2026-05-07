@@ -3,110 +3,120 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import TopBar from "@/components/layout/TopBar";
-
-type Appointment = {
-  id: string;
-  rawId: string;
-  patientId: string;
-  patientName: string;
-  initials: string;
-  doctorId: string;
-  doctorName: string;
-  date: string;
-  time: string;
-  status: string;
-  observation: string;
-};
-
-type PatientHistory = {
-  id: string;
-  shortId: string;
-  patientId: string;
-  patientName: string;
-  initials: string;
-  doctorName: string;
-  appointmentId: string;
-  date: string;
-  time: string;
-  status: string;
-  observation: string;
-};
+import { fetchDoctorDashboard, DoctorDashboardResponse } from "@/services/doctorService";
 
 const STATUS_COLORS: Record<string, string> = {
+  ASSIGNED:    "bg-[#FEF3C7] text-[#92400E]",
+  COMPLETED:   "bg-[#DCFCE7] text-[#166534]",
+  IN_PROGRESS: "bg-[#FEF3C7] text-[#92400E]",
   BOOKED:      "bg-[#E5EEFF] text-[#1E40AF]",
   ARRIVAL:     "bg-[#F0FDFA] text-[#0F766E]",
   ASSIGN:      "bg-[#FEF3C7] text-[#92400E]",
-  COMPLETE:    "bg-[#DCFCE7] text-[#166534]",
   CANCEL:      "bg-[#F1F5F9] text-[#475569]",
   MISSED:      "bg-[#FFDAD6] text-[#93000A]",
-  COMPLETED:   "bg-[#DCFCE7] text-[#166534]",
-  IN_PROGRESS: "bg-[#FEF3C7] text-[#92400E]",
 };
 
 export default function DoctorDashboard() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [histories, setHistories] = useState<PatientHistory[]>([]);
+  const [dashboard, setDashboard] = useState<DoctorDashboardResponse["data"] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token") ?? "";
-    const headers = { Authorization: `Bearer ${token}` };
+    const load = async () => {
+      try {
+        const res = await fetchDoctorDashboard();
+        if (res.success) {
+          setDashboard(res.data);
 
-    Promise.all([
-      fetch("/api/admin/appointments", { headers }).then(r => r.json()),
-      fetch("/api/admin/patient-histories", { headers }).then(r => r.json()),
-    ]).then(([apptResult, histResult]) => {
-      if (apptResult.success) {
-        // Show only ASSIGN status — appointments assigned to this doctor
-        setAppointments(apptResult.data.filter((a: Appointment) => a.status === "ASSIGN"));
+          // Store doctor name and photo so TopBar shows them immediately
+          if (res.data.doctorName) {
+            localStorage.setItem("userName", res.data.doctorName);
+          }
+          if (res.data.profilePhotoUrl) {
+            localStorage.setItem("profilePhotoUrl", res.data.profilePhotoUrl);
+          } else {
+            // Don't overwrite a photo the doctor already uploaded via settings
+          }
+          window.dispatchEvent(new Event("user-auth-updated"));
+        } else {
+          setError(res.message || "Failed to load dashboard.");
+        }
+      } catch (e: any) {
+        setError(e?.response?.data?.message || "Failed to load dashboard.");
+      } finally {
+        setLoading(false);
       }
-      if (histResult.success) {
-        setHistories(histResult.data);
-      }
-    }).catch(() => {
-      // fail silently — show empty state
-    }).finally(() => setLoading(false));
+    };
+
+    load();
   }, []);
 
-  // Find the patient history record for a given appointment
-  const getHistoryForAppointment = (appointmentId: string) =>
-    histories.find(h => h.appointmentId === appointmentId);
-
   const stats = [
-    { label: "Assigned Today", value: appointments.length.toString(), color: "text-[#00685C]" },
-    { label: "Completed", value: histories.filter(h => h.status === "COMPLETED").length.toString(), color: "text-[#0B1C30]" },
-    { label: "In Progress", value: histories.filter(h => h.status === "IN_PROGRESS").length.toString(), color: "text-[#435B7E]" },
-    { label: "Satisfaction", value: "98%", color: "text-[#0D9488]" },
+    {
+      label: "Assigned Today",
+      value: dashboard?.todayAssignedAppointments?.toString() ?? "0",
+      color: "text-[#00685C]",
+    },
+    {
+      label: "Completed",
+      value: dashboard?.completedHistories?.toString() ?? "0",
+      color: "text-[#0B1C30]",
+    },
+    {
+      label: "Pending",
+      value: dashboard?.pendingHistories?.toString() ?? "0",
+      color: "text-[#435B7E]",
+    },
+    {
+      label: "Rating",
+      value: dashboard?.averageRating != null
+        ? `${Number(dashboard.averageRating).toFixed(1)} / 5`
+        : "—",
+      color: "text-[#0D9488]",
+    },
   ];
 
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar
         title="Doctor Dashboard"
-        subtitle="Overview"
-        userName="Dr. Julianne Case"
-        userRole="Orthodontist"
+        subtitle={dashboard?.today
+          ? new Date(dashboard.today).toLocaleDateString("en-US", {
+              weekday: "long", month: "long", day: "numeric",
+            })
+          : "Overview"}
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6 lg:gap-8">
+
+        {error && (
+          <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-          {stats.map(stat => (
+          {stats.map((stat) => (
             <div key={stat.label} className="bg-white border border-[#F1F5F9] rounded-xl p-4 sm:p-6 shadow-sm">
               {loading ? (
                 <div className="h-8 sm:h-10 bg-[#F1F5F9] rounded animate-pulse mb-2" />
               ) : (
-                <p className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${stat.color}`}>{stat.value}</p>
+                <p className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${stat.color}`}>
+                  {stat.value}
+                </p>
               )}
               <p className="text-xs sm:text-sm text-[#3D4946] mt-1">{stat.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Assigned Appointments Table */}
+        {/* Today's Assigned Appointments */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg sm:text-xl font-semibold text-[#0B1C30]">Assigned Appointments</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-[#0B1C30]">
+              Today&apos;s Assigned Appointments
+            </h3>
             <Link href="/doctor/appointments" className="text-xs sm:text-sm text-[#0D9488] hover:underline">
               View Full Schedule
             </Link>
@@ -117,7 +127,7 @@ export default function DoctorDashboard() {
               <table className="w-full min-w-[640px]">
                 <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                   <tr>
-                    {["PATIENT", "OBSERVATION", "DATE & TIME", "STATUS", "ACTIONS"].map(h => (
+                    {["PATIENT", "DATE", "STATUS", "ACTION"].map((h) => (
                       <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                         {h}
                       </th>
@@ -128,65 +138,68 @@ export default function DoctorDashboard() {
                   {loading ? (
                     [...Array(3)].map((_, i) => (
                       <tr key={i} className="border-t border-[#F8FAFC]">
-                        {[...Array(5)].map((__, j) => (
+                        {[...Array(4)].map((__, j) => (
                           <td key={j} className="px-6 py-4">
                             <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                           </td>
                         ))}
                       </tr>
                     ))
-                  ) : appointments.length === 0 ? (
+                  ) : !dashboard?.todayAppointments?.length ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
-                        No appointments assigned to you yet.
+                      <td colSpan={4} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                        No appointments assigned to you today.
                       </td>
                     </tr>
                   ) : (
-                    appointments.map((appt, i) => {
-                      const history = getHistoryForAppointment(appt.rawId);
-                      return (
-                        <tr
-                          key={appt.rawId}
-                          className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors`}
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E]">
-                                {appt.initials}
-                              </div>
-                              <div>
-                                <p className="text-sm font-semibold text-[#0B1C30]">{appt.patientName}</p>
-                                <p className="text-xs text-[#94A3B8]">{appt.id}</p>
-                              </div>
+                    dashboard.todayAppointments.map((appt, i) => (
+                      <tr
+                        key={appt.id}
+                        className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors`}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
+                              {appt.patientName
+                                .split(" ")
+                                .map((n: string) => n[0])
+                                .slice(0, 2)
+                                .join("")
+                                .toUpperCase()}
                             </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-[#3D4946] max-w-[200px] truncate">
-                            {appt.observation || "No observation yet"}
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-medium text-[#0B1C30]">{appt.date}</p>
-                            <p className="text-xs text-[#3D4946]">{appt.time}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                              {appt.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            {history ? (
-                              <Link
-                                href={`/doctor/record/${history.id}`}
-                                className="text-xs text-[#0D9488] hover:underline font-semibold"
-                              >
-                                View Record
-                              </Link>
-                            ) : (
-                              <span className="text-xs text-[#94A3B8]">No record</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
+                            <div>
+                              <p className="text-sm font-semibold text-[#0B1C30]">{appt.patientName}</p>
+                              <p className="text-xs text-[#94A3B8]">{appt.patientId.slice(0, 8)}…</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-medium text-[#0B1C30]">
+                            {new Date(appt.appointmentDate).toLocaleDateString("en-US", {
+                              month: "short", day: "numeric",
+                            })}
+                          </p>
+                          <p className="text-xs text-[#94A3B8]">
+                            {new Date(appt.appointmentDate).toLocaleTimeString([], {
+                              hour: "2-digit", minute: "2-digit",
+                            })}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                            {appt.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Link
+                            href={`/doctor/record/${appt.id}`}
+                            className="text-xs text-[#0D9488] hover:underline font-semibold"
+                          >
+                            View Record
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>

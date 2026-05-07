@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { 
+  fetchDoctors, 
+  suspendDoctor, 
+  activateDoctor 
+} from "@/services/doctorService";
+import { 
+  addReferencePoints, 
+  removeReferencePoints 
+} from "@/services/adminService";
+import { unlockPatient } from "@/services/patientService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,13 +91,17 @@ function Btn({
   );
 }
 
+// Centralized response handler
+const handleResponse = (result: any, showToast: (message: string, type: "success" | "error") => void) => {
+  showToast(result.message, result.success ? "success" : "error");
+  return result.success;
+};
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminSettingsPage() {
-  const token = () => (typeof window !== "undefined" ? localStorage.getItem("token") ?? "" : "");
-  const authHeader = () => ({ Authorization: `Bearer ${token()}`, "Content-Type": "application/json" });
-
   const [toast, setToast] = useState<Toast | null>(null);
+  
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
@@ -95,71 +109,34 @@ export default function AdminSettingsPage() {
 
   // ── Reference Points ──────────────────────────────────────────────────────
   const [rpPatientId, setRpPatientId] = useState("");
-  const [rpData, setRpData] = useState<{ patientId: string; referencePoints: number } | null>(null);
-  const [rpLoading, setRpLoading] = useState(false);
   const [rpPoints, setRpPoints] = useState("");
   const [rpReason, setRpReason] = useState("");
   const [rpMutating, setRpMutating] = useState(false);
 
-  const fetchReferencePoints = async () => {
-    if (!rpPatientId.trim()) return;
-    setRpLoading(true);
-    setRpData(null);
-    try {
-      const res = await fetch(`/api/admin/reference-points/${rpPatientId.trim()}`, {
-        headers: authHeader(),
-      });
-      const result = await res.json();
-      if (result.success) setRpData(result.data);
-      else showToast(result.message, "error");
-    } catch {
-      showToast("Failed to fetch reference points.", "error");
-    } finally {
-      setRpLoading(false);
-    }
-  };
-
   const mutatePoints = async (action: "add" | "remove") => {
     const pts = parseInt(rpPoints, 10);
-    if (!rpData) return showToast("Fetch a patient first.", "error");
+    if (!rpPatientId.trim()) return showToast("Enter a patient ID first.", "error");
     if (!pts || pts <= 0) return showToast("Enter a valid positive number of points.", "error");
+    
     setRpMutating(true);
     try {
-      let res: Response;
+      let result;
       if (action === "add") {
-        res = await fetch(
-          `/api/admin/reference-points/add?patientId=${rpData.patientId}&points=${pts}&reason=${encodeURIComponent(rpReason)}`,
-          { method: "POST", headers: authHeader() }
-        );
+        result = await addReferencePoints(rpPatientId.trim(), pts, rpReason);
       } else {
-        res = await fetch("/api/admin/reference-points/remove", {
-          method: "POST",
-          headers: authHeader(),
-          body: JSON.stringify({ patientId: rpData.patientId, pointsToRemove: pts, reason: rpReason }),
+        result = await removeReferencePoints({
+          patientId: rpPatientId.trim(),
+          pointsToRemove: pts,
+          reason: rpReason,
         });
       }
-      const result = await res.json();
-      if (result.success) {
-        showToast(result.message, "success");
-        // Optimistic update
-        setRpData(prev =>
-          prev
-            ? {
-                ...prev,
-                referencePoints:
-                  action === "add"
-                    ? prev.referencePoints + pts
-                    : Math.max(0, prev.referencePoints - pts),
-              }
-            : null
-        );
+      
+      if (handleResponse(result, showToast)) {
         setRpPoints("");
         setRpReason("");
-      } else {
-        showToast(result.message, "error");
       }
-    } catch {
-      showToast("Request failed.", "error");
+    } catch (error: any) {
+      showToast(error.message || "Request failed.", "error");
     } finally {
       setRpMutating(false);
     }
@@ -169,19 +146,16 @@ export default function AdminSettingsPage() {
   const [unlockId, setUnlockId] = useState("");
   const [unlocking, setUnlocking] = useState(false);
 
-  const unlockPatient = async () => {
+  const handleUnlockPatient = async () => {
     if (!unlockId.trim()) return showToast("Enter a patient ID.", "error");
     setUnlocking(true);
     try {
-      const res = await fetch(`/api/users/patients/${unlockId.trim()}/unlock`, {
-        method: "PATCH",
-        headers: authHeader(),
-      });
-      const result = await res.json();
-      showToast(result.message, result.success ? "success" : "error");
-      if (result.success) setUnlockId("");
-    } catch {
-      showToast("Request failed.", "error");
+      const result = await unlockPatient(unlockId.trim());
+      if (handleResponse(result, showToast)) {
+        setUnlockId("");
+      }
+    } catch (error: any) {
+      showToast(error.message || "Request failed.", "error");
     } finally {
       setUnlocking(false);
     }
@@ -190,51 +164,69 @@ export default function AdminSettingsPage() {
   // ── Doctor Suspend / Activate ─────────────────────────────────────────────
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [doctorsLoading, setDoctorsLoading] = useState(true);
-  const [doctorAction, setDoctorAction] = useState<string | null>(null); // id of doctor being actioned
-  const [doctorSearch, setDoctorSearch] = useState(""); // Search query
+  const [doctorAction, setDoctorAction] = useState<string | null>(null);
+  const [doctorSearch, setDoctorSearch] = useState("");
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch("/api/admin/doctors", { headers: authHeader() });
-        const result = await res.json();
+        const result = await fetchDoctors(0, 50);
+
         if (result.success) {
-          // Add a local "status" field defaulting to Active
-          setDoctors(result.data.map((d: Doctor) => ({ ...d, status: d.status ?? "Active" })));
+          setDoctors(
+            result.data.content.map((d: any) => ({
+              id: d.id,
+              fullName: d.name,
+              initials: d.name
+                .split(" ")
+                .map((n: string) => n[0])
+                .join("")
+                .toUpperCase(),
+              specialty: d.specialization || "General",
+              email: d.email,
+              patients: 0,
+              status: d.status === "ACTIVE" ? "Active" : "Suspended",
+            }))
+          );
+        } else {
+          showToast("Failed to load doctors", "error");
+          setDoctors([]);
         }
-      } catch {
-        // non-critical
+      } catch (error: any) {
+        showToast(error.message || "Failed to load doctors", "error");
+        setDoctors([]);
       } finally {
         setDoctorsLoading(false);
       }
     };
+
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleDoctorStatus = async (doctor: Doctor) => {
-    const action = doctor.status === "Active" ? "suspend" : "activate";
+    const isActive = doctor.status === "Active";
     setDoctorAction(doctor.id);
+    
     try {
-      const res = await fetch(`/api/users/doctors/${doctor.id}/${action}`, {
-        method: "PATCH",
-        headers: authHeader(),
-      });
-      const result = await res.json();
-      if (result.success) {
-        showToast(result.message, "success");
+      let result;
+      if (isActive) {
+        result = await suspendDoctor(doctor.id);
+      } else {
+        result = await activateDoctor(doctor.id);
+      }
+      
+      if (handleResponse(result, showToast)) {
         setDoctors(prev =>
           prev.map(d =>
             d.id === doctor.id
-              ? { ...d, status: action === "suspend" ? "Suspended" : "Active" }
+              ? { ...d, status: isActive ? "Suspended" : "Active" }
               : d
           )
         );
-      } else {
-        showToast(result.message, "error");
       }
-    } catch {
-      showToast("Request failed.", "error");
+    } catch (error: any) {
+      showToast(error.message || "Request failed.", "error");
     } finally {
       setDoctorAction(null);
     }
@@ -281,37 +273,19 @@ export default function AdminSettingsPage() {
         {/* ── 1. Reference Points ── */}
         <Section
           title="Reference Points"
-          subtitle="View and adjust a patient's reference point balance"
+          subtitle="Add or remove reference points from a patient's balance"
         >
           <div className="flex flex-col gap-5">
-            {/* Lookup */}
+            {/* Patient ID Input */}
             <Field label="Patient ID">
-              <div className="flex gap-3">
-                <Input
-                  placeholder="550e8400-e29b-41d4-a716-446655440001"
-                  value={rpPatientId}
-                  onChange={e => setRpPatientId(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && fetchReferencePoints()}
-                  className="flex-1"
-                />
-                <Btn onClick={fetchReferencePoints} loading={rpLoading} variant="ghost">
-                  Fetch
-                </Btn>
-              </div>
+              <Input
+                placeholder="550e8400-e29b-41d4-a716-446655440001"
+                value={rpPatientId}
+                onChange={e => setRpPatientId(e.target.value)}
+              />
             </Field>
 
-            {/* Current balance */}
-            {rpData && (
-              <div className="flex items-center justify-between bg-[#F0FDFA] border border-[#CCFBF1] rounded-xl px-6 py-4">
-                <div>
-                  <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest">Current Balance</p>
-                  <p className="text-xs text-[#94A3B8] mt-0.5 font-mono">{rpData.patientId}</p>
-                </div>
-                <p className="text-4xl font-bold text-[#00685C]">{rpData.referencePoints}</p>
-              </div>
-            )}
-
-            {/* Adjust */}
+            {/* Points and Reason */}
             <div className="grid grid-cols-2 gap-4">
               <Field label="Points">
                 <Input
@@ -335,7 +309,6 @@ export default function AdminSettingsPage() {
               <Btn
                 onClick={() => mutatePoints("add")}
                 loading={rpMutating}
-                disabled={!rpData}
                 variant="primary"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -346,7 +319,6 @@ export default function AdminSettingsPage() {
               <Btn
                 onClick={() => mutatePoints("remove")}
                 loading={rpMutating}
-                disabled={!rpData}
                 variant="danger"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -370,10 +342,10 @@ export default function AdminSettingsPage() {
                   placeholder="550e8400-e29b-41d4-a716-446655440003"
                   value={unlockId}
                   onChange={e => setUnlockId(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && unlockPatient()}
+                  onKeyDown={e => e.key === "Enter" && handleUnlockPatient()}
                   className="flex-1"
                 />
-                <Btn onClick={unlockPatient} loading={unlocking} variant="success">
+                <Btn onClick={handleUnlockPatient} loading={unlocking} variant="success">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
                   </svg>

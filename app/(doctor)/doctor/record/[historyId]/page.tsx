@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { updateObservation } from "@/services/doctorService";
 
 type HistoryRecord = {
   id: string;
@@ -87,12 +88,7 @@ export default function PatientRecordPage() {
     if (!observation.trim()) return showToast("Observation cannot be empty.", "error");
     setSavingObs(true);
     try {
-      const res = await fetch(`/api/patient-history/${historyId}/observation`, {
-        method: "PATCH",
-        headers: { ...authHeader(), "Content-Type": "application/json" },
-        body: JSON.stringify({ observation }),
-      });
-      const result = await res.json();
+      const result = await updateObservation(historyId, observation);
       if (result.success) {
         showToast(result.message, "success");
         setRecord(prev => prev ? { ...prev, observation, status: "IN_PROGRESS" } : prev);

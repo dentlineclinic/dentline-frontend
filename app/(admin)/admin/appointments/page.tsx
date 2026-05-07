@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useAppointments } from "@/hooks/useAppointments";
+import { fetchDoctors } from "@/services/doctorService";
+import api from "@/lib/axios"
 
 type Appointment = {
   id: string;
@@ -28,21 +31,24 @@ type Doctor = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  BOOKED:   "bg-[#E5EEFF] text-[#1E40AF]",
-  ARRIVAL:  "bg-[#F0FDFA] text-[#0F766E]",
-  ASSIGN:   "bg-[#FEF3C7] text-[#92400E]",
-  COMPLETE: "bg-[#DCFCE7] text-[#166534]",
-  CANCEL:   "bg-[#F1F5F9] text-[#475569]",
-  MISSED:   "bg-[#FFDAD6] text-[#93000A]",
+  BOOKED: "bg-[#E5EEFF] text-[#1E40AF]",
+  ARRIVED: "bg-[#F0FDFA] text-[#0F766E]",
+  ASSIGNED: "bg-[#FEF3C7] text-[#92400E]",
+  COMPLETED: "bg-[#DCFCE7] text-[#166534]",
+  CANCELLED: "bg-[#F1F5F9] text-[#475569]",
+  MISSED: "bg-[#FFDAD6] text-[#93000A]",
 };
 
-const ALL_FILTERS = ["All","TODAY", "BOOKED", "ARRIVAL", "ASSIGN", "COMPLETE", "CANCEL", "MISSED"];
+const ALL_FILTERS = ["All", "TODAY", "BOOKED", "ARRIVED", "ASSIGNED", "COMPLETED", "CANCELLED", "MISSED"];
 
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [page, setPage] = useState(0);
+  const size = 10;
+
+  const { data, isLoading, error, refetch } = useAppointments(page, size);
+
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
 
@@ -56,38 +62,100 @@ export default function AppointmentsPage() {
   const [doctorSearch, setDoctorSearch] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [doctorPage, setDoctorPage] = useState(0);
+  const [totalDoctorPages, setTotalDoctorPages] = useState(0);
 
-  useEffect(() => {
-    loadAppointments();
-    loadDoctors();
+  // Copy ID feedback
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyId = (rawId: string) => {
+    navigator.clipboard.writeText(rawId).then(() => {
+      setCopiedId(rawId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  // ✅ Service-based doctor fetcher with proper separation of concerns
+  const loadDoctors = useCallback(async (pageNum = 0, pageSize = 10, searchTerm = "") => {
+    setLoadingDoctors(true);
+    try {
+      const response = await fetchDoctors(pageNum, pageSize, searchTerm);
+
+      if (response.success && response.data) {
+        const mapped = response.data.content.map((doc: any) => ({
+          id: doc.id,
+          shortId: `DOC-${doc.id.slice(0, 6).toUpperCase()}`,
+          fullName: doc.name,
+          initials: doc.name
+            .split(" ")
+            .map((n: string) => n[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase(),
+          specialty: doc.specialization,
+          email: doc.email,
+          patients: 0,
+          status: doc.status,
+        }));
+
+        setDoctors(mapped);
+        setTotalDoctorPages(response.data.totalPages);
+      }
+    } catch (err) {
+      console.error("Failed to load doctors", err);
+    } finally {
+      setLoadingDoctors(false);
+    }
   }, []);
 
-  const loadAppointments = async () => {
-    try {
-      const res = await fetch("/api/admin/appointments", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
-      });
-      const result = await res.json();
-      if (result.success) setAppointments(result.data);
-      else setError(result.message);
-    } catch {
-      setError("Failed to load appointments.");
-    } finally {
-      setLoading(false);
+  // Load doctors only when popup opens
+  useEffect(() => {
+    if (showDoctorPanel) {
+      setDoctorPage(0);
+      setDoctorSearch("");
+      loadDoctors(0, 10, "");
     }
-  };
+  }, [showDoctorPanel, loadDoctors]);
 
-  const loadDoctors = async () => {
-    try {
-      const res = await fetch("/api/admin/doctors", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
-      });
-      const result = await res.json();
-      if (result.success) setDoctors(result.data);
-    } catch {
-      // non-critical
-    }
-  };
+  // Debounced search for doctors
+  useEffect(() => {
+    if (!showDoctorPanel) return;
+
+    const delay = setTimeout(() => {
+      loadDoctors(0, 10, doctorSearch);
+      setDoctorPage(0);
+    }, 300);
+
+    return () => clearTimeout(delay);
+  }, [doctorSearch, showDoctorPanel, loadDoctors]);
+
+  // Map backend data to UI shape
+  const mappedAppointments: Appointment[] =
+    data?.data?.content?.map((appt: any) => {
+      const dt = new Date(appt.appointmentDate);
+
+      return {
+        id: `APT-${appt.id.slice(0, 6).toUpperCase()}`,
+        rawId: appt.id,
+        patientId: appt.patientId,
+        patientName: appt.patientName,
+        initials: appt.patientName
+          .split(" ")
+          .map((n: string) => n[0])
+          .slice(0, 2)
+          .join("")
+          .toUpperCase(),
+        doctorId: appt.doctorId,
+        doctorName: appt.doctorName || "Unassigned",
+        date: dt.toLocaleDateString(),
+        time: dt.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        status: appt.status,
+        observation: appt.observation ?? "No notes",
+      };
+    }) ?? [];
 
   const openPanel = (appt: Appointment) => {
     setSelectedAppt(appt);
@@ -103,13 +171,26 @@ export default function AppointmentsPage() {
     setAssignError(null);
   };
 
-  const markArrival = () => {
+  const markArrival = async () => {
     if (!selectedAppt) return;
+
     setUpdatingStatus(true);
-    const updated = { ...selectedAppt, status: "ARRIVAL" };
-    setAppointments(prev => prev.map(a => a.rawId === selectedAppt.rawId ? updated : a));
-    setSelectedAppt(updated);
-    setUpdatingStatus(false);
+    setStatusError(null);
+
+    try {
+      const response = await api.patch(`/appointments/${selectedAppt.rawId}/arrive`);
+
+      if (response.data.success) {
+        await refetch();
+        closeAll();
+      } else {
+        setStatusError(response.data.message || "Failed to update status");
+      }
+    } catch (err: any) {
+      setStatusError(err.response?.data?.message || "Failed to update status");
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   const handleAssignClick = () => {
@@ -118,18 +199,50 @@ export default function AppointmentsPage() {
     setShowDoctorPanel(true);
   };
 
-  const assignDoctor = (doctor: Doctor) => {
+  const assignDoctor = async (doctor: Doctor) => {
     if (!selectedAppt) return;
+
     setAssigning(true);
-    const updated = { ...selectedAppt, doctorId: doctor.id, doctorName: doctor.fullName, status: "ASSIGN" };
-    setAppointments(prev => prev.map(a => a.rawId === selectedAppt.rawId ? updated : a));
-    setSelectedAppt(updated);
-    setShowDoctorPanel(false);
-    setAssigning(false);
+    setAssignError(null);
+
+    try {
+      const response = await api.patch(`/appointments/${selectedAppt.rawId}/assign`, {
+        doctorId: doctor.id,
+      });
+
+      if (response.data.success) {
+        await refetch();
+        closeAll(); // ✅ Correct UX decision - close panel after assign
+      } else {
+        setAssignError(response.data.message || "Failed to assign doctor");
+      }
+    } catch (err: any) {
+      setAssignError(err.response?.data?.message || "Failed to assign doctor");
+    } finally {
+      setAssigning(false);
+    }
   };
 
-  const visible = appointments.filter(a => {
-    const matchesFilter = filter === "All" || a.status === filter;
+  const handleDoctorPageChange = (newPage: number) => {
+    setDoctorPage(newPage);
+    loadDoctors(newPage, 10, doctorSearch);
+  };
+
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString();
+  };
+
+  const visible = mappedAppointments.filter(a => {
+    let matchesFilter = true;
+    if (filter === "All") {
+      matchesFilter = true;
+    } else if (filter === "TODAY") {
+      matchesFilter = a.date === getTodayDate();
+    } else {
+      matchesFilter = a.status === filter;
+    }
+
     const matchesSearch =
       a.patientName.toLowerCase().includes(search.toLowerCase()) ||
       a.doctorName.toLowerCase().includes(search.toLowerCase()) ||
@@ -137,10 +250,13 @@ export default function AppointmentsPage() {
     return matchesFilter && matchesSearch;
   });
 
+  // Frontend fallback filter (if backend doesn't support search)
   const filteredDoctors = doctors.filter(d =>
     d.fullName.toLowerCase().includes(doctorSearch.toLowerCase()) ||
     d.specialty.toLowerCase().includes(doctorSearch.toLowerCase())
   );
+
+  const errorMessage = error ? "Failed to load appointments." : null;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -153,11 +269,10 @@ export default function AppointmentsPage() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                  filter === f
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${filter === f
                     ? "bg-[#00685C] text-white"
                     : "bg-white border border-[#F1F5F9] text-[#3D4946] hover:bg-[#F8FAFC]"
-                }`}
+                  }`}
               >
                 {f}
               </button>
@@ -172,9 +287,9 @@ export default function AppointmentsPage() {
           />
         </div>
 
-        {error && (
+        {errorMessage && (
           <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
-            {error}
+            {errorMessage}
           </div>
         )}
 
@@ -182,85 +297,126 @@ export default function AppointmentsPage() {
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
-            <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
-              <tr>
-                {["ID", "PATIENT", "DOCTOR", "OBSERVATION", "DATE & TIME", "STATUS", "ACTIONS"].map(h => (
-                  <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                [...Array(5)].map((_, i) => (
-                  <tr key={i} className="border-t border-[#F8FAFC]">
-                    {[...Array(7)].map((__, j) => (
-                      <td key={j} className="px-6 py-4">
-                        <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : visible.length === 0 ? (
+              <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
-                    No appointments found.
-                  </td>
+                  {["ID", "PATIENT", "DOCTOR", "OBSERVATION", "DATE & TIME", "STATUS", "ACTIONS"].map(h => (
+                    <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ) : (
-                visible.map((appt, i) => {
-                  const canManage = appt.status === "BOOKED" || appt.status === "ARRIVAL";
-                  return (
-                    <tr
-                      key={appt.rawId}
-                      className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors ${selectedAppt?.rawId === appt.rawId ? "bg-[#F0FDFA]" : ""}`}
-                    >
-                      <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{appt.id}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E]">
-                            {appt.initials}
-                          </div>
-                          <span className="text-sm font-semibold text-[#0B1C30]">{appt.patientName}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[#3D4946]">{appt.doctorName}</td>
-                      <td className="px-6 py-4 text-sm text-[#3D4946] max-w-[180px] truncate">{appt.observation}</td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-[#0B1C30]">{appt.date}</p>
-                        <p className="text-xs text-[#3D4946]">{appt.time}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                          {appt.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => openPanel(appt)}
-                          disabled={!canManage}
-                          className={`text-xs font-semibold transition-colors ${
-                            canManage
-                              ? "text-[#0D9488] hover:underline cursor-pointer"
-                              : "text-[#94A3B8] cursor-not-allowed"
-                          }`}
-                        >
-                          Manage
-                        </button>
-                      </td>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i} className="border-t border-[#F8FAFC]">
+                      {[...Array(7)].map((__, j) => (
+                        <td key={j} className="px-6 py-4">
+                          <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
+                        </td>
+                      ))}
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                  ))
+                ) : visible.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                      No appointments found.
+                    </td>
+                  </tr>
+                ) : (
+                  visible.map((appt, i) => {
+                    const canManage = appt.status === "BOOKED" || appt.status === "ARRIVED";
+                    return (
+                      <tr
+                        key={appt.rawId}
+                        className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors ${selectedAppt?.rawId === appt.rawId ? "bg-[#F0FDFA]" : ""}`}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-[#0D9488]">{appt.id}</span>
+                            <button
+                              onClick={e => { e.stopPropagation(); copyId(appt.rawId); }}
+                              title="Copy full appointment ID"
+                              className="flex-shrink-0 p-1 rounded hover:bg-[#F0FDFA] transition-colors group"
+                            >
+                              {copiedId === appt.rawId ? (
+                                <svg className="w-3.5 h-3.5 text-[#0F766E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#0D9488] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E]">
+                              {appt.initials}
+                            </div>
+                            <span className="text-sm font-semibold text-[#0B1C30]">{appt.patientName}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[#3D4946]">{appt.doctorName}</td>
+                        <td className="px-6 py-4 text-sm text-[#3D4946] max-w-[180px] truncate">{appt.observation}</td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-medium text-[#0B1C30]">{appt.date}</p>
+                          <p className="text-xs text-[#3D4946]">{appt.time}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                            {appt.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => openPanel(appt)}
+                            disabled={!canManage}
+                            className={`text-xs font-semibold transition-colors ${canManage
+                                ? "text-[#0D9488] hover:underline cursor-pointer"
+                                : "text-[#94A3B8] cursor-not-allowed"
+                              }`}
+                          >
+                            Manage
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {!loading && (
+        {/* Pagination */}
+        <div className="flex items-center justify-between mt-6">
+          <button
+            disabled={page === 0}
+            onClick={() => setPage((p) => p - 1)}
+            className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#3D4946] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Previous
+          </button>
+
+          <span className="text-sm text-[#3D4946]">
+            Page {page + 1} of {data?.data?.totalPages ?? 1}
+          </span>
+
+          <button
+            disabled={page >= (data?.data?.totalPages ?? 1) - 1}
+            onClick={() => setPage((p) => p + 1)}
+            className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#3D4946] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Next
+          </button>
+        </div>
+
+        {!isLoading && (
           <p className="text-sm text-[#3D4946]">
-            Showing {visible.length} of {appointments.length} appointments
+            Showing {visible.length} of {mappedAppointments.length} appointments
           </p>
         )}
       </main>
@@ -334,7 +490,7 @@ export default function AppointmentsPage() {
             )}
 
             {/* Actions */}
-            {selectedAppt.status === "BOOKED" || selectedAppt.status === "ARRIVAL" ? (
+            {selectedAppt.status === "BOOKED" || selectedAppt.status === "ARRIVED" ? (
               <div className="flex flex-col gap-3 pt-2">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest">Change Status</p>
 
@@ -356,15 +512,14 @@ export default function AppointmentsPage() {
                   </button>
                 )}
 
-                {selectedAppt.status === "ARRIVAL" && (
+                {selectedAppt.status === "ARRIVED" && (
                   <button
                     onClick={handleAssignClick}
-                    disabled={updatingStatus}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
-                      showDoctorPanel
+                    disabled={assigning}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${showDoctorPanel
                         ? "bg-[#FEF3C7] border-[#92400E] text-[#92400E]"
                         : "bg-white border-[#E2E8F0] text-[#0B1C30] hover:bg-[#FEF3C7] hover:border-[#92400E] hover:text-[#92400E]"
-                    }`}
+                      }`}
                   >
                     <span className="w-8 h-8 rounded-full bg-[#FEF3C7] flex items-center justify-center flex-shrink-0">
                       <svg className="w-4 h-4 text-[#92400E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,7 +593,19 @@ export default function AppointmentsPage() {
               </div>
             )}
 
-            {filteredDoctors.length === 0 ? (
+            {loadingDoctors ? (
+              <div className="flex flex-col gap-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <div className="w-10 h-10 bg-[#F1F5F9] rounded-full animate-pulse" />
+                    <div className="flex-1">
+                      <div className="h-4 bg-[#F1F5F9] rounded w-32 animate-pulse mb-2" />
+                      <div className="h-3 bg-[#F1F5F9] rounded w-24 animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredDoctors.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-12 h-12 bg-[#F1F5F9] rounded-full flex items-center justify-center mx-auto mb-3">
                   <svg className="w-6 h-6 text-[#94A3B8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -471,15 +638,30 @@ export default function AppointmentsPage() {
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer with pagination */}
           <div className="px-6 py-4 border-t border-[#F1F5F9] flex items-center justify-between">
-            <p className="text-xs text-[#94A3B8]">{filteredDoctors.length} available</p>
-            <button
-              onClick={() => setShowDoctorPanel(false)}
-              className="text-sm font-semibold text-[#3D4946] hover:text-[#0B1C30]"
-            >
-              Back
-            </button>
+            <p className="text-xs text-[#94A3B8]">
+              {loadingDoctors ? "Loading..." : `${filteredDoctors.length} available`}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleDoctorPageChange(doctorPage - 1)}
+                disabled={doctorPage === 0 || loadingDoctors}
+                className="text-sm font-semibold text-[#3D4946] hover:text-[#0B1C30] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-[#94A3B8]">
+                {doctorPage + 1} / {totalDoctorPages || 1}
+              </span>
+              <button
+                onClick={() => handleDoctorPageChange(doctorPage + 1)}
+                disabled={doctorPage >= totalDoctorPages - 1 || loadingDoctors}
+                className="text-sm font-semibold text-[#3D4946] hover:text-[#0B1C30] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       )}

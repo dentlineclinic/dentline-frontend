@@ -2,21 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-
-type HistoryEntry = {
-  id: string;
-  patientId: string;
-  patientName: string;
-  doctorId: string;
-  doctorName: string;
-  appointmentId: string;
-  appointmentDate: string;
-  amount: number;
-  paymentStatus: string;
-  status: string;
-  observation: string;
-  createdAt: string;
-};
+import { fetchPatientHistoriesById, PatientHistory } from "@/services/patientHistoryService";
+import PatientHistoryModal from "@/components/modals/PatientHistoryModal";
 
 type Patient = {
   id: string;
@@ -30,7 +17,7 @@ type Patient = {
 
 type SearchResult = {
   patient: Patient;
-  histories: HistoryEntry[];
+  histories: PatientHistory[];
   totalElements: number;
   totalPages: number;
   currentPage: number;
@@ -54,66 +41,75 @@ export default function DoctorPatientsPage() {
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  
+  // Modal state
+  const [selectedHistory, setSelectedHistory] = useState<PatientHistory | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const token = () => (typeof window !== "undefined" ? localStorage.getItem("token") ?? "" : "");
-  const authHeader = () => ({ Authorization: `Bearer ${token()}` });
+  const openHistoryModal = (history: PatientHistory) => {
+    setSelectedHistory(history);
+    setIsModalOpen(true);
+  };
+
+  const closeHistoryModal = () => {
+    setIsModalOpen(false);
+    setSelectedHistory(null);
+  };
+
+  const handleObservationSaved = () => {
+    // Refresh the search results to show updated observation
+    if (result) {
+      search(result.currentPage);
+    }
+  };
 
   const search = async (page = 0) => {
-    const q = query.trim();
-    if (!q) return;
+    const patientId = query.trim();
+    if (!patientId) return;
 
     setSearching(true);
     setError(null);
     setHasSearched(true);
 
     try {
-      // Step 1: find the patient by name or ID from the patients list
-      const patientsRes = await fetch("/api/admin/patients", { headers: authHeader() });
-      const patientsResult = await patientsRes.json();
+      const res = await fetchPatientHistoriesById(patientId, page, 10);
 
-      if (!patientsResult.success) {
-        setError(patientsResult.message);
+      if (!res.success) {
+        setError(res.message);
         setResult(null);
         return;
       }
 
-      const patients: Patient[] = patientsResult.data;
-      const lq = q.toLowerCase();
-      const matched = patients.find(
-        p =>
-          p.fullName.toLowerCase().includes(lq) ||
-          p.id.toLowerCase().includes(lq) ||
-          p.shortId.toLowerCase().includes(lq)
-      );
+      const histories = res.data.content;
 
-      if (!matched) {
-        setError(`No patient found matching "${q}".`);
-        setResult(null);
-        return;
-      }
-
-      // Step 2: fetch histories for that patient
-      const histRes = await fetch(
-        `/api/patient-history/patient/${matched.id}?page=${page}&size=10`,
-        { headers: authHeader() }
-      );
-      const histResult = await histRes.json();
-
-      if (!histResult.success) {
-        setError(histResult.message);
+      // Handle empty history case
+      if (histories.length === 0) {
+        setError("No history found for this patient.");
         setResult(null);
         return;
       }
 
       setResult({
-        patient: matched,
-        histories: histResult.data.content,
-        totalElements: histResult.data.totalElements,
-        totalPages: histResult.data.totalPages,
-        currentPage: histResult.data.number,
+        patient: {
+          id: patientId,
+          shortId: patientId.slice(-6),
+          fullName: histories[0]?.patientName || "Unknown Patient",
+          initials: histories[0]?.patientName
+            ?.split(" ")
+            .map(n => n[0])
+            .join("") || "NA",
+          email: "",
+          gender: "",
+          dateOfBirth: "",
+        },
+        histories,
+        totalElements: res.data.totalElements,
+        totalPages: res.data.totalPages,
+        currentPage: res.data.number,
       });
-    } catch {
-      setError("Search failed. Please try again.");
+
+    } catch (err) {
+      setError("Failed to fetch patient history");
       setResult(null);
     } finally {
       setSearching(false);
@@ -124,6 +120,14 @@ export default function DoctorPatientsPage() {
     search(page);
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10 flex flex-col gap-6">
@@ -132,7 +136,7 @@ export default function DoctorPatientsPage() {
         <div className="flex flex-col gap-2">
           <h2 className="text-xl font-bold text-[#0B1C30]">Patient History Search</h2>
           <p className="text-sm text-[#94A3B8]">
-            Enter a patient name or ID to view their full history records.
+            Enter a patient ID to view their full history records.
           </p>
           <div className="flex gap-3 mt-2">
             <div className="relative flex-1 max-w-lg">
@@ -146,7 +150,7 @@ export default function DoctorPatientsPage() {
               </svg>
               <input
                 type="search"
-                placeholder="Search by patient name or ID…"
+                placeholder="Search by patient ID…"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && search(0)}
@@ -193,7 +197,7 @@ export default function DoctorPatientsPage() {
             </div>
             <p className="text-base font-semibold text-[#0B1C30]">Search for a patient</p>
             <p className="text-sm text-[#94A3B8] text-center max-w-xs">
-              Enter a patient&apos;s full name or UUID to retrieve their complete history records.
+              Enter a patient ID to retrieve their complete history records.
             </p>
           </div>
         )}
@@ -209,10 +213,7 @@ export default function DoctorPatientsPage() {
               <div className="flex-1">
                 <p className="text-base font-bold text-[#0B1C30]">{result.patient.fullName}</p>
                 <p className="text-xs text-[#94A3B8]">
-                  {result.patient.shortId} · {result.patient.gender} ·{" "}
-                  {new Date(result.patient.dateOfBirth).toLocaleDateString("en-US", {
-                    month: "short", day: "numeric", year: "numeric",
-                  })}
+                  Patient ID: {result.patient.id.slice(0, 8)}...
                 </p>
               </div>
               <div className="text-right">
@@ -238,7 +239,7 @@ export default function DoctorPatientsPage() {
                       <div>
                         <p className="text-sm font-semibold text-[#0B1C30]">{h.doctorName}</p>
                         <p className="text-xs text-[#94A3B8] mt-0.5">
-                          {h.appointmentDate} · Appt {h.appointmentId.slice(-8).toUpperCase()}
+                          {formatDate(h.appointmentDate)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -258,21 +259,40 @@ export default function DoctorPatientsPage() {
 
                     {/* Row 3: amount + link */}
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-[#3D4946]">
-                        Amount:{" "}
-                        <span className="font-bold text-[#0B1C30]">
-                          ${typeof h.amount === "number" ? h.amount.toLocaleString() : h.amount}
-                        </span>
-                      </p>
-                      <Link
-                        href={`/doctor/record/${h.id}`}
-                        className="text-xs font-semibold text-[#0D9488] hover:underline flex items-center gap-1"
-                      >
-                        Open Record
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
+                      <div>
+                        <p className="text-sm text-[#3D4946]">
+                          Amount:{" "}
+                          <span className="font-bold text-[#0B1C30]">
+                            ${typeof h.amount === "number" ? h.amount.toLocaleString() : h.amount}
+                          </span>
+                        </p>
+                        {h.balance !== undefined && h.balance > 0 && (
+                          <p className="text-xs text-[#94A3B8] mt-0.5">
+                            Balance: ${typeof h.balance === "number" ? h.balance.toLocaleString() : h.balance}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Link
+                          href={`/doctor/record/${h.id}`}
+                          className="text-xs font-semibold text-[#0D9488] hover:underline flex items-center gap-1"
+                        >
+                          Open Record
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                        <button
+                          onClick={() => openHistoryModal(h)}
+                          className="text-xs font-semibold text-[#00685C] hover:underline flex items-center gap-1"
+                        >
+                          Quick View
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -320,6 +340,15 @@ export default function DoctorPatientsPage() {
         )}
 
       </main>
+
+      {/* Patient History Modal */}
+      <PatientHistoryModal
+        isOpen={isModalOpen}
+        onClose={closeHistoryModal}
+        history={selectedHistory}
+        doctorMode={true}
+        onObservationSaved={handleObservationSaved}
+      />
     </div>
   );
 }

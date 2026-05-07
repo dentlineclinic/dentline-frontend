@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import api from "@/lib/axios";
+import { fetchPaymentStats } from "@/services/patientHistoryService";
 
 type PatientHistory = {
   id: string;
@@ -13,24 +15,29 @@ type PatientHistory = {
   appointmentId: string;
   date: string;
   time: string;
-  amount: string;
+  amount: number;
+  balance: number;
   paymentStatus: string;
   status: string;
   observation: string;
   createdAt: string;
+  imageUrls: string[];
+  videoUrls: string[];
 };
 
-type SelectedHistory = PatientHistory & { balance?: string };
-
-type Appointment = {
-  id: string;
-  rawId: string;
-  patientName: string;
-  doctorName: string;
-  date: string;
-  time: string;
-  status: string;
+export type PaymentStats = {
+  totalRecords: number;
+  totalBilled: number;
+  totalRevenue: number;
+  totalOutstanding: number;
+  paidCount: number;
+  pendingCount: number;
+  unpaidCount: number;
+  completedCount: number;
+  completedRatePercent: number;
 };
+
+type SelectedHistory = PatientHistory;
 
 const PAYMENT_COLORS: Record<string, string> = {
   PAID:    "bg-[#DCFCE7] text-[#166534]",
@@ -44,6 +51,12 @@ const STATUS_COLORS: Record<string, string> = {
   PENDING:     "bg-[#FEF3C7] text-[#92400E]",
 };
 
+const formatCurrency = (n: number) =>
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+  }).format(n);
+
 export default function PatientHistoriesPage() {
   const [histories, setHistories] = useState<PatientHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +64,15 @@ export default function PatientHistoriesPage() {
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("All");
   const [selectedHistory, setSelectedHistory] = useState<SelectedHistory | null>(null);
+  
+  // ✅ Stats state
+  const [stats, setStats] = useState<PaymentStats | null>(null);
+  
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const size = 10;
 
   // Create panel state
   const [showCreatePanel, setShowCreatePanel] = useState(false);
@@ -60,39 +82,146 @@ export default function PatientHistoriesPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
 
-  const token = () => (typeof window !== "undefined" ? localStorage.getItem("token") ?? "" : "");
-  const authHeader = () => ({ Authorization: `Bearer ${token()}`, "Content-Type": "application/json" });
+  const calculateBalance = (amount: number, paymentStatus: string): number => {
+    return paymentStatus === "PAID" ? 0 : amount;
+  };
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch("/api/admin/patient-histories", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
-        });
-        const result = await res.json();
-        if (result.success) {
-          const historiesWithBalance = result.data.map((h: PatientHistory) => ({
-            ...h,
-            balance: calculateBalance(h.amount, h.paymentStatus)
-          }));
-          setHistories(historiesWithBalance);
-        } else {
-          setError(result.message);
-        }
-      } catch {
-        setError("Failed to load patient histories.");
-      } finally {
-        setLoading(false);
-      }
+  // Safe date parsing
+  const formatDateSafe = (dateString: string | null | undefined) => {
+    if (!dateString) return { date: "—", time: "—" };
+    const dt = new Date(dateString);
+    if (isNaN(dt.getTime())) return { date: "—", time: "—" };
+    return {
+      date: dt.toLocaleDateString(),
+      time: dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
-    load();
+  };
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "NA";
+    return name
+      .split(" ")
+      .map((n: string) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  };
+
+  // ✅ Load stats from backend - using imported service (NO duplicate /api)
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetchPaymentStats();
+      
+      // Debug log to check response structure
+      console.log("STATS RESPONSE:", res);
+      
+      if (res.success) {
+        setStats(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to load payment stats:", err);
+    }
   }, []);
 
-  const calculateBalance = (amount: string, paymentStatus: string) => {
-    if (paymentStatus === "PAID") return "$0";
-    if (paymentStatus === "UNPAID") return amount;
-    return amount;
+  const loadHistories = useCallback(async (pageNum: number, pageSize: number, searchTerm: string, paymentStatus: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const params: any = { page: pageNum, size: pageSize };
+      
+      if (paymentStatus !== "All") {
+        params.paymentStatus = paymentStatus;
+      }
+      
+      const res = await api.get("/patient-history/all", { params });
+
+      if (res.data.success) {
+        const mapped = res.data.data.content.map((h: any) => {
+          const { date, time } = formatDateSafe(h.appointmentDate);
+          
+          return {
+            id: h.id,
+            shortId: `HIS-${h.id.slice(0, 6).toUpperCase()}`,
+            patientId: h.patientId,
+            patientName: h.patientName || "Unknown Patient",
+            initials: getInitials(h.patientName),
+            doctorId: h.doctorId,
+            doctorName: h.doctorName || "Unknown Doctor",
+            appointmentId: h.appointmentId,
+            date,
+            time,
+            amount: parseFloat(h.amount) || 0,
+            balance: parseFloat(h.balance) || 0,
+            paymentStatus: h.paymentStatus || "PENDING",
+            status: h.status || "PENDING",
+            observation: h.observation || "No observation notes",
+            createdAt: h.createdAt ? new Date(h.createdAt).toLocaleString() : "—",
+            imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
+            videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
+          };
+        });
+
+        setHistories(mapped);
+        setTotalPages(res.data.data.totalPages);
+        setTotalElements(res.data.data.totalElements);
+      } else {
+        setError(res.data.message || "Failed to load patient histories.");
+      }
+    } catch (err: any) {
+      console.error("Error loading histories:", err);
+      setError(err.response?.data?.message || "Failed to load patient histories.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ✅ Call loadStats on mount only
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  // Client-side filtering for search
+  const visible = histories.filter(h =>
+    h.patientName.toLowerCase().includes(search.toLowerCase()) ||
+    h.doctorName.toLowerCase().includes(search.toLowerCase()) ||
+    h.shortId.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Current page completion rate (for UI feedback only, not for totals)
+  const currentPageCompletedCount = histories.filter(h => h.status === "COMPLETED").length;
+  const currentPageCompletionRate = histories.length
+    ? Math.round((currentPageCompletedCount / histories.length) * 100)
+    : 0;
+
+  const handlePaymentFilterChange = (value: string) => {
+    setPaymentFilter(value);
+    setPage(0);
   };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setPage(0);
+  };
+
+  // Debounced API calls
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    debounceTimerRef.current = setTimeout(() => {
+      loadHistories(page, size, search, paymentFilter);
+    }, 400);
+    
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [page, search, paymentFilter, loadHistories]);
 
   const openCreatePanel = () => {
     setCreateApptId("");
@@ -103,112 +232,116 @@ export default function PatientHistoriesPage() {
   };
 
   const createHistory = async () => {
-    if (!createApptId.trim()) return setCreateError("Please enter an appointment ID.");
+    if (!createApptId.trim()) {
+      setCreateError("Please enter an appointment ID.");
+      return;
+    }
+    
     const amount = parseFloat(createAmount);
-    if (!createAmount || isNaN(amount) || amount <= 0) return setCreateError("Amount must be a positive number.");
+    if (!createAmount || isNaN(amount) || amount <= 0) {
+      setCreateError("Amount must be a positive number.");
+      return;
+    }
+    
     setCreating(true);
     setCreateError(null);
     setCreateSuccess(null);
+    
     try {
-      const res = await fetch("/api/patient-history", {
-        method: "POST",
-        headers: authHeader(),
-        body: JSON.stringify({ appointmentId: createApptId, amount }),
+      const res = await api.post("/patient-history", {
+        appointmentId: createApptId,
+        amount,
       });
-      const result = await res.json();
-      if (result.success) {
-        setCreateSuccess(result.message);
-        setTimeout(() => {
+      
+      if (res.data.success) {
+        setCreateSuccess(res.data.message || "Patient history created successfully!");
+        
+        setTimeout(async () => {
+          await Promise.all([
+            loadHistories(page, size, search, paymentFilter),
+            loadStats(), // ✅ Refresh stats after creating
+          ]);
           setShowCreatePanel(false);
           setCreateApptId("");
           setCreateAmount("");
         }, 1500);
-        // Refresh the list
-        const listRes = await fetch("/api/admin/patient-histories", { headers: authHeader() });
-        const listResult = await listRes.json();
-        if (listResult.success) {
-          setHistories(listResult.data.map((h: PatientHistory) => ({
-            ...h,
-            balance: calculateBalance(h.amount, h.paymentStatus),
-          })));
-        }
       } else {
-        setCreateError(result.message);
+        setCreateError(res.data.message || "Failed to create patient history.");
       }
-    } catch {
-      setCreateError("Failed to create patient history.");
+    } catch (err: any) {
+      setCreateError(err.response?.data?.message || "Failed to create patient history.");
     } finally {
       setCreating(false);
     }
   };
 
-  const visible = histories.filter(h => {
-    const matchesSearch =
-      h.patientName.toLowerCase().includes(search.toLowerCase()) ||
-      h.doctorName.toLowerCase().includes(search.toLowerCase()) ||
-      h.shortId.toLowerCase().includes(search.toLowerCase());
-    const matchesPayment = paymentFilter === "All" || h.paymentStatus === paymentFilter;
-    return matchesSearch && matchesPayment;
-  });
-
-  // Summary stats
-  const totalAmount = histories.reduce((sum, h) => {
-    const num = parseFloat(h.amount.replace(/[$,]/g, ""));
-    return sum + (isNaN(num) ? 0 : num);
-  }, 0);
-  const paidCount = histories.filter(h => h.paymentStatus === "PAID").length;
-  const unpaidCount = histories.filter(h => h.paymentStatus !== "PAID").length;
-
   const openDetails = (history: PatientHistory) => {
-    const balance = calculateBalance(history.amount, history.paymentStatus);
-    setSelectedHistory({ ...history, balance });
+    setSelectedHistory({ ...history });
   };
 
   const closeDetails = () => {
     setSelectedHistory(null);
   };
 
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10 flex flex-col gap-6">
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-6">
-          {loading ? (
-            [...Array(3)].map((_, i) => (
+        {/* ✅ Summary Cards - Using backend stats */}
+        {stats ? (
+          <div className="grid grid-cols-3 gap-6">
+            <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
+              <p className="text-sm text-[#3D4946]">Total Records</p>
+              <p className="text-3xl font-bold text-[#0B1C30] mt-1">
+                {stats.totalRecords}
+              </p>
+              <p className="text-xs text-[#0D9488] mt-1">Patient history entries</p>
+            </div>
+
+            <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
+              <p className="text-sm text-[#3D4946]">Total Revenue</p>
+              <p className="text-3xl font-bold text-[#0B1C30] mt-1">
+                {formatCurrency(stats.totalRevenue)}
+              </p>
+              <p className="text-xs text-[#0D9488] mt-1">
+                Outstanding: {formatCurrency(stats.totalOutstanding)}
+              </p>
+            </div>
+
+            <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
+              <p className="text-sm text-[#3D4946]">Payment Breakdown</p>
+              <p className="text-xs text-[#3D4946] mt-2">
+                Paid: {stats.paidCount} · Pending: {stats.pendingCount} · Unpaid: {stats.unpaidCount}
+              </p>
+              <p className="text-xs text-[#0D9488] mt-1">
+                Completion Rate: {stats.completedRatePercent}%
+              </p>
+            </div>
+          </div>
+        ) : (
+          // Loading skeleton for stats
+          <div className="grid grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
                 <div className="h-3 bg-[#F1F5F9] rounded animate-pulse w-1/2 mb-3" />
-                <div className="h-8 bg-[#F1F5F9] rounded animate-pulse w-3/4" />
+                <div className="h-8 bg-[#F1F5F9] rounded animate-pulse w-3/4 mb-2" />
+                <div className="h-3 bg-[#F1F5F9] rounded animate-pulse w-1/3" />
               </div>
-            ))
-          ) : (
-            <>
-              <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-                <p className="text-sm text-[#3D4946]">Total Records</p>
-                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{histories.length}</p>
-                <p className="text-xs text-[#0D9488] mt-1">Patient history entries</p>
-              </div>
-              <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-                <p className="text-sm text-[#3D4946]">Total Billed</p>
-                <p className="text-3xl font-bold text-[#0B1C30] mt-1">
-                  ${totalAmount.toLocaleString()}
-                </p>
-                <p className="text-xs text-[#0D9488] mt-1">
-                  {paidCount} paid · {unpaidCount} outstanding
-                </p>
-              </div>
-              <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-                <p className="text-sm text-[#3D4946]">Completion Rate</p>
-                <p className="text-3xl font-bold text-[#0B1C30] mt-1">
-                  {histories.length
-                    ? `${Math.round((histories.filter(h => h.status === "COMPLETED").length / histories.length) * 100)}%`
-                    : "—"}
-                </p>
-                <p className="text-xs text-[#0D9488] mt-1">Treatments completed</p>
-              </div>
-            </>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
+
+        {/* Current Page Info (optional - shows only current page data) */}
+        {!loading && histories.length > 0 && (
+          <div className="text-xs text-[#94A3B8] bg-[#F8FAFC] rounded-lg px-4 py-2">
+            Current page: {histories.length} records · 
+            {currentPageCompletedCount} completed ({currentPageCompletionRate}% completion rate)
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -216,7 +349,7 @@ export default function PatientHistoriesPage() {
             {["All", "PAID", "PENDING", "UNPAID"].map(f => (
               <button
                 key={f}
-                onClick={() => setPaymentFilter(f)}
+                onClick={() => handlePaymentFilterChange(f)}
                 className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
                   paymentFilter === f
                     ? "bg-[#00685C] text-white"
@@ -232,7 +365,7 @@ export default function PatientHistoriesPage() {
               type="search"
               placeholder="Search by patient, doctor or ID…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={handleSearchChange}
               className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-72"
             />
             <button
@@ -258,78 +391,107 @@ export default function PatientHistoriesPage() {
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
-            <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
-              <tr>
-                {["ID", "PATIENT", "DOCTOR", "APPOINTMENT DATE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
-                  <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                [...Array(5)].map((_, i) => (
-                  <tr key={i} className="border-t border-[#F8FAFC]">
-                    {[...Array(7)].map((__, j) => (
-                      <td key={j} className="px-6 py-4">
-                        <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
-                       </td>
-                    ))}
-                  </tr>
-                ))
-              ) : visible.length === 0 ? (
+              <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
-                    No patient history records found.
-                  </td>
+                  {["ID", "PATIENT", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
+                    <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ) : (
-                visible.map((h) => (
-                  <tr key={h.id} className="hover:bg-[#F8FAFC] transition-colors border-t border-[#F8FAFC]">
-                    <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{h.shortId}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
-                          {h.initials}
-                        </div>
-                        <span className="text-sm font-semibold text-[#0B1C30]">{h.patientName}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-[#3D4946]">{h.doctorName}</td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-[#0B1C30]">{h.date}</p>
-                      <p className="text-xs text-[#3D4946]">{h.time}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                        {h.paymentStatus}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[h.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                        {h.status.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => openDetails(h)}
-                        className="text-xs text-[#0D9488] hover:underline font-semibold"
-                      >
-                        View Details
-                      </button>
+              </thead>
+              <tbody>
+                {loading ? (
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i} className="border-t border-[#F8FAFC]">
+                      {[...Array(8)].map((__, j) => (
+                        <td key={j} className="px-6 py-4">
+                          <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : visible.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                      No patient history records found.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  visible.map((h) => (
+                    <tr key={h.id} className="hover:bg-[#F8FAFC] transition-colors border-t border-[#F8FAFC]">
+                      <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{h.shortId}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
+                            {h.initials}
+                          </div>
+                          <span className="text-sm font-semibold text-[#0B1C30]">{h.patientName}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[#3D4946]">{h.doctorName}</td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-[#0B1C30]">{h.date}</p>
+                        <p className="text-xs text-[#3D4946]">{h.time}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-semibold text-[#0B1C30]">
+                        {formatCurrency(h.amount)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                          {h.paymentStatus}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[h.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                          {h.status.replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => openDetails(h)}
+                          className="text-xs text-[#0D9488] hover:underline font-semibold"
+                        >
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
+        {/* Pagination Controls */}
+        {!loading && totalPages > 0 && (
+          <div className="flex items-center justify-between mt-6">
+            <button
+              disabled={page === 0}
+              onClick={() => handlePageChange(page - 1)}
+              className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#3D4946] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+
+            <span className="text-sm text-[#3D4946]">
+              Page {page + 1} of {totalPages}
+            </span>
+
+            <button
+              disabled={page >= totalPages - 1}
+              onClick={() => handlePageChange(page + 1)}
+              className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#3D4946] hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        )}
+
+        {/* Record count */}
         {!loading && (
           <p className="text-sm text-[#3D4946]">
-            Showing {visible.length} of {histories.length} records
+            Showing {visible.length} of {totalElements} records
           </p>
         )}
       </main>
@@ -361,7 +523,9 @@ export default function PatientHistoriesPage() {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest">Appointment ID</p>
-                  <p className="text-sm font-semibold text-[#0D9488] mt-1">{selectedHistory.appointmentId.slice(-8).toUpperCase()}</p>
+                  <p className="text-sm font-semibold text-[#0D9488] mt-1">
+                    {selectedHistory.appointmentId?.slice(-8)?.toUpperCase() || "N/A"}
+                  </p>
                 </div>
               </div>
 
@@ -420,11 +584,13 @@ export default function PatientHistoriesPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <p className="text-xs text-[#94A3B8]">Amount</p>
-                    <p className="text-sm font-bold text-[#0B1C30]">{selectedHistory.amount}</p>
+                    <p className="text-sm font-bold text-[#0B1C30]">{formatCurrency(selectedHistory.amount)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Balance</p>
-                    <p className="text-sm font-bold text-[#0D9488]">{selectedHistory.balance}</p>
+                    <p className={`text-sm font-bold ${selectedHistory.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
+                      {formatCurrency(selectedHistory.balance)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Payment Status</p>
@@ -433,6 +599,14 @@ export default function PatientHistoriesPage() {
                     </span>
                   </div>
                 </div>
+                {selectedHistory.paymentStatus !== "PAID" && (
+                  <p className="text-xs text-[#94A3B8] mt-3 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    To record or manage payments, go to the <strong className="text-[#0D9488]">Payments</strong> page.
+                  </p>
+                )}
               </div>
 
               {/* Clinical Observation */}
@@ -442,6 +616,50 @@ export default function PatientHistoriesPage() {
                   {selectedHistory.observation || "No observation notes available"}
                 </p>
               </div>
+
+              {/* Media — Images */}
+              {selectedHistory.imageUrls.length > 0 && (
+                <div className="bg-[#F8FAFC] rounded-lg p-4">
+                  <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
+                    Clinical Images ({selectedHistory.imageUrls.length})
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {selectedHistory.imageUrls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        className="block aspect-square rounded-lg overflow-hidden border border-[#E2E8F0] hover:opacity-90 transition-opacity bg-[#E2E8F0]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Media — Videos */}
+              {selectedHistory.videoUrls.length > 0 && (
+                <div className="bg-[#F8FAFC] rounded-lg p-4">
+                  <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
+                    Clinical Videos ({selectedHistory.videoUrls.length})
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {selectedHistory.videoUrls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-lg px-4 py-3 hover:border-[#00685C] transition-colors">
+                        <div className="w-8 h-8 bg-[#F0FDFA] rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm text-[#0B1C30] font-medium truncate flex-1">Video {i + 1}</span>
+                        <svg className="w-4 h-4 text-[#94A3B8] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -519,7 +737,7 @@ export default function PatientHistoriesPage() {
               {/* Amount Input */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Amount ($) <span className="text-[#93000A]">*</span>
+                  Amount <span className="text-[#93000A]">*</span>
                 </label>
                 <input
                   type="number"

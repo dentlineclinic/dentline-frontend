@@ -8,7 +8,10 @@ export const loginUser = async (payload: {
   const response = await api.post("/auth/login", payload);
   return response;
 };
-
+export interface BasicResponse {
+  success: boolean;
+  message: string;
+}
 export const requestRegistrationOtp = async (payload: { email: string }) => {
   const response = await api.post("/auth/register/request-otp", payload);
   return response;
@@ -49,4 +52,38 @@ export const verifyAdminOtp = async (payload: {
 }) => {
   const response = await api.post("/auth/otp/verify", payload);
   return response;
+};
+
+export const getDoctorId = () => {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload?.id || payload?.userId || null;
+  } catch {
+    return null;
+  }
+};
+
+export const changePassword = async (
+  payload: {
+    currentPassword: string;
+    newPassword: string;
+  }
+): Promise<BasicResponse> => {
+  const res = await api.post("/auth/change-password", payload);
+  return res.data;
+};
+
+
+export const logoutUser = async (): Promise<BasicResponse> => {
+  const response = await api.post("/auth/logout");
+
+  
+  localStorage.removeItem("token");
+  localStorage.removeItem("role");
+  localStorage.removeItem("user");
+
+  return response.data;
 };

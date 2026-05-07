@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
+import { fetchMyPatientHistories } from "@/services/patientHistoryService";
+import { submitReview as submitReviewApi } from "@/services/reviewService";
 
 type PatientHistory = {
   id: string;
@@ -11,11 +13,13 @@ type PatientHistory = {
   doctorName: string;
   appointmentId: string;
   appointmentDate: string;
-  amount: string;
+  amount: number;
   paymentStatus: string;
   status: string;
   observation: string;
   createdAt: string;
+  imageUrls: string[];
+  videoUrls: string[];
 };
 
 const statusColors: Record<string, string> = {
@@ -30,150 +34,6 @@ const paymentColors: Record<string, string> = {
   UNPAID: "bg-[#FFDAD6] text-[#93000A]",
 };
 
-// Demo data for testing
-const DEMO_HISTORIES: PatientHistory[] = [
-  {
-    id: "1",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC001",
-    doctorName: "Dr. Sarah Johnson",
-    appointmentId: "APT2024001",
-    appointmentDate: "2024-03-15",
-    amount: "250.00",
-    paymentStatus: "PAID",
-    status: "COMPLETED",
-    observation: "Regular checkup completed. Patient is in good health. Blood pressure: 120/80, Heart rate: 72. No abnormalities detected. Recommended annual follow-up.",
-    createdAt: "2024-03-15"
-  },
-  {
-    id: "2",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC002",
-    doctorName: "Dr. Michael Chen",
-    appointmentId: "APT2024012",
-    appointmentDate: "2024-02-10",
-    amount: "450.00",
-    paymentStatus: "PAID",
-    status: "COMPLETED",
-    observation: "Dental cleaning and cavities filling for teeth #14 and #15. Local anesthesia administered. Patient tolerated procedure well. Recommended 6-month follow-up for regular cleaning.",
-    createdAt: "2024-02-10"
-  },
-  {
-    id: "3",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC003",
-    doctorName: "Dr. Emily Rodriguez",
-    appointmentId: "APT2024025",
-    appointmentDate: "2024-03-20",
-    amount: "180.00",
-    paymentStatus: "PENDING",
-    status: "PENDING",
-    observation: "Initial eye examination scheduled. Patient complains of headaches when reading and blurred distance vision. Preliminary tests conducted. Full results pending.",
-    createdAt: "2024-03-20"
-  },
-  {
-    id: "4",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC001",
-    doctorName: "Dr. Sarah Johnson",
-    appointmentId: "APT2024038",
-    appointmentDate: "2024-04-05",
-    amount: "350.00",
-    paymentStatus: "UNPAID",
-    status: "IN_PROGRESS",
-    observation: "Comprehensive blood work and physical examination. Tests ordered: CBC, Lipid Panel, Thyroid Function, Vitamin D. Results expected in 3-5 business days. Follow-up scheduled for results review.",
-    createdAt: "2024-04-05"
-  },
-  {
-    id: "5",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC004",
-    doctorName: "Dr. James Wilson",
-    appointmentId: "APT2024041",
-    appointmentDate: "2024-04-12",
-    amount: "125.00",
-    paymentStatus: "PAID",
-    status: "COMPLETED",
-    observation: "Annual flu vaccination and COVID-19 booster administered. Patient tolerated both injections well. No adverse reactions reported during 15-minute observation period.",
-    createdAt: "2024-04-12"
-  },
-  {
-    id: "6",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC002",
-    doctorName: "Dr. Michael Chen",
-    appointmentId: "APT2024055",
-    appointmentDate: "2024-04-18",
-    amount: "520.00",
-    paymentStatus: "UNPAID",
-    status: "PENDING",
-    observation: "Consultation for wisdom teeth extraction. Panoramic X-rays taken. All four wisdom teeth impacted. Treatment plan discussed. Patient scheduled for extraction procedure next month.",
-    createdAt: "2024-04-18"
-  },
-  {
-    id: "7",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC005",
-    doctorName: "Dr. Lisa Patel",
-    appointmentId: "APT2024062",
-    appointmentDate: "2024-05-01",
-    amount: "295.00",
-    paymentStatus: "PENDING",
-    status: "IN_PROGRESS",
-    observation: "Dermatology consultation for persistent skin rash on forearms. Prescribed topical corticosteroid cream. Biopsy sample taken for laboratory analysis. Follow-up in 2 weeks.",
-    createdAt: "2024-05-01"
-  },
-  {
-    id: "8",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC006",
-    doctorName: "Dr. Robert Taylor",
-    appointmentId: "APT2024078",
-    appointmentDate: "2024-05-15",
-    amount: "680.00",
-    paymentStatus: "UNPAID",
-    status: "PENDING",
-    observation: "MRI scan scheduled for knee injury sustained during sports. Pre-authorization required from insurance. Patient advised to arrive 30 minutes early for screening.",
-    createdAt: "2024-05-15"
-  },
-  {
-    id: "9",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC007",
-    doctorName: "Dr. Amanda Foster",
-    appointmentId: "APT2024085",
-    appointmentDate: "2024-05-20",
-    amount: "175.00",
-    paymentStatus: "PAID",
-    status: "COMPLETED",
-    observation: "Physical therapy session for lower back pain. Assessment completed, range of motion limited. Provided exercises for core strengthening. Patient instructed to continue home exercises.",
-    createdAt: "2024-05-20"
-  },
-  {
-    id: "10",
-    patientId: "PAT001",
-    patientName: "John Smith",
-    doctorId: "DOC008",
-    doctorName: "Dr. William Martinez",
-    appointmentId: "APT2024092",
-    appointmentDate: "2024-05-25",
-    amount: "890.00",
-    paymentStatus: "UNPAID",
-    status: "IN_PROGRESS",
-    observation: "Cardiology consultation for chest pain evaluation. ECG performed, stress test scheduled. Patient advised to avoid strenuous activity until test results are reviewed.",
-    createdAt: "2024-05-25"
-  }
-];
-
 export default function MedicalHistoryPage() {
   const [histories, setHistories] = useState<PatientHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -184,54 +44,33 @@ export default function MedicalHistoryPage() {
   
   // Review form state
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewHistoryId, setReviewHistoryId] = useState<string | null>(null);
+  const [reviewAppointmentId, setReviewAppointmentId] = useState<string | null>(null); // ✅ Fixed: renamed to appointmentId
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [useDemoData, setUseDemoData] = useState(true);
 
   useEffect(() => {
     const loadHistories = async () => {
       setLoading(true);
-      
-      // Use demo data if enabled
-      if (useDemoData) {
-        setTimeout(() => {
-          setHistories(DEMO_HISTORIES);
-          setUserName("John Smith");
-          setLoading(false);
-          setError(null);
-        }, 800);
-        return;
-      }
+      setError(null);
 
       try {
-        // Get patient ID from localStorage
-        const userId = localStorage.getItem("userId");
         const name = localStorage.getItem("userName") || "Patient";
         setUserName(name);
 
-        if (!userId) {
-          setError("Please log in to view your medical history");
-          setLoading(false);
-          return;
-        }
-
-        // Fetch patient histories
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/patient-history/patient/${userId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const result = await res.json();
+        const result = await fetchMyPatientHistories(0, 10);
 
         if (result.success) {
-          setHistories(result.data.content || []);
+          setHistories(
+            (result.data.content || []).map((h: any) => ({
+              ...h,
+              imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
+              videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
+            }))
+          );
         } else {
           setError(result.message || "Failed to load medical history");
         }
@@ -244,15 +83,16 @@ export default function MedicalHistoryPage() {
     };
 
     loadHistories();
-  }, [useDemoData]);
+  }, []);
 
   const filteredHistories = histories.filter((h) => {
     if (statusFilter === "All") return true;
     return h.status === statusFilter;
   });
 
-  const openReviewForm = (historyId: string) => {
-    setReviewHistoryId(historyId);
+  // ✅ Fixed: now accepts appointmentId instead of historyId
+  const openReviewForm = (appointmentId: string) => {
+    setReviewAppointmentId(appointmentId);
     setShowReviewForm(true);
     setRating(0);
     setReviewText("");
@@ -262,20 +102,27 @@ export default function MedicalHistoryPage() {
 
   const closeReviewForm = () => {
     setShowReviewForm(false);
-    setReviewHistoryId(null);
+    setReviewAppointmentId(null);
     setRating(0);
     setReviewText("");
     setReviewSuccess(null);
     setReviewError(null);
   };
 
+  // ✅ Fixed: using real API call instead of mock
   const submitReview = async () => {
     if (rating === 0) {
       setReviewError("Please select a rating");
       return;
     }
+
     if (!reviewText.trim()) {
       setReviewError("Please write a review");
+      return;
+    }
+
+    if (!reviewAppointmentId) {
+      setReviewError("Invalid appointment");
       return;
     }
 
@@ -283,58 +130,46 @@ export default function MedicalHistoryPage() {
     setReviewError(null);
 
     try {
-      // Simulate API call - replace with actual API endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setReviewSuccess("Review submitted successfully!");
-      setTimeout(() => {
-        closeReviewForm();
-      }, 2000);
-    } catch (err) {
-      setReviewError("Failed to submit review. Please try again.");
+      const result = await submitReviewApi({
+        appointmentId: reviewAppointmentId, // ✅ correct mapping
+        rating,
+        comment: reviewText,
+      });
+
+      if (result.success) {
+        setReviewSuccess(result.message || "Review submitted successfully!");
+
+        setTimeout(() => {
+          closeReviewForm();
+        }, 2000);
+      } else {
+        setReviewError(result.message || "Failed to submit review");
+      }
+    } catch (err: any) {
+      // Handle backend error message if available
+      const message =
+        err?.response?.data?.message ||
+        "Failed to submit review. Please try again.";
+
+      setReviewError(message);
     } finally {
       setSubmittingReview(false);
     }
   };
 
-  const totalAmount = histories.reduce((sum, h) => {
-    const amount = parseFloat(h.amount);
-    return sum + (isNaN(amount) ? 0 : amount);
-  }, 0);
-
+  const totalAmount = histories.reduce((sum, h) => sum + h.amount, 0);
   const paidAmount = histories
     .filter(h => h.paymentStatus === "PAID")
-    .reduce((sum, h) => {
-      const amount = parseFloat(h.amount);
-      return sum + (isNaN(amount) ? 0 : amount);
-    }, 0);
+    .reduce((sum, h) => sum + h.amount, 0);
 
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar
         title="Medical History"
         subtitle="Your complete treatment records"
-        userName={userName}
-        userRole="Patient"
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-4 sm:gap-6">
-        {/* Demo Data Toggle Button */}
-        {!loading && (
-          <div className="flex justify-end">
-            <button
-              onClick={() => setUseDemoData(!useDemoData)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                useDemoData
-                  ? "bg-[#00685C] text-white"
-                  : "bg-white border border-[#F1F5F9] text-[#3D4946] hover:bg-[#F8FAFC]"
-              }`}
-            >
-              {useDemoData ? "Using Demo Data ✓" : "Switch to Demo Data"}
-            </button>
-          </div>
-        )}
-
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
@@ -514,7 +349,7 @@ export default function MedicalHistoryPage() {
                             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                           />
                         </svg>
-                        {history.appointmentDate}
+                        {new Date(history.appointmentDate).toLocaleDateString()}
                       </span>
                       <span className="flex items-center gap-1 font-semibold text-[#0D9488]">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -525,7 +360,7 @@ export default function MedicalHistoryPage() {
                             d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
-                        ${history.amount}
+                        ${history.amount.toLocaleString()}
                       </span>
                       <span
                         className={`text-xs font-bold px-2 py-1 rounded-full ${
@@ -618,12 +453,14 @@ export default function MedicalHistoryPage() {
                   <div>
                     <p className="text-xs text-[#94A3B8]">Treatment Date</p>
                     <p className="text-sm font-medium text-[#0B1C30]">
-                      {selectedHistory.appointmentDate}
+                      {new Date(selectedHistory.appointmentDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Record Created</p>
-                    <p className="text-sm font-medium text-[#0B1C30]">{selectedHistory.createdAt}</p>
+                    <p className="text-sm font-medium text-[#0B1C30]">
+                      {new Date(selectedHistory.createdAt).toLocaleDateString()}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Status</p>
@@ -664,7 +501,7 @@ export default function MedicalHistoryPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-[#94A3B8]">Amount</p>
-                    <p className="text-lg font-bold text-[#0B1C30]">${selectedHistory.amount}</p>
+                    <p className="text-lg font-bold text-[#0B1C30]">${selectedHistory.amount.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Payment Status</p>
@@ -691,6 +528,50 @@ export default function MedicalHistoryPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Clinical Images */}
+              {selectedHistory.imageUrls?.length > 0 && (
+                <div className="bg-[#F8FAFC] rounded-lg p-4">
+                  <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
+                    Clinical Images ({selectedHistory.imageUrls.length})
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {selectedHistory.imageUrls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        className="block aspect-square rounded-xl overflow-hidden border border-[#E2E8F0] hover:opacity-90 transition-opacity bg-[#E2E8F0]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Clinical image ${i + 1}`} className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Clinical Videos */}
+              {selectedHistory.videoUrls?.length > 0 && (
+                <div className="bg-[#F8FAFC] rounded-lg p-4">
+                  <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
+                    Clinical Videos ({selectedHistory.videoUrls.length})
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {selectedHistory.videoUrls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-lg px-4 py-3 hover:border-[#00685C] transition-colors">
+                        <div className="w-8 h-8 bg-[#F0FDFA] rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm text-[#0B1C30] font-medium flex-1">Video {i + 1}</span>
+                        <svg className="w-4 h-4 text-[#94A3B8] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -701,18 +582,21 @@ export default function MedicalHistoryPage() {
               >
                 Close
               </button>
-              <button
-                onClick={() => {
-                  setSelectedHistory(null);
-                  openReviewForm(selectedHistory.id);
-                }}
-                className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#008375] transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                </svg>
-                Drop Review
-              </button>
+              {/* ✅ Only show Drop Review button for COMPLETED appointments */}
+              {selectedHistory.status === "COMPLETED" && (
+                <button
+                  onClick={() => {
+                    setSelectedHistory(null);
+                    openReviewForm(selectedHistory.appointmentId); // ✅ Fixed: passing appointmentId
+                  }}
+                  className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#008375] transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                  Drop Review
+                </button>
+              )}
             </div>
           </div>
         </div>
