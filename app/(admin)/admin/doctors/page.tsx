@@ -136,7 +136,7 @@ export default function DoctorsPage() {
   }, [page, size, search, statusFilter]);
 
   // Cleaner debounce with explicit dependencies
-  const debounceTimerRef = useRef<NodeJS.Timeout>();
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   
   useEffect(() => {
     // Clear previous timer
