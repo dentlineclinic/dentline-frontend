@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { fetchDoctors } from "@/services/doctorService";
 import Link from "next/link";
@@ -31,6 +31,14 @@ type DisplayDoctor = {
 };
 
 export default function DoctorsPage() {
+  return (
+    <Suspense fallback={null}>
+      <DoctorsPageInner />
+    </Suspense>
+  );
+}
+
+function DoctorsPageInner() {
   const searchParams = useSearchParams();
   const [showSuccess, setShowSuccess] = useState(false);
   
