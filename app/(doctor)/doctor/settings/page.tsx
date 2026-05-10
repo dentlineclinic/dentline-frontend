@@ -15,16 +15,16 @@ export default function DoctorSettingsPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
   const [doctorName, setDoctorName] = useState("");
+  const [doctorId, setDoctorId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const doctorId = getDoctorId();
-
   useEffect(() => {
     setDoctorName(localStorage.getItem("userName") ?? "");
     setProfilePhotoUrl(localStorage.getItem("profilePhotoUrl") ?? "");
+    setDoctorId(getDoctorId());
   }, []);
 
   const initials = doctorName

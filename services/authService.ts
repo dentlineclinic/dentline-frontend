@@ -55,6 +55,7 @@ export const verifyAdminOtp = async (payload: {
 };
 
 export const getDoctorId = () => {
+  if (typeof window === "undefined") return null;
   const token = localStorage.getItem("token");
   if (!token) return null;
 
