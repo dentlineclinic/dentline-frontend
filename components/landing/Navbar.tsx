@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 
 const navLinks = [
@@ -20,8 +21,15 @@ export default function Navbar({ activePage = "Home" }: { activePage?: string })
     >
       <div className="max-w-[1280px] mx-auto px-10 py-4 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="text-[#0D9488] font-bold text-2xl tracking-tight">
-          Dentline Clinic
+        <Link href="/" className="flex items-center">
+          <Image
+            src="https://res.cloudinary.com/da00pceww/image/upload/v1778415626/DENTLINE_logo_new-transparent-01_dms7y1.png"
+            alt="Dentline Clinic"
+            width={180}
+            height={60}
+            className="h-10 w-auto object-contain"
+            priority
+          />
         </Link>
 
         {/* Desktop Nav */}
