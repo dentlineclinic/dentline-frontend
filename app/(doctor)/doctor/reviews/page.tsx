@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import TopBar from "@/components/layout/TopBar";
 import { getAdminReviews } from "@/services/reviewService";
 
+export const dynamic = "force-dynamic";
+
 type Review = {
   id: string;
   patientName: string;

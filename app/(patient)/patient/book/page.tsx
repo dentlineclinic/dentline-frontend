@@ -4,6 +4,8 @@ import { useState } from "react";
 import TopBar from "@/components/layout/TopBar";
 import { bookAppointment } from "@/services/patientService";
 
+export const dynamic = "force-dynamic";
+
 export default function BookAppointmentPage() {
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createDoctor } from "@/services/doctorService";
 
+export const dynamic = "force-dynamic";
+
 export default function CreateDoctorPage() {
   const router = useRouter();
   

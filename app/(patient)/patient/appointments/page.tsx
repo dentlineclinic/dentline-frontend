@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
 import { fetchMyAppointments, Appointment } from "@/services/patientService";
 
+export const dynamic = "force-dynamic";
+
 const statusColors: Record<string, string> = {
   BOOKED: "bg-[#E5EEFF] text-[#435B7E]",
   ASSIGNED: "bg-[#E5EEFF] text-[#435B7E]",

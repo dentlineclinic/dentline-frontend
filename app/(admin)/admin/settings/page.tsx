@@ -12,6 +12,8 @@ import {
 } from "@/services/adminService";
 import { unlockPatient } from "@/services/patientService";
 
+export const dynamic = "force-dynamic";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Doctor = {

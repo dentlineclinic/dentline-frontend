@@ -7,6 +7,8 @@ import {
   markPaymentUnpaid,
 } from "@/services/patientHistoryService";
 
+export const dynamic = "force-dynamic";
+
 type HistoryRow = {
   id: string;
   shortId: string;

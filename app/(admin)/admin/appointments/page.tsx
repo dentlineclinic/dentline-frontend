@@ -5,6 +5,8 @@ import { useAppointments } from "@/hooks/useAppointments";
 import { fetchDoctors } from "@/services/doctorService";
 import api from "@/lib/axios"
 
+export const dynamic = "force-dynamic";
+
 type Appointment = {
   id: string;
   rawId: string;

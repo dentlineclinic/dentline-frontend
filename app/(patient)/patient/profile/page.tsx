@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
 import { updatePatientProfile, changePassword, uploadProfilePhoto } from "@/services/patientService";
 
+export const dynamic = "force-dynamic";
+
 export default function PatientProfilePage() {
   const [patientId, setPatientId] = useState<string | null>(null);
   

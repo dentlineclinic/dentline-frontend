@@ -7,6 +7,8 @@ import { fetchAppointments } from "@/services/appointmentService";
 import { getAdminReviews } from "@/services/reviewService";
 import { fetchPatientHistories } from "@/services/patientHistoryService";
 
+export const dynamic = "force-dynamic";
+
 type DashboardAppointment = {
   id: string;
   shortId: string;

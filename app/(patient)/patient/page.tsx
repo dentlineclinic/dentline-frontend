@@ -5,6 +5,8 @@ import TopBar from "@/components/layout/TopBar";
 import Link from "next/link";
 import { fetchPatientDashboard, type PatientHistoryDto } from "@/services/patientService";
 
+export const dynamic = "force-dynamic";
+
 type DisplayHistory = {
   id: string;
   diagnosis: string;

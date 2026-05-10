@@ -10,6 +10,8 @@ import {
   type Notification, // ✅ Import type from service
 } from "@/services/notificationService";
 
+export const dynamic = "force-dynamic";
+
 // Priority color mapping with fallback
 const priorityColors: Record<string, string> = {
   HIGH: "bg-[#FFDAD6] text-[#93000A]",

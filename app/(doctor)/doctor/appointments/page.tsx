@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import TopBar from "@/components/layout/TopBar";
 import { fetchDoctorAppointments } from "@/services/doctorService";
 
+export const dynamic = "force-dynamic";
+
 type Appointment = {
   id: string;
   shortId: string;

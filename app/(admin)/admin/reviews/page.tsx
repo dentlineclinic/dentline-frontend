@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { getAdminReviews } from "@/services/reviewService";
 
+export const dynamic = "force-dynamic";
+
 // ✅ Updated types to match backend
 type Review = {
   id: string;

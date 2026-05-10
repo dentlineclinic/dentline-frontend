@@ -5,6 +5,8 @@ import TopBar from "@/components/layout/TopBar";
 import { changePassword, uploadDoctorProfilePhoto } from "@/services/doctorService";
 import { getDoctorId } from "@/services/authService";
 
+export const dynamic = "force-dynamic";
+
 export default function DoctorSettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");

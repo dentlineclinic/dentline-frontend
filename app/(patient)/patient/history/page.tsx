@@ -5,6 +5,8 @@ import TopBar from "@/components/layout/TopBar";
 import { fetchMyPatientHistories } from "@/services/patientHistoryService";
 import { submitReview as submitReviewApi } from "@/services/reviewService";
 
+export const dynamic = "force-dynamic";
+
 type PatientHistory = {
   id: string;
   patientId: string;

@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { fetchPatients, createPatient } from "@/services/patientService";
 
+export const dynamic = "force-dynamic";
+
 type Patient = {
   id: string;
   shortId: string;

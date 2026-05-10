@@ -5,6 +5,8 @@ import Link from "next/link";
 import { fetchPatientHistoriesById, PatientHistory } from "@/services/patientHistoryService";
 import PatientHistoryModal from "@/components/modals/PatientHistoryModal";
 
+export const dynamic = "force-dynamic";
+
 type Patient = {
   id: string;
   shortId: string;

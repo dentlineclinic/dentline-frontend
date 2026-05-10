@@ -5,6 +5,8 @@ import Link from "next/link";
 import TopBar from "@/components/layout/TopBar";
 import { fetchDoctorDashboard, DoctorDashboardResponse } from "@/services/doctorService";
 
+export const dynamic = "force-dynamic";
+
 const STATUS_COLORS: Record<string, string> = {
   ASSIGNED:    "bg-[#FEF3C7] text-[#92400E]",
   COMPLETED:   "bg-[#DCFCE7] text-[#166534]",

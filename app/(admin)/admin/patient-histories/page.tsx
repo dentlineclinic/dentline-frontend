@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import api from "@/lib/axios";
 import { fetchPaymentStats } from "@/services/patientHistoryService";
 
+export const dynamic = "force-dynamic";
+
 type PatientHistory = {
   id: string;
   shortId: string;

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { updateObservation } from "@/services/doctorService";
 
+export const dynamic = "force-dynamic";
+
 type HistoryRecord = {
   id: string;
   shortId: string;

@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { fetchDoctors } from "@/services/doctorService";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 // Correct Doctor type definition
 export type Doctor = {
   id: string;
