@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useLogin } from "@/hooks/useLogin";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -49,7 +50,14 @@ export default function LoginPage() {
           {/* Left: Branding */}
           <div className="hidden md:flex flex-col justify-between bg-[#008375] p-10 w-[500px] flex-shrink-0">
             <div className="flex items-center gap-1">
-              <div className="w-7 h-7 bg-white/20 rounded" />
+              <div className="w-7 h-7 relative">
+                <Image
+                  src="https://res.cloudinary.com/da00pceww/image/upload/v1778523653/DENTLINE_logo_lettermark-02_d0vx2k.png"
+                  alt="Dentline Logo"
+                  fill
+                  className="object-contain"
+                />
+              </div>
               <span className="text-white font-semibold text-2xl tracking-tight">Dentline Clinic</span>
             </div>
 

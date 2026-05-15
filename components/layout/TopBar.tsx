@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { avatarSmall } from "@/lib/cloudinary";
 
 interface TopBarProps {
   title: string;
@@ -93,7 +94,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
             {photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={photoUrl}
+                src={avatarSmall(photoUrl)}
                 alt={displayName}
                 className="w-full h-full object-cover"
                 onError={() => setPhotoUrl("")}

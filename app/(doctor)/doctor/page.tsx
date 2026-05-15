@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import TopBar from "@/components/layout/TopBar";
-import { fetchDoctorDashboard, DoctorDashboardResponse } from "@/services/doctorService";
+import { useDoctorDashboard } from "@/hooks/useDashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -19,39 +19,18 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function DoctorDashboard() {
-  const [dashboard, setDashboard] = useState<DoctorDashboardResponse["data"] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: response, isLoading: loading, error: queryError } = useDoctorDashboard();
 
+  const dashboard = response?.data ?? null;
+  const error = queryError ? (queryError as any)?.response?.data?.message || "Failed to load dashboard." : null;
+
+  // Sync name + photo to localStorage so TopBar updates
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetchDoctorDashboard();
-        if (res.success) {
-          setDashboard(res.data);
-
-          // Store doctor name and photo so TopBar shows them immediately
-          if (res.data.doctorName) {
-            localStorage.setItem("userName", res.data.doctorName);
-          }
-          if (res.data.profilePhotoUrl) {
-            localStorage.setItem("profilePhotoUrl", res.data.profilePhotoUrl);
-          } else {
-            // Don't overwrite a photo the doctor already uploaded via settings
-          }
-          window.dispatchEvent(new Event("user-auth-updated"));
-        } else {
-          setError(res.message || "Failed to load dashboard.");
-        }
-      } catch (e: any) {
-        setError(e?.response?.data?.message || "Failed to load dashboard.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-  }, []);
+    if (!dashboard) return;
+    if (dashboard.doctorName) localStorage.setItem("userName", dashboard.doctorName);
+    if (dashboard.profilePhotoUrl) localStorage.setItem("profilePhotoUrl", dashboard.profilePhotoUrl);
+    window.dispatchEvent(new Event("user-auth-updated"));
+  }, [dashboard]);
 
   const stats = [
     {

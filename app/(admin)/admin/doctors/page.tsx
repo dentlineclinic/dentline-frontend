@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { toast } from "react-toastify";
 import { fetchDoctors } from "@/services/doctorService";
 import Link from "next/link";
 
@@ -40,9 +41,6 @@ export default function DoctorsPage() {
 
 function DoctorsPageInner() {
   const searchParams = useSearchParams();
-  const [showSuccess, setShowSuccess] = useState(false);
-  
-  // Page State Design
   const [doctors, setDoctors] = useState<DisplayDoctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -61,12 +59,8 @@ function DoctorsPageInner() {
   useEffect(() => {
     const created = searchParams.get("created");
     if (created === "true") {
-      setShowSuccess(true);
-      // Hide success message after 5 seconds
-      const timer = setTimeout(() => setShowSuccess(false), 5000);
-      // Clean up URL without reloading
+      toast.success("Doctor created successfully!");
       window.history.replaceState({}, "", "/admin/doctors");
-      return () => clearTimeout(timer);
     }
   }, [searchParams]);
 
@@ -219,27 +213,6 @@ function DoctorsPageInner() {
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-4 lg:gap-6">
-        
-        {/* Success Banner */}
-        {showSuccess && (
-          <div className="bg-[#DCFCE7] text-[#166534] text-sm font-semibold px-4 py-3 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Doctor created successfully!</span>
-            </div>
-            <button 
-              onClick={() => setShowSuccess(false)} 
-              className="text-[#166534] hover:text-[#0B5C2E] transition-colors"
-              aria-label="Close"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
         
         {/* Filters and Add Button */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

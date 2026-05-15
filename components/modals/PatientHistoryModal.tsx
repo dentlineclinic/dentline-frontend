@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { toast } from "react-toastify";
 import { PatientHistory } from "@/services/patientHistoryService";
 import {
   updateObservation,
@@ -8,6 +9,7 @@ import {
   uploadHistoryImage,
   uploadHistoryVideo,
 } from "@/services/doctorService";
+import { imageThumbnail } from "@/lib/cloudinary";
 
 interface PatientHistoryModalProps {
   isOpen: boolean;
@@ -40,7 +42,6 @@ export default function PatientHistoryModal({
   const [observation, setObservation] = useState("");
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   // Local copies of media so UI updates immediately after upload
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -60,8 +61,8 @@ export default function PatientHistoryModal({
   }, [history]);
 
   const showToast = (message: string, type: "success" | "error") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    if (type === "success") toast.success(message);
+    else toast.error(message);
   };
 
   const saveObservation = async () => {
@@ -179,21 +180,6 @@ export default function PatientHistoryModal({
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-
-          {/* Toast */}
-          {toast && (
-            <div className={`fixed top-6 right-6 z-[60] px-5 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-3 ${
-              toast.type === "success"
-                ? "bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]"
-                : "bg-[#FFDAD6] text-[#93000A] border border-[#FFBAB4]"
-            }`}>
-              {toast.type === "success"
-                ? <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                : <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              }
-              {toast.message}
-            </div>
-          )}
 
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-[#F1F5F9] px-6 py-4 flex items-center justify-between rounded-t-2xl">
@@ -335,7 +321,7 @@ export default function PatientHistoryModal({
                     <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                       className="block aspect-square rounded-xl overflow-hidden border border-[#E2E8F0] hover:opacity-90 transition-opacity bg-[#F8FAFC]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Clinical image ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={imageThumbnail(url)} alt={`Clinical image ${i + 1}`} className="w-full h-full object-cover" />
                     </a>
                   ))}
                 </div>

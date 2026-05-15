@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { toast } from "react-toastify";
 import { updateObservation } from "@/services/doctorService";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +28,6 @@ type HistoryRecord = {
   createdAt: string;
 };
 
-type Toast = { message: string; type: "success" | "error" };
-
 const STATUS_COLORS: Record<string, string> = {
   COMPLETED:   "bg-[#DCFCE7] text-[#166534]",
   IN_PROGRESS: "bg-[#FEF3C7] text-[#92400E]",
@@ -42,7 +41,6 @@ export default function PatientRecordPage() {
 
   const [record, setRecord] = useState<HistoryRecord | null>(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<Toast | null>(null);
 
   // Observation
   const [observation, setObservation] = useState("");
@@ -60,8 +58,8 @@ export default function PatientRecordPage() {
   const [completing, setCompleting] = useState(false);
 
   const showToast = (message: string, type: "success" | "error") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+    if (type === "success") toast.success(message);
+    else toast.error(message);
   };
 
   useEffect(() => {
@@ -199,28 +197,6 @@ export default function PatientRecordPage() {
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10">
         <div className="max-w-3xl flex flex-col gap-6">
-
-          {/* Toast */}
-          {toast && (
-            <div
-              className={`fixed top-6 right-6 z-[100] px-5 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-3 ${
-                toast.type === "success"
-                  ? "bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]"
-                  : "bg-[#FFDAD6] text-[#93000A] border border-[#FFBAB4]"
-              }`}
-            >
-              {toast.type === "success" ? (
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-              {toast.message}
-            </div>
-          )}
 
           {/* Back + header */}
           <div className="flex items-center justify-between">

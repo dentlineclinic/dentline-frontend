@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "react-toastify";
 import { 
   fetchDoctors, 
   suspendDoctor, 
@@ -25,8 +26,6 @@ type Doctor = {
   patients: number;
   status: string; // "Active" | "Suspended"
 };
-
-type Toast = { message: string; type: "success" | "error" };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,20 +93,15 @@ function Btn({
 }
 
 // Centralized response handler
-const handleResponse = (result: any, showToast: (message: string, type: "success" | "error") => void) => {
-  showToast(result.message, result.success ? "success" : "error");
+const handleResponse = (result: any) => {
+  if (result.success) toast.success(result.message);
+  else toast.error(result.message);
   return result.success;
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminSettingsPage() {
-  const [toast, setToast] = useState<Toast | null>(null);
-  
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
 
   // ── Reference Points ──────────────────────────────────────────────────────
   const [rpPatientId, setRpPatientId] = useState("");
@@ -117,8 +111,8 @@ export default function AdminSettingsPage() {
 
   const mutatePoints = async (action: "add" | "remove") => {
     const pts = parseInt(rpPoints, 10);
-    if (!rpPatientId.trim()) return showToast("Enter a patient ID first.", "error");
-    if (!pts || pts <= 0) return showToast("Enter a valid positive number of points.", "error");
+    if (!rpPatientId.trim()) return toast.error("Enter a patient ID first.");
+    if (!pts || pts <= 0) return toast.error("Enter a valid positive number of points.");
     
     setRpMutating(true);
     try {
@@ -133,12 +127,12 @@ export default function AdminSettingsPage() {
         });
       }
       
-      if (handleResponse(result, showToast)) {
+      if (handleResponse(result)) {
         setRpPoints("");
         setRpReason("");
       }
     } catch (error: any) {
-      showToast(error.message || "Request failed.", "error");
+      toast.error(error.message || "Request failed.");
     } finally {
       setRpMutating(false);
     }
@@ -149,15 +143,15 @@ export default function AdminSettingsPage() {
   const [unlocking, setUnlocking] = useState(false);
 
   const handleUnlockPatient = async () => {
-    if (!unlockId.trim()) return showToast("Enter a patient ID.", "error");
+    if (!unlockId.trim()) return toast.error("Enter a patient ID.");
     setUnlocking(true);
     try {
       const result = await unlockPatient(unlockId.trim());
-      if (handleResponse(result, showToast)) {
+      if (handleResponse(result)) {
         setUnlockId("");
       }
     } catch (error: any) {
-      showToast(error.message || "Request failed.", "error");
+      toast.error(error.message || "Request failed.");
     } finally {
       setUnlocking(false);
     }
@@ -191,11 +185,11 @@ export default function AdminSettingsPage() {
             }))
           );
         } else {
-          showToast("Failed to load doctors", "error");
+          toast.error("Failed to load doctors");
           setDoctors([]);
         }
       } catch (error: any) {
-        showToast(error.message || "Failed to load doctors", "error");
+        toast.error(error.message || "Failed to load doctors");
         setDoctors([]);
       } finally {
         setDoctorsLoading(false);
@@ -218,7 +212,7 @@ export default function AdminSettingsPage() {
         result = await activateDoctor(doctor.id);
       }
       
-      if (handleResponse(result, showToast)) {
+      if (handleResponse(result)) {
         setDoctors(prev =>
           prev.map(d =>
             d.id === doctor.id
@@ -228,7 +222,7 @@ export default function AdminSettingsPage() {
         );
       }
     } catch (error: any) {
-      showToast(error.message || "Request failed.", "error");
+      toast.error(error.message || "Request failed.");
     } finally {
       setDoctorAction(null);
     }
@@ -249,28 +243,6 @@ export default function AdminSettingsPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10 flex flex-col gap-8 max-w-3xl">
-
-        {/* Toast */}
-        {toast && (
-          <div
-            className={`fixed top-6 right-6 z-[100] px-5 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-3 transition-all ${
-              toast.type === "success"
-                ? "bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]"
-                : "bg-[#FFDAD6] text-[#93000A] border border-[#FFBAB4]"
-            }`}
-          >
-            {toast.type === "success" ? (
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            )}
-            {toast.message}
-          </div>
-        )}
 
         {/* ── 1. Reference Points ── */}
         <Section

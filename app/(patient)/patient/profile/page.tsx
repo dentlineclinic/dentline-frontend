@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "react-toastify";
 import TopBar from "@/components/layout/TopBar";
 import { updatePatientProfile, changePassword, uploadProfilePhoto } from "@/services/patientService";
+import { avatarMedium } from "@/lib/cloudinary";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +33,6 @@ export default function PatientProfilePage() {
   const [loading, setLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -73,13 +73,11 @@ export default function PatientProfilePage() {
     e.preventDefault();
     
     if (!patientId) {
-      setError("User not found");
+      toast.error("User not found");
       return;
     }
 
     setLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
       const result = await updatePatientProfile(patientId, {
@@ -90,20 +88,16 @@ export default function PatientProfilePage() {
       });
 
       if (result.success) {
-        setSuccess(result.message || "Profile updated successfully");
-        
-        // Persist updated values to localStorage
+        toast.success(result.message || "Profile updated successfully");
         localStorage.setItem("userPhone", phoneNumber);
         localStorage.setItem("emergencyContactName", emergencyContactName);
         localStorage.setItem("emergencyContactPhone", emergencyContactPhone);
         localStorage.setItem("medicalHistory", medicalHistory);
-        
-        setTimeout(() => setSuccess(null), 3000);
       } else {
-        setError(result.message || "Failed to update profile");
+        toast.error(result.message || "Failed to update profile");
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Something went wrong. Please try again.");
+      toast.error(err?.response?.data?.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -113,47 +107,32 @@ export default function PatientProfilePage() {
     e.preventDefault();
     
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
+      toast.error("New passwords do not match");
       return;
     }
-    
     if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters long");
+      toast.error("Password must be at least 8 characters long");
       return;
     }
-    
     if (!currentPassword) {
-      setError("Please enter your current password");
+      toast.error("Please enter your current password");
       return;
     }
 
     setPasswordLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
-      const result = await changePassword({
-        currentPassword,
-        newPassword,
-      });
-
+      const result = await changePassword({ currentPassword, newPassword });
       if (result.success) {
-        setSuccess(result.message || "Password changed successfully");
-        
-        // Clear password fields
+        toast.success(result.message || "Password changed successfully");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccess(null), 3000);
       } else {
-        setError(result.message || "Failed to change password");
+        toast.error(result.message || "Failed to change password");
       }
     } catch (err: any) {
-      const message = err?.response?.data?.message || "Something went wrong. Please try again.";
-      setError(message);
-      console.error(err);
+      toast.error(err?.response?.data?.message || "Something went wrong. Please try again.");
     } finally {
       setPasswordLoading(false);
     }
@@ -163,60 +142,44 @@ export default function PatientProfilePage() {
     e.preventDefault();
     
     if (!selectedFile) {
-      setError("Please select a file to upload");
+      toast.error("Please select a file to upload");
       return;
     }
-    
     if (!patientId) {
-      setError("User not found");
+      toast.error("User not found");
       return;
     }
-
-    // Validate file type
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
     if (!allowedTypes.includes(selectedFile.type)) {
-      setError("Please upload a valid image file (JPEG, PNG, WEBP)");
+      toast.error("Please upload a valid image file (JPEG, PNG, WEBP)");
       return;
     }
-
-    // Validate file size (max 5MB)
     if (selectedFile.size > 5 * 1024 * 1024) {
-      setError("File size must be less than 5MB");
+      toast.error("File size must be less than 5MB");
       return;
     }
 
     setPhotoLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
       const result = await uploadProfilePhoto(patientId, selectedFile);
-
       if (result.success) {
-        setSuccess(result.message || "Profile photo uploaded successfully");
-        
-        // result.data is PatientDto — read profilePhotoUrl directly
+        toast.success(result.message || "Profile photo uploaded successfully");
         const newPhotoUrl = result.data?.profilePhotoUrl ?? "";
         if (newPhotoUrl) {
           setProfilePhotoUrl(newPhotoUrl);
           localStorage.setItem("profilePhotoUrl", newPhotoUrl);
           window.dispatchEvent(new Event("user-auth-updated"));
         }
-
         setSelectedFile(null);
         setPhotoPreview(null);
-        
         const fileInput = document.getElementById("profile-photo") as HTMLInputElement;
         if (fileInput) fileInput.value = "";
-        
-        setTimeout(() => setSuccess(null), 3000);
       } else {
-        setError(result.message || "Failed to upload profile photo");
+        toast.error(result.message || "Failed to upload profile photo");
       }
     } catch (err: any) {
-      const message = err?.response?.data?.message || "Upload failed. Please try again.";
-      setError(message);
-      console.error(err);
+      toast.error(err?.response?.data?.message || "Upload failed. Please try again.");
     } finally {
       setPhotoLoading(false);
     }
@@ -247,25 +210,6 @@ export default function PatientProfilePage() {
 
       <main className="flex-1 p-10">
         <div className="max-w-2xl flex flex-col gap-6">
-          {/* Success/Error Messages */}
-          {success && (
-            <div className="flex items-center gap-3 bg-[#DCFCE7] border border-[#BBF7D0] text-[#166534] px-4 py-3 rounded-xl text-sm font-semibold">
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              {success}
-            </div>
-          )}
-          
-          {error && (
-            <div className="flex items-center gap-3 bg-[#FFDAD6] border border-[#FFBAB4] text-[#93000A] px-4 py-3 rounded-xl text-sm font-semibold">
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {error}
-            </div>
-          )}
-
           {/* Profile Photo Upload */}
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 shadow-sm">
             <h3 className="text-lg font-semibold text-[#0B1C30] mb-6">Profile Photo</h3>
@@ -275,7 +219,7 @@ export default function PatientProfilePage() {
                 {photoPreview || profilePhotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={photoPreview || profilePhotoUrl}
+                    src={photoPreview || avatarMedium(profilePhotoUrl)}
                     alt="Profile"
                     className="w-full h-full object-cover"
                   />

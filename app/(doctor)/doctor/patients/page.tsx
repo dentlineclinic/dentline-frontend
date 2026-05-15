@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import dynamicImport from "next/dynamic";
 import Link from "next/link";
 import { fetchPatientHistoriesById, PatientHistory } from "@/services/patientHistoryService";
-import PatientHistoryModal from "@/components/modals/PatientHistoryModal";
+
+// Dynamically import the modal — it's heavy (uploads, observation editor) and only
+// needed when a doctor clicks "Quick View". This keeps the initial bundle smaller.
+const PatientHistoryModal = dynamicImport(
+  () => import("@/components/modals/PatientHistoryModal"),
+  { ssr: false }
+);
 
 export const dynamic = "force-dynamic";
 

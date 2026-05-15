@@ -1,20 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import TopBar from "@/components/layout/TopBar";
 import Link from "next/link";
-import { fetchPatientDashboard, type PatientHistoryDto } from "@/services/patientService";
+import { usePatientDashboard } from "@/hooks/useDashboard";
+import type { PatientHistoryDto } from "@/services/patientService";
 
 export const dynamic = "force-dynamic";
-
-type DisplayHistory = {
-  id: string;
-  diagnosis: string;
-  doctorName: string;
-  date: string;
-  time: string;
-  status: string;
-};
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING:   "bg-[#FEF3C7] text-[#92400E]",
@@ -40,76 +32,36 @@ function getGreeting() {
 }
 
 export default function PatientDashboard() {
-  const [userName, setUserName] = useState("");
-  const [completedAppointments, setCompletedAppointments] = useState<number | null>(null);
-  const [totalAppointments, setTotalAppointments] = useState<number | null>(null);
-  const [lastAppointmentDate, setLastAppointmentDate] = useState<string>("—");
-  const [recentHistories, setRecentHistories] = useState<DisplayHistory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: response, isLoading: loading } = usePatientDashboard();
 
+  // Sync name + photo to localStorage so TopBar updates
   useEffect(() => {
-    const load = async () => {
-      try {
-        const response = await fetchPatientDashboard();
-        
-        if (response.success && response.data) {
-          const { patientName, profilePhotoUrl, completedAppointments, totalAppointments, lastAppointmentDate, recentHistories } = response.data;
-          
-          // Update patient name in localStorage and state
-          setUserName(patientName);
-          localStorage.setItem("userName", patientName);
+    if (!response?.success || !response.data) return;
+    const { patientName, profilePhotoUrl } = response.data;
+    if (patientName) localStorage.setItem("userName", patientName);
+    if (profilePhotoUrl) localStorage.setItem("profilePhotoUrl", profilePhotoUrl);
+    window.dispatchEvent(new Event("user-auth-updated"));
+  }, [response]);
 
-          // Update profile photo if the backend returned one
-          if (profilePhotoUrl) {
-            localStorage.setItem("profilePhotoUrl", profilePhotoUrl);
-          }
-          
-          // Dispatch event to update TopBar
-          window.dispatchEvent(new Event("user-auth-updated"));
-          
-          // Set dashboard stats
-          setCompletedAppointments(completedAppointments);
-          setTotalAppointments(totalAppointments);
-          
-          // Format last appointment date
-          if (lastAppointmentDate) {
-            const { date } = formatDate(lastAppointmentDate);
-            setLastAppointmentDate(date);
-          }
-          
-          // Format recent histories
-          setRecentHistories(
-            recentHistories.map((h: PatientHistoryDto) => {
-              const { date, time } = formatDate(h.appointmentDate);
-              return {
-                id: h.id,
-                diagnosis: h.diagnosis || "General Checkup",
-                doctorName: h.doctorName || "Unassigned",
-                date,
-                time,
-                status: h.status || "PENDING",
-              };
-            })
-          );
-        }
-      } catch (error) {
-        console.error("Failed to load patient dashboard:", error);
-        // Fall back to localStorage if available
-        setUserName(localStorage.getItem("userName") ?? "");
-      } finally {
-        setLoading(false);
-      }
+  const data = response?.data;
+  const displayName = data?.patientName || localStorage.getItem("userName") || "there";
+
+  const recentHistories = (data?.recentHistories ?? []).map((h: PatientHistoryDto) => {
+    const { date, time } = formatDate(h.appointmentDate);
+    return {
+      id: h.id,
+      diagnosis: h.diagnosis || "General Checkup",
+      doctorName: h.doctorName || "Unassigned",
+      date,
+      time,
+      status: h.status || "PENDING",
     };
-
-    load();
-  }, []);
-
-  const displayName = userName || "there";
+  });
 
   const stats = [
-    { label: "Total Appointments",     value: totalAppointments === null     ? "—" : String(totalAppointments),     icon: "🦷" },
-    { label: "Completed Appointments", value: completedAppointments === null ? "—" : String(completedAppointments), icon: "📅" },
-    { label: "Next Visit",             value: lastAppointmentDate,                                                  icon: "⏰" },
+    { label: "Total Appointments",     value: data?.totalAppointments     != null ? String(data.totalAppointments)     : "—", icon: "🦷" },
+    { label: "Completed Appointments", value: data?.completedAppointments != null ? String(data.completedAppointments) : "—", icon: "📅" },
+    { label: "Next Visit",             value: data?.lastAppointmentDate ? formatDate(data.lastAppointmentDate).date : "—", icon: "⏰" },
   ];
 
   return (
@@ -125,11 +77,11 @@ export default function PatientDashboard() {
             {getGreeting()}, {displayName}! 👋
           </h2>
           <p className="text-white/80 text-sm sm:text-base">
-            {totalAppointments === null
+            {loading
               ? "Loading your appointments…"
-              : totalAppointments === 0
+              : data?.totalAppointments === 0
               ? "You have no appointments yet."
-              : `You have ${totalAppointments} appointment${totalAppointments !== 1 ? "s" : ""} on record.`}
+              : `You have ${data?.totalAppointments ?? 0} appointment${(data?.totalAppointments ?? 0) !== 1 ? "s" : ""} on record.`}
           </p>
           <Link
             href="/patient/book"

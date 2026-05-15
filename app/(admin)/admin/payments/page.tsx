@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { toast } from "react-toastify";
 import {
   fetchPayments,
   recordPayment,
@@ -88,11 +89,6 @@ export default function PaymentsPage() {
   // Record payment panel
   const [payAmount, setPayAmount] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-
-  // Page-level success banner
-  const [pageSuccess, setPageSuccess] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -154,11 +150,6 @@ export default function PaymentsPage() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  const showBanner = (msg: string) => {
-    setPageSuccess(msg);
-    setTimeout(() => setPageSuccess(null), 5000);
-  };
-
   const refreshAllData = async () => {
     await loadPayments(page, search);
   };
@@ -167,22 +158,18 @@ export default function PaymentsPage() {
     if (!selected) return;
     const amount = parseFloat(payAmount);
     if (!payAmount || isNaN(amount) || amount <= 0) {
-      setActionError("Enter a valid amount greater than 0.");
+      toast.error("Enter a valid amount greater than 0.");
       return;
     }
     setActionLoading(true);
-    setActionError(null);
-    setActionSuccess(null);
     try {
       await recordPayment(selected.id, amount);
-      setActionSuccess("Payment recorded successfully.");
+      toast.success(`Payment of ${fmt(amount)} recorded for ${selected.patientName}.`);
       setPayAmount("");
-      showBanner(`Payment of ${fmt(amount)} recorded for ${selected.patientName}.`);
-      
       await refreshAllData();
       setSelected(null);
     } catch (e: any) {
-      setActionError(e?.response?.data?.message || "Failed to record payment.");
+      toast.error(e?.response?.data?.message || "Failed to record payment.");
     } finally {
       setActionLoading(false);
     }
@@ -191,18 +178,13 @@ export default function PaymentsPage() {
   const handleMarkUnpaid = async () => {
     if (!selected) return;
     setActionLoading(true);
-    setActionError(null);
-    setActionSuccess(null);
     try {
       await markPaymentUnpaid(selected.id);
-      setActionSuccess("Payment status marked as UNPAID. You can now record a payment.");
-      showBanner(`${selected.patientName}'s payment marked as unpaid.`);
-      // Refresh table data
+      toast.success(`${selected.patientName}'s payment marked as unpaid.`);
       await loadPayments(page, search);
-      // Update the selected row's status in-place so the panel switches to record payment
       setSelected((prev) => prev ? { ...prev, paymentStatus: "UNPAID" } : null);
     } catch (e: any) {
-      setActionError(e?.response?.data?.message || "Failed to mark as unpaid.");
+      toast.error(e?.response?.data?.message || "Failed to mark as unpaid.");
     } finally {
       setActionLoading(false);
     }
@@ -211,21 +193,6 @@ export default function PaymentsPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6">
-
-        {/* Page-level success banner */}
-        {pageSuccess && (
-          <div className="flex items-center gap-3 bg-[#DCFCE7] border border-[#86EFAC] text-[#166534] px-4 py-3 rounded-lg text-sm font-semibold">
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {pageSuccess}
-            <button onClick={() => setPageSuccess(null)} className="ml-auto">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
@@ -312,8 +279,6 @@ export default function PaymentsPage() {
                       onClick={() => {
                         setSelected(r);
                         setPayAmount("");
-                        setActionError(null);
-                        setActionSuccess(null);
                       }}
                       className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors cursor-pointer ${selected?.id === r.id ? "bg-[#F0FDFA]" : ""}`}
                     >
@@ -442,18 +407,6 @@ export default function PaymentsPage() {
                 {selected.observation}
               </p>
             </div>
-
-            {/* Feedback */}
-            {actionSuccess && (
-              <div className="bg-[#DCFCE7] border border-[#86EFAC] text-[#166534] text-sm font-semibold px-4 py-3 rounded-lg">
-                {actionSuccess}
-              </div>
-            )}
-            {actionError && (
-              <div className="bg-[#FFDAD6] border border-[#FCA5A5] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
-                {actionError}
-              </div>
-            )}
 
             {/*
               Action logic:

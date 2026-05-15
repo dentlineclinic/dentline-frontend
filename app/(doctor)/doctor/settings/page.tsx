@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import TopBar from "@/components/layout/TopBar";
 import { changePassword, uploadDoctorProfilePhoto } from "@/services/doctorService";
 import { getDoctorId } from "@/services/authService";
+import { avatarMedium } from "@/lib/cloudinary";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,6 @@ export default function DoctorSettingsPage() {
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -34,21 +35,15 @@ export default function DoctorSettingsPage() {
     .join("")
     .toUpperCase() || "DR";
 
-  const showMessage = (type: "success" | "error", text: string) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 3500);
-  };
-
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null);
 
     if (newPassword !== confirmPassword) {
-      showMessage("error", "New passwords do not match");
+      toast.error("New passwords do not match");
       return;
     }
     if (newPassword.length < 8) {
-      showMessage("error", "Password must be at least 8 characters long");
+      toast.error("Password must be at least 8 characters long");
       return;
     }
 
@@ -56,15 +51,15 @@ export default function DoctorSettingsPage() {
     try {
       const res = await changePassword({ currentPassword, newPassword });
       if (res.success) {
-        showMessage("success", res.message || "Password changed successfully");
+        toast.success(res.message || "Password changed successfully");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } else {
-        showMessage("error", res.message || "Failed to change password");
+        toast.error(res.message || "Failed to change password");
       }
     } catch {
-      showMessage("error", "Failed to change password");
+      toast.error("Failed to change password");
     } finally {
       setLoading(false);
     }
@@ -83,27 +78,20 @@ export default function DoctorSettingsPage() {
   const handlePhotoUpload = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedFile) {
-      showMessage("error", "Please select a file to upload");
-      return;
-    }
-    if (!doctorId) {
-      showMessage("error", "Doctor ID not found");
-      return;
-    }
+    if (!selectedFile) { toast.error("Please select a file to upload"); return; }
+    if (!doctorId) { toast.error("Doctor ID not found"); return; }
 
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
     if (!allowedTypes.includes(selectedFile.type)) {
-      showMessage("error", "Please upload a valid image file (JPEG, PNG, WEBP)");
+      toast.error("Please upload a valid image file (JPEG, PNG, WEBP)");
       return;
     }
     if (selectedFile.size > 5 * 1024 * 1024) {
-      showMessage("error", "File size must be less than 5MB");
+      toast.error("File size must be less than 5MB");
       return;
     }
 
     setPhotoLoading(true);
-    setMessage(null);
     try {
       const res = await uploadDoctorProfilePhoto(doctorId, selectedFile);
       if (res.success) {
@@ -113,15 +101,15 @@ export default function DoctorSettingsPage() {
           localStorage.setItem("profilePhotoUrl", newPhotoUrl);
           window.dispatchEvent(new Event("user-auth-updated"));
         }
-        showMessage("success", res.message || "Profile photo uploaded successfully");
+        toast.success(res.message || "Profile photo uploaded successfully");
         setSelectedFile(null);
         setPhotoPreview(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
       } else {
-        showMessage("error", res.message || "Failed to upload profile photo");
+        toast.error(res.message || "Failed to upload profile photo");
       }
     } catch {
-      showMessage("error", "Upload failed. Please try again.");
+      toast.error("Upload failed. Please try again.");
     } finally {
       setPhotoLoading(false);
     }
@@ -134,21 +122,6 @@ export default function DoctorSettingsPage() {
       <main className="flex-1 p-10">
         <div className="max-w-2xl flex flex-col gap-6">
 
-          {/* Message */}
-          {message && (
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold ${
-              message.type === "success"
-                ? "bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]"
-                : "bg-[#FFDAD6] text-[#93000A] border border-[#FFBAB4]"
-            }`}>
-              {message.type === "success"
-                ? <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                : <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              }
-              {message.text}
-            </div>
-          )}
-
           {/* Profile Photo */}
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 shadow-sm">
             <h3 className="text-lg font-semibold text-[#0B1C30] mb-6">Profile Photo</h3>
@@ -159,7 +132,7 @@ export default function DoctorSettingsPage() {
                 {photoPreview || profilePhotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={photoPreview || profilePhotoUrl}
+                    src={photoPreview || avatarMedium(profilePhotoUrl)}
                     alt="Profile"
                     className="w-full h-full object-cover"
                   />
