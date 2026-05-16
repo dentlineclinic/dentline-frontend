@@ -2,7 +2,7 @@ import axios, { AxiosError } from "axios";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
-  timeout: 15_000, // 15s — Nigerian networks are slow; 30s feels broken to users
+  timeout: 100_000, // 30s — accounts for cold-start on free-tier backends
 });
 
 // ── REQUEST INTERCEPTOR ──────────────────────────────────────────────────────
@@ -27,6 +27,18 @@ api.interceptors.response.use(
 
     // Cancelled requests (AbortController) — don't treat as errors
     if (axios.isCancel(error)) return Promise.reject(error);
+
+    // Timeout or network error — give a human-readable message
+    if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+      return Promise.reject(
+        new Error("The server is taking too long to respond. Please try again in a moment.")
+      );
+    }
+    if (!error.response) {
+      return Promise.reject(
+        new Error("Unable to reach the server. Please check your connection.")
+      );
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
