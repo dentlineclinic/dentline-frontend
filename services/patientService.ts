@@ -209,6 +209,8 @@ export interface PatientDashboardDto {
   completedAppointments: number;
   totalAppointments: number;
   lastAppointmentDate: string | null;
+  referenceCode: string | null;
+  referencePoints: number;
   recentHistories: PatientHistoryDto[];
 }
 

@@ -282,15 +282,7 @@ export default function DoctorPatientsPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-3">
-                        <Link
-                          href={`/doctor/record/${h.id}`}
-                          className="text-xs font-semibold text-[#0D9488] hover:underline flex items-center gap-1"
-                        >
-                          Open Record
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </Link>
+                        
                         <button
                           onClick={() => openHistoryModal(h)}
                           className="text-xs font-semibold text-[#00685C] hover:underline flex items-center gap-1"

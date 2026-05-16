@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
 import Link from "next/link";
 import { usePatientDashboard } from "@/hooks/useDashboard";
@@ -33,6 +33,14 @@ function getGreeting() {
 
 export default function PatientDashboard() {
   const { data: response, isLoading: loading } = usePatientDashboard();
+  const [copied, setCopied] = useState(false);
+
+  const copyReferenceCode = (code: string) => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   // Sync name + photo to localStorage so TopBar updates
   useEffect(() => {
@@ -44,7 +52,7 @@ export default function PatientDashboard() {
   }, [response]);
 
   const data = response?.data;
-  const displayName = data?.patientName || localStorage.getItem("userName") || "there";
+  const displayName = data?.patientName || (typeof window !== "undefined" ? localStorage.getItem("userName") : null) || "there";
 
   const recentHistories = (data?.recentHistories ?? []).map((h: PatientHistoryDto) => {
     const { date, time } = formatDate(h.appointmentDate);
@@ -110,6 +118,69 @@ export default function PatientDashboard() {
             </div>
           ))}
         </div>
+
+        {/* Referral Card */}
+        {(loading || data?.referenceCode) && (
+          <div className="bg-white border border-[#F1F5F9] rounded-xl p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#F0FDFA] rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-[#94A3B8] mb-0.5">Your Referral Code</p>
+                {loading ? (
+                  <div className="h-6 w-24 bg-[#F1F5F9] rounded animate-pulse" />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base sm:text-lg font-bold text-[#0B1C30] tracking-widest font-mono">
+                      {data?.referenceCode ?? "—"}
+                    </span>
+                    {data?.referenceCode && (
+                      <button
+                        onClick={() => copyReferenceCode(data.referenceCode!)}
+                        title="Copy referral code"
+                        className="p-1.5 rounded-lg hover:bg-[#F0FDFA] transition-colors group"
+                        aria-label="Copy referral code"
+                      >
+                        {copied ? (
+                          <svg className="w-4 h-4 text-[#0F766E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 text-[#94A3B8] group-hover:text-[#0D9488] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-[#94A3B8] mt-0.5">Share with friends to earn points</p>
+              </div>
+            </div>
+
+            {/* Reference Points */}
+            <div className="flex items-center gap-3 sm:flex-col sm:items-end">
+              <div className="text-right">
+                <p className="text-xs text-[#94A3B8] mb-0.5">Reference Points</p>
+                {loading ? (
+                  <div className="h-8 w-16 bg-[#F1F5F9] rounded animate-pulse" />
+                ) : (
+                  <p className="text-2xl sm:text-3xl font-bold text-[#00685C]">
+                    {data?.referencePoints ?? 0}
+                  </p>
+                )}
+              </div>
+              <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Recent Histories */}
         <div className="flex flex-col gap-4">
