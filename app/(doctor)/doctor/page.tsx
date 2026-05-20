@@ -108,7 +108,7 @@ export default function DoctorDashboard() {
               <table className="w-full min-w-[640px]">
                 <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                   <tr>
-                    {["PATIENT", "DATE", "STATUS", "ACTION"].map((h) => (
+                    {["PATIENT", "DATE", "STATUS"].map((h) => (
                       <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                         {h}
                       </th>
@@ -119,7 +119,7 @@ export default function DoctorDashboard() {
                   {loading ? (
                     [...Array(3)].map((_, i) => (
                       <tr key={i} className="border-t border-[#F8FAFC]">
-                        {[...Array(4)].map((__, j) => (
+                        {[...Array(3)].map((__, j) => (
                           <td key={j} className="px-6 py-4">
                             <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                           </td>
@@ -128,7 +128,7 @@ export default function DoctorDashboard() {
                     ))
                   ) : !dashboard?.todayAppointments?.length ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                      <td colSpan={3} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                         No appointments assigned to you today.
                       </td>
                     </tr>
@@ -171,14 +171,7 @@ export default function DoctorDashboard() {
                             {appt.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <Link
-                            href={`/doctor/record/${appt.id}`}
-                            className="text-xs text-[#0D9488] hover:underline font-semibold"
-                          >
-                            View Record
-                          </Link>
-                        </td>
+                        
                       </tr>
                     ))
                   )}

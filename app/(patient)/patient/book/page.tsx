@@ -51,15 +51,30 @@ export default function BookAppointmentPage() {
         <div className="max-w-2xl">
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 shadow-sm">
             <h3 className="text-xl font-semibold text-[#0B1C30] mb-6">Appointment Details</h3>
+            <div className="mb-6 rounded-xl border border-[#CCFBF1] bg-[#F0FDFA] p-4">
+              <h4 className="text-sm font-bold text-[#00685C] mb-2">
+                Important Information
+              </h4>
+
+              <p className="text-sm text-[#3D4946] leading-6">
+                <span className="font-semibold">Note:</span> Each appointment costs{" "}
+                <span className="font-semibold text-[#00685C]">₦12,000</span>. Payment
+                will be made after the patient arrives at the clinic.
+              </p>
+
+              <p className="text-sm text-[#3D4946] leading-6 mt-3">
+                Patients may also receive discounts or rewards through referral points
+                for being loyal and wonderful patients.
+              </p>
+            </div>
 
             {/* Message Display */}
             {message && (
               <div
-                className={`mb-6 p-4 rounded-lg ${
-                  message.type === "success"
+                className={`mb-6 p-4 rounded-lg ${message.type === "success"
                     ? "bg-green-50 border border-green-200 text-green-700"
                     : "bg-red-50 border border-red-200 text-red-700"
-                }`}
+                  }`}
               >
                 {message.text}
               </div>

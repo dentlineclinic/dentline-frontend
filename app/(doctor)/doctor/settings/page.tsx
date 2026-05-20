@@ -51,16 +51,20 @@ export default function DoctorSettingsPage() {
     try {
       const res = await changePassword({ currentPassword, newPassword });
       if (res.success) {
-        toast.success(res.message || "Password changed successfully");
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
+        toast.success("Password changed. Logging you out…");
+        // Clear all session data and redirect to login
+        setTimeout(() => {
+          localStorage.clear();
+          document.cookie = "token=; path=/; max-age=0; samesite=strict";
+          document.cookie = "role=; path=/; max-age=0; samesite=strict";
+          window.location.href = "/login";
+        }, 2000);
       } else {
         toast.error(res.message || "Failed to change password");
+        setLoading(false);
       }
     } catch {
       toast.error("Failed to change password");
-    } finally {
       setLoading(false);
     }
   };

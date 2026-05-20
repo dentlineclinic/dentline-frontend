@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSwipeable } from "react-swipeable";
 import { logoutUser } from "@/services/authService";
 
 interface NavItem {
@@ -48,6 +49,7 @@ export default function Sidebar({
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     setUserName(localStorage.getItem("userName") ?? "");
@@ -55,7 +57,38 @@ export default function Sidebar({
     setUserRole(localStorage.getItem("userRole") ?? "");
   }, []);
 
-  const [loggingOut, setLoggingOut] = useState(false);
+  // Lock / unlock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
+  const openSidebar = useCallback(() => setIsMobileMenuOpen(true), []);
+  const closeSidebar = useCallback(() => setIsMobileMenuOpen(false), []);
+
+  // Swipe-right on the page body opens the sidebar
+  const swipeOpenHandlers = useSwipeable({
+    onSwipedRight: openSidebar,
+    delta: 40,          // minimum px to register as a swipe
+    trackTouch: true,
+    trackMouse: false,
+    preventScrollOnSwipe: false,
+  });
+
+  // Swipe-left on the sidebar itself closes it
+  const swipeCloseHandlers = useSwipeable({
+    onSwipedLeft: closeSidebar,
+    delta: 40,
+    trackTouch: true,
+    trackMouse: false,
+    preventScrollOnSwipe: false,
+  });
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -64,9 +97,7 @@ export default function Sidebar({
     } catch {
       // Even if the backend call fails, clear local state and redirect
     } finally {
-      // Clear all stored user data
       localStorage.clear();
-      // Expire auth cookies
       document.cookie = "token=; path=/; max-age=0; samesite=strict";
       document.cookie = "role=; path=/; max-age=0; samesite=strict";
       router.push("/login");
@@ -79,34 +110,59 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="lg:hidden fixed top-4 left-4 z-[60] bg-white p-2 rounded-lg shadow-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors"
-        aria-label="Toggle menu"
+      {/*
+       * ─── MOBILE-ONLY SWIPE CAPTURE ZONE ────────────────────────────────────
+       * A thin invisible strip on the left edge that captures swipe-right
+       * gestures and shows a subtle "›" indicator so users know it's draggable.
+       * Hidden on lg+ because the desktop sidebar is always visible.
+       */}
+      <div
+        {...swipeOpenHandlers}
+        onClick={openSidebar}
+        aria-label="Open navigation"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && openSidebar()}
+        className={`lg:hidden fixed left-0 top-1/2 -translate-y-1/2 z-[55] flex items-center justify-center
+          w-5 h-16 rounded-r-xl bg-[#00685C]/80 shadow-md cursor-pointer
+          transition-all duration-300 ease-in-out
+          ${isMobileMenuOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       >
-        <svg className="w-6 h-6 text-[#0F172A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          {isMobileMenuOpen ? (
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          ) : (
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          )}
+        <svg
+          className="w-3 h-3 text-white"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
         </svg>
-      </button>
+      </div>
 
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 backdrop-blur-sm bg-white/30 z-40"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+      {/*
+       * ─── MOBILE BACKDROP ────────────────────────────────────────────────────
+       * Semi-transparent overlay behind the drawer. Tap to close.
+       */}
+      <div
+        onClick={closeSidebar}
+        aria-hidden="true"
+        className={`lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]
+          transition-opacity duration-300 ease-in-out
+          ${isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+      />
 
-      {/* Sidebar */}
+      {/*
+       * ─── SIDEBAR ────────────────────────────────────────────────────────────
+       * Desktop: always visible (translate-x-0 via lg:translate-x-0).
+       * Mobile:  slides in/out based on isMobileMenuOpen.
+       */}
       <aside
-        className={`fixed left-0 top-0 bottom-0 w-64 bg-[#F8FAFC] border-r border-[#E2E8F0] flex flex-col justify-between transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? "translate-x-0 z-50" : "-translate-x-full lg:translate-x-0 z-50"
-        }`}
+        {...swipeCloseHandlers}
+        className={`fixed left-0 top-0 bottom-0 w-64 bg-[#F8FAFC] border-r border-[#E2E8F0]
+          flex flex-col justify-between z-50
+          transition-transform duration-300 ease-in-out
+          ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        aria-label="Main navigation"
       >
         <div className="flex flex-col min-h-0 flex-1">
           {/* Portal title */}
@@ -116,8 +172,6 @@ export default function Sidebar({
               {subtitle}
             </p>
           </div>
-
-          
 
           {/* Nav */}
           <nav className="px-4 py-4 flex flex-col gap-2 overflow-y-auto flex-1">
@@ -131,7 +185,7 @@ export default function Sidebar({
                 <Link
                   key={item.label}
                   href={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={closeSidebar}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                     isActive
                       ? "bg-white text-[#0D9488] shadow-sm font-semibold"
@@ -148,9 +202,8 @@ export default function Sidebar({
           </nav>
         </div>
 
-        {/* Bottom: optional action + logout */}
+        {/* Bottom: logout */}
         <div className="px-4 pb-6 flex flex-col gap-2">
-          
           <button
             onClick={handleLogout}
             disabled={loggingOut}

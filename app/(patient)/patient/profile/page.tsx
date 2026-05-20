@@ -124,16 +124,20 @@ export default function PatientProfilePage() {
     try {
       const result = await changePassword({ currentPassword, newPassword });
       if (result.success) {
-        toast.success(result.message || "Password changed successfully");
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
+        toast.success("Password changed. Logging you out…");
+        // Clear all session data and redirect to login
+        setTimeout(() => {
+          localStorage.clear();
+          document.cookie = "token=; path=/; max-age=0; samesite=strict";
+          document.cookie = "role=; path=/; max-age=0; samesite=strict";
+          window.location.href = "/login";
+        }, 2000);
       } else {
         toast.error(result.message || "Failed to change password");
+        setPasswordLoading(false);
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Something went wrong. Please try again.");
-    } finally {
       setPasswordLoading(false);
     }
   };
