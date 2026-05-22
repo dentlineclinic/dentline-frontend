@@ -57,12 +57,23 @@ export const USER_ROLES = {
   PATIENT: "PATIENT",
 } as const;
 
-// Local Storage Keys
+// Local Storage Keys — use these everywhere instead of raw strings
 export const STORAGE_KEYS = {
   TOKEN: "token",
+  REFRESH_TOKEN: "refreshToken",
   USER_ID: "userId",
   USER_NAME: "userName",
+  USER_EMAIL: "userEmail",
   USER_ROLE: "userRole",
+  PROFILE_PHOTO_URL: "profilePhotoUrl",
+  TOKEN_TYPE: "tokenType",
+  MUST_CHANGE_PASSWORD: "mustChangePassword",
+} as const;
+
+// Auth cookie names
+export const COOKIE_KEYS = {
+  TOKEN: "token",
+  ROLE: "role",
 } as const;
 
 // Pagination
@@ -142,3 +153,29 @@ export const ROUTES = {
   PATIENT_HISTORY: "/patient/history",
   PATIENT_PROFILE: "/patient/profile",
 } as const;
+
+// ─── Shared STATUS_COLORS ────────────────────────────────────────────────────
+// Single source of truth — import this instead of redefining per-page.
+
+export const STATUS_COLORS: Record<string, string> = {
+  // Appointment statuses
+  BOOKED:      "bg-[#E5EEFF] text-[#1E40AF]",
+  ARRIVAL:     "bg-[#F0FDFA] text-[#0F766E]",
+  ARRIVED:     "bg-[#F0FDFA] text-[#0F766E]",
+  ASSIGN:      "bg-[#FEF3C7] text-[#92400E]",
+  ASSIGNED:    "bg-[#FEF3C7] text-[#92400E]",
+  COMPLETE:    "bg-[#DCFCE7] text-[#166534]",
+  COMPLETED:   "bg-[#DCFCE7] text-[#166534]",
+  CANCEL:      "bg-[#F1F5F9] text-[#475569]",
+  CANCELLED:   "bg-[#F1F5F9] text-[#475569]",
+  MISSED:      "bg-[#FFDAD6] text-[#93000A]",
+  // History statuses
+  IN_PROGRESS: "bg-[#FEF3C7] text-[#92400E]",
+  PENDING:     "bg-[#FEF3C7] text-[#92400E]",
+};
+
+export const PAYMENT_COLORS: Record<string, string> = {
+  PAID:    "bg-[#DCFCE7] text-[#166534]",
+  PENDING: "bg-[#FEF3C7] text-[#92400E]",
+  UNPAID:  "bg-[#FFDAD6] text-[#93000A]",
+};

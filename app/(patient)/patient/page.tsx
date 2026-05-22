@@ -5,24 +5,10 @@ import TopBar from "@/components/layout/TopBar";
 import Link from "next/link";
 import { usePatientDashboard } from "@/hooks/useDashboard";
 import type { PatientHistoryDto } from "@/services/patientService";
+import { STATUS_COLORS } from "@/lib/constants";
+import { formatDateSplit } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_COLORS: Record<string, string> = {
-  PENDING:   "bg-[#FEF3C7] text-[#92400E]",
-  COMPLETED: "bg-[#DCFCE7] text-[#166534]",
-  CANCELLED: "bg-[#F1F5F9] text-[#475569]",
-};
-
-function formatDate(raw: string | null | undefined) {
-  if (!raw) return { date: "—", time: "—" };
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return { date: "—", time: "—" };
-  return {
-    date: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-  };
-}
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -32,7 +18,7 @@ function getGreeting() {
 }
 
 export default function PatientDashboard() {
-  const { data: response, isLoading: loading } = usePatientDashboard();
+  const { data: response, isLoading: loading, isError } = usePatientDashboard();
   const [copied, setCopied] = useState(false);
 
   const copyReferenceCode = (code: string) => {
@@ -55,7 +41,7 @@ export default function PatientDashboard() {
   const displayName = data?.patientName || (typeof window !== "undefined" ? localStorage.getItem("userName") : null) || "there";
 
   const recentHistories = (data?.recentHistories ?? []).map((h: PatientHistoryDto) => {
-    const { date, time } = formatDate(h.appointmentDate);
+    const { date, time } = formatDateSplit(h.appointmentDate);
     return {
       id: h.id,
       diagnosis: h.diagnosis || "General Checkup",
@@ -69,7 +55,7 @@ export default function PatientDashboard() {
   const stats = [
     { label: "Total Appointments",     value: data?.totalAppointments     != null ? String(data.totalAppointments)     : "—", icon: "🦷" },
     { label: "Completed Appointments", value: data?.completedAppointments != null ? String(data.completedAppointments) : "—", icon: "📅" },
-    { label: "Next Visit",             value: data?.lastAppointmentDate ? formatDate(data.lastAppointmentDate).date : "—", icon: "⏰" },
+    { label: "Next Visit",             value: data?.lastAppointmentDate ? formatDateSplit(data.lastAppointmentDate).date : "—", icon: "⏰" },
   ];
 
   return (
@@ -77,6 +63,13 @@ export default function PatientDashboard() {
       <TopBar title="My Dashboard" subtitle="Welcome back" />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6 lg:gap-8">
+
+        {/* Error state */}
+        {isError && (
+          <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
+            Failed to load your dashboard. Please refresh the page.
+          </div>
+        )}
 
         {/* Welcome Banner */}
         <div className="bg-gradient-to-r from-[#00685C] to-[#008375] rounded-xl p-6 sm:p-8 text-white relative overflow-hidden">

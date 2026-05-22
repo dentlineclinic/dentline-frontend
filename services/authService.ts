@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import { clearAuthState } from "@/lib/auth";
 
 export const loginUser = async (payload: {
   email: string;
@@ -80,11 +81,7 @@ export const changePassword = async (
 
 export const logoutUser = async (): Promise<BasicResponse> => {
   const response = await api.post("/auth/logout");
-
-  
-  localStorage.removeItem("token");
-  localStorage.removeItem("role");
-  localStorage.removeItem("user");
-
+  // Clear all auth state: localStorage + cookies
+  clearAuthState();
   return response.data;
 };

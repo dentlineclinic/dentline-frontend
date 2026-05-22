@@ -72,8 +72,8 @@ export default function BookAppointmentPage() {
             {message && (
               <div
                 className={`mb-6 p-4 rounded-lg ${message.type === "success"
-                    ? "bg-green-50 border border-green-200 text-green-700"
-                    : "bg-red-50 border border-red-200 text-red-700"
+                  ? "bg-green-50 border border-green-200 text-green-700"
+                  : "bg-red-50 border border-red-200 text-red-700"
                   }`}
               >
                 {message.text}
@@ -87,6 +87,7 @@ export default function BookAppointmentPage() {
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
                   required
                   className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C]"
                 />

@@ -17,8 +17,25 @@ export function formatDate(dateString: string, format: "short" | "long" = "short
   });
 }
 
+/**
+ * Splits a raw ISO date string into separate `date` and `time` display strings.
+ * Returns "—" for both if the value is missing or invalid.
+ * Use this instead of the local `formatDate` defined in individual pages.
+ */
+export function formatDateSplit(raw: string | null | undefined): { date: string; time: string } {
+  if (!raw) return { date: "—", time: "—" };
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return { date: "—", time: "—" };
+  return {
+    date: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  };
+}
+
 export function formatTime(timeString: string): string {
-  return timeString;
+  const d = new Date(timeString);
+  if (isNaN(d.getTime())) return timeString;
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 export function formatDateTime(dateString: string, timeString: string): string {

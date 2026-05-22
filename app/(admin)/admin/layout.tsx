@@ -1,4 +1,5 @@
 import Sidebar from "@/components/layout/Sidebar";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
 const adminNavItems = [
   {
@@ -95,8 +96,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         actionLabel="New Record"
         actionHref="/admin/appointments/new"
       />
-      {/* Content always takes full width on mobile, shifts right on desktop */}
-      <div className="min-h-screen lg:pl-64">{children}</div>
+      <div className="min-h-screen lg:pl-64">
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </div>
     </div>
   );
 }

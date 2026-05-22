@@ -4,19 +4,9 @@ import { useEffect } from "react";
 import Link from "next/link";
 import TopBar from "@/components/layout/TopBar";
 import { useDoctorDashboard } from "@/hooks/useDashboard";
+import { STATUS_COLORS } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_COLORS: Record<string, string> = {
-  ASSIGNED:    "bg-[#FEF3C7] text-[#92400E]",
-  COMPLETED:   "bg-[#DCFCE7] text-[#166534]",
-  IN_PROGRESS: "bg-[#FEF3C7] text-[#92400E]",
-  BOOKED:      "bg-[#E5EEFF] text-[#1E40AF]",
-  ARRIVAL:     "bg-[#F0FDFA] text-[#0F766E]",
-  ASSIGN:      "bg-[#FEF3C7] text-[#92400E]",
-  CANCEL:      "bg-[#F1F5F9] text-[#475569]",
-  MISSED:      "bg-[#FFDAD6] text-[#93000A]",
-};
 
 export default function DoctorDashboard() {
   const { data: response, isLoading: loading, error: queryError } = useDoctorDashboard();

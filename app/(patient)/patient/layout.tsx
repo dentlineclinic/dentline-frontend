@@ -1,5 +1,7 @@
 import Sidebar from "@/components/layout/Sidebar";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
+// ... nav items unchanged ...
 const patientNavItems = [
   {
     label: "Dashboard",
@@ -56,8 +58,9 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
         subtitle="Dentline Clinic"
         navItems={patientNavItems}
       />
-      {/* Content always takes full width on mobile, shifts right on desktop */}
-      <div className="min-h-screen lg:pl-64">{children}</div>
+      <div className="min-h-screen lg:pl-64">
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </div>
     </div>
   );
 }

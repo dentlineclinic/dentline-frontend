@@ -6,6 +6,8 @@ import { fetchPatients } from "@/services/patientService";
 import { fetchAppointments } from "@/services/appointmentService";
 import { getAdminReviews } from "@/services/reviewService";
 import { fetchPatientHistories } from "@/services/patientHistoryService";
+import { STATUS_COLORS } from "@/lib/constants";
+import { formatDateSplit, getInitials } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -20,37 +22,6 @@ type DashboardAppointment = {
   time: string;
   status: string;
 };
-
-const STATUS_COLORS: Record<string, string> = {
-  BOOKED:      "bg-[#E5EEFF] text-[#1E40AF]",
-  ARRIVAL:     "bg-[#F0FDFA] text-[#0F766E]",
-  ASSIGN:      "bg-[#FEF3C7] text-[#92400E]",
-  COMPLETE:    "bg-[#DCFCE7] text-[#166534]",
-  COMPLETED:   "bg-[#DCFCE7] text-[#166534]",
-  MISSED:      "bg-[#FFDAD6] text-[#93000A]",
-  CANCEL:      "bg-[#F1F5F9] text-[#475569]",
-  CANCELLED:   "bg-[#F1F5F9] text-[#475569]",
-  IN_PROGRESS: "bg-[#FEF3C7] text-[#92400E]",
-};
-
-function initials(name: string) {
-  return (name || "?")
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
-function formatDate(raw: string | null | undefined) {
-  if (!raw) return { date: "—", time: "—" };
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return { date: "—", time: "—" };
-  return {
-    date: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-  };
-}
 
 const fmtCurrency = (n: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(n);
@@ -109,12 +80,12 @@ export default function AdminDashboard() {
 
         setRecentAppointments(
           sorted.slice(0, 5).map((a) => {
-            const { date, time } = formatDate(a.appointmentDate);
+            const { date, time } = formatDateSplit(a.appointmentDate);
             return {
               id: a.id,
               shortId: `APT-${a.id.slice(0, 6).toUpperCase()}`,
               patientName: a.patientName || "Unknown",
-              initials: initials(a.patientName || ""),
+              initials: getInitials(a.patientName || ""),
               doctorName: a.doctorName || "Unassigned",
               note: a.reason || a.observation || "—",
               date,
