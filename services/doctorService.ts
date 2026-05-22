@@ -232,7 +232,7 @@ export const uploadHistoryVideo = async (
   formData.append("file", file);
 
   const res = await api.post(
-    `/upload/video/${historyId}`,
+    `/patient-history/${historyId}/upload/video`,
     formData
   );
 
