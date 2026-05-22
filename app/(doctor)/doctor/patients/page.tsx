@@ -272,12 +272,12 @@ export default function DoctorPatientsPage() {
                         <p className="text-sm text-[#3D4946]">
                           Amount:{" "}
                           <span className="font-bold text-[#0B1C30]">
-                            ${typeof h.amount === "number" ? h.amount.toLocaleString() : h.amount}
+                            ₦{typeof h.amount === "number" ? h.amount.toLocaleString() : h.amount}
                           </span>
                         </p>
                         {h.balance !== undefined && h.balance > 0 && (
                           <p className="text-xs text-[#94A3B8] mt-0.5">
-                            Balance: ${typeof h.balance === "number" ? h.balance.toLocaleString() : h.balance}
+                            Balance: ₦{typeof h.balance === "number" ? h.balance.toLocaleString() : h.balance}
                           </p>
                         )}
                       </div>
