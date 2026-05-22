@@ -85,3 +85,20 @@ export const logoutUser = async (): Promise<BasicResponse> => {
   clearAuthState();
   return response.data;
 };
+
+export const requestPasswordOtp = async (payload: {
+  email: string;
+}): Promise<BasicResponse> => {
+  const res = await api.post("/auth/forgot-password/request-otp", payload);
+  return res.data;
+};
+
+export const resetForgottenPassword = async (payload: {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<BasicResponse> => {
+  const res = await api.post("/auth/forgot-password/reset", payload);
+  return res.data;
+};
