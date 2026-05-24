@@ -8,6 +8,8 @@ import {
   markHistoryAsCompleted,
   uploadHistoryImage,
   uploadHistoryVideo,
+  deleteHistoryImage,
+  deleteHistoryVideo,
 } from "@/services/doctorService";
 import { imageThumbnail } from "@/lib/cloudinary";
 
@@ -48,6 +50,10 @@ export default function PatientHistoryModal({
   const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+
+  // Track which media item is being deleted (by URL) to show per-item spinner
+  const [deletingImage, setDeletingImage] = useState<string | null>(null);
+  const [deletingVideo, setDeletingVideo] = useState<string | null>(null);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -155,6 +161,64 @@ export default function PatientHistoryModal({
       showToast("Failed to upload video.", "error");
     } finally {
       setUploadingVideo(false);
+    }
+  };
+
+  /**
+   * Extracts the media ID from a Cloudinary URL.
+   * The backend expects the public_id which is everything after the version
+   * segment, e.g. "dentline/histories/abc123" from a full Cloudinary URL.
+   * We send the last path segment (filename without extension) as the ID.
+   */
+  const extractMediaId = (url: string): string => {
+    try {
+      const pathname = new URL(url).pathname;
+      // Remove extension and take the last segment
+      const withoutExt = pathname.replace(/\.[^/.]+$/, "");
+      return withoutExt.split("/").pop() ?? url;
+    } catch {
+      // Fallback for blob/local URLs (optimistic uploads not yet persisted)
+      return url;
+    }
+  };
+
+  const handleDeleteImage = async (url: string) => {
+    if (!history || deletingImage) return;
+    const mediaId = extractMediaId(url);
+    setDeletingImage(url);
+    try {
+      const result = await deleteHistoryImage(history.id, mediaId);
+      if (result.success) {
+        setImageUrls(prev => prev.filter(u => u !== url));
+        showToast("Image deleted.", "success");
+        onObservationSaved?.();
+      } else {
+        showToast(result.message || "Failed to delete image.", "error");
+      }
+    } catch {
+      showToast("Failed to delete image.", "error");
+    } finally {
+      setDeletingImage(null);
+    }
+  };
+
+  const handleDeleteVideo = async (url: string) => {
+    if (!history || deletingVideo) return;
+    const mediaId = extractMediaId(url);
+    setDeletingVideo(url);
+    try {
+      const result = await deleteHistoryVideo(history.id, mediaId);
+      if (result.success) {
+        setVideoUrls(prev => prev.filter(u => u !== url));
+        showToast("Video deleted.", "success");
+        onObservationSaved?.();
+      } else {
+        showToast(result.message || "Failed to delete video.", "error");
+      }
+    } catch {
+      showToast("Failed to delete video.", "error");
+    } finally {
+      setDeletingVideo(null);
     }
   };
 
@@ -318,11 +382,33 @@ export default function PatientHistoryModal({
                 </h3>
                 <div className="grid grid-cols-3 gap-3">
                   {imageUrls.map((url, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                      className="block aspect-square rounded-xl overflow-hidden border border-[#E2E8F0] hover:opacity-90 transition-opacity bg-[#F8FAFC]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={imageThumbnail(url)} alt={`Clinical image ${i + 1}`} className="w-full h-full object-cover" />
-                    </a>
+                    <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-[#E2E8F0] bg-[#F8FAFC]">
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={imageThumbnail(url)} alt={`Clinical image ${i + 1}`} className="w-full h-full object-cover" />
+                      </a>
+
+                      {/* Delete button — visible on hover in doctor mode */}
+                      {doctorMode && !isCompleted && (
+                        <button
+                          onClick={() => handleDeleteImage(url)}
+                          disabled={deletingImage === url}
+                          aria-label={`Delete image ${i + 1}`}
+                          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-lg bg-[#93000A]/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#93000A] disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {deletingImage === url ? (
+                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -336,19 +422,47 @@ export default function PatientHistoryModal({
                 </h3>
                 <div className="flex flex-col gap-2">
                   {videoUrls.map((url, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-3 hover:border-[#00685C] transition-colors">
-                      <div className="w-8 h-8 bg-[#F0FDFA] rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div key={i} className="flex items-center gap-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-3">
+                      {/* Clickable video link */}
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
+                      >
+                        <div className="w-8 h-8 bg-[#F0FDFA] rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm text-[#0B1C30] font-medium flex-1 truncate">Video {i + 1}</span>
+                        <svg className="w-4 h-4 text-[#94A3B8] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
-                      </div>
-                      <span className="text-sm text-[#0B1C30] font-medium flex-1">Video {i + 1}</span>
-                      <svg className="w-4 h-4 text-[#94A3B8] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </a>
+                      </a>
+
+                      {/* Delete button — doctor mode only, not completed */}
+                      {doctorMode && !isCompleted && (
+                        <button
+                          onClick={() => handleDeleteVideo(url)}
+                          disabled={deletingVideo === url}
+                          aria-label={`Delete video ${i + 1}`}
+                          className="w-7 h-7 rounded-lg bg-[#FFDAD6] text-[#93000A] flex items-center justify-center flex-shrink-0 hover:bg-[#93000A] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deletingVideo === url ? (
+                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>

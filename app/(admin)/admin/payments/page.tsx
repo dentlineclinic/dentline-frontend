@@ -7,6 +7,7 @@ import {
   recordPayment,
   markPaymentUnpaid,
 } from "@/services/patientHistoryService";
+import { fetchAdminPaymentSummary } from "@/services/adminService";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,9 @@ type HistoryRow = {
 };
 
 type SummaryData = {
-  totalRevenue: number;
-  totalPending: number;
-  totalPendingRecords: number;
+  totalAmount: number;
+  totalBalance: number;
+  totalPatientHistories: number;
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
@@ -69,9 +70,9 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<SummaryData>({
-    totalRevenue: 0,
-    totalPending: 0,
-    totalPendingRecords: 0,
+    totalAmount: 0,
+    totalBalance: 0,
+    totalPatientHistories: 0,
   });
 
   // Pagination
@@ -132,7 +133,18 @@ export default function PaymentsPage() {
     }
   }, [size]);
 
-  // ✅ Load payments when page or search changes (with debounce)
+  // Load summary stats from the dedicated endpoint on mount
+  useEffect(() => {
+    fetchAdminPaymentSummary()
+      .then((res) => {
+        if (res.success) setSummary(res.data);
+      })
+      .catch(() => {
+        // Non-critical — table still works without summary
+      });
+  }, []);
+
+  // Load payments when page or search changes (with debounce)
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => loadPayments(page, search), 300);
@@ -207,18 +219,18 @@ export default function PaymentsPage() {
           ) : (
             <>
               <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-                <p className="text-sm text-[#3D4946]">Total Revenue</p>
-                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{fmt(summary.totalRevenue)}</p>
-                <p className="text-xs text-[#0D9488] mt-1">Total revenue (all records)</p>
+                <p className="text-sm text-[#3D4946]">Total Billed</p>
+                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{fmt(summary.totalAmount)}</p>
+                <p className="text-xs text-[#0D9488] mt-1">Across all patient histories</p>
               </div>
               <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-                <p className="text-sm text-[#3D4946]">Pending Payments</p>
-                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{fmt(summary.totalPending)}</p>
-                <p className="text-xs text-[#0D9488] mt-1">{summary.totalPendingRecords} unpaid/pending records</p>
+                <p className="text-sm text-[#3D4946]">Outstanding Balance</p>
+                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{fmt(summary.totalBalance)}</p>
+                <p className="text-xs text-[#0D9488] mt-1">Total unpaid / pending amount</p>
               </div>
               <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
                 <p className="text-sm text-[#3D4946]">Total Records</p>
-                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{totalElements}</p>
+                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{summary.totalPatientHistories || totalElements}</p>
                 <p className="text-xs text-[#0D9488] mt-1">All payment entries</p>
               </div>
             </>

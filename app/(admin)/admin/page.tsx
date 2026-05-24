@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchPatients } from "@/services/patientService";
-import { fetchAppointments } from "@/services/appointmentService";
-import { getAdminReviews } from "@/services/reviewService";
-import { fetchPatientHistories } from "@/services/patientHistoryService";
+import { fetchAdminDashboard, type AdminDashboardAppointment } from "@/services/adminService";
 import { STATUS_COLORS } from "@/lib/constants";
 import { formatDateSplit, getInitials } from "@/lib/utils";
 
@@ -24,62 +21,37 @@ type DashboardAppointment = {
 };
 
 const fmtCurrency = (n: number) =>
-  new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  }).format(n);
 
 export default function AdminDashboard() {
-  const [totalPatients, setTotalPatients]       = useState<number | null>(null);
-  const [dailyAppointments, setDailyAppointments] = useState<number | null>(null);
-  const [monthlyRevenue, setMonthlyRevenue]     = useState<number | null>(null);
-  const [satisfaction, setSatisfaction]         = useState<number | null>(null);
+  const [totalPatients, setTotalPatients]           = useState<number | null>(null);
+  const [dailyAppointments, setDailyAppointments]   = useState<number | null>(null);
+  const [monthlyRevenue, setMonthlyRevenue]         = useState<number | null>(null);
+  const [satisfaction, setSatisfaction]             = useState<number | null>(null);
   const [recentAppointments, setRecentAppointments] = useState<DashboardAppointment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading]                       = useState(true);
+  const [error, setError]                           = useState<string | null>(null);
 
   useEffect(() => {
-    const today = new Date();
-    const todayStr = today.toDateString();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    fetchAdminDashboard()
+      .then((res) => {
+        if (!res.success) {
+          setError(res.message || "Failed to load dashboard data.");
+          return;
+        }
 
-    Promise.allSettled([
-      // 1. Total patients
-      fetchPatients(0, 1),
-
-      // 2. All appointments (large page to get today's + latest 5)
-      fetchAppointments(0, 100),
-
-      // 3. Reviews for satisfaction score
-      getAdminReviews(0, 100),
-
-      // 4. Patient histories for monthly revenue
-      fetchPatientHistories(0, 100),
-    ]).then(([patientsRes, apptRes, reviewsRes, historiesRes]) => {
-      // ── Total Patients ──────────────────────────────────────────────────
-      if (patientsRes.status === "fulfilled") {
-        const d = patientsRes.value;
-        setTotalPatients(d?.data?.totalElements ?? 0);
-      }
-
-      // ── Appointments ────────────────────────────────────────────────────
-      if (apptRes.status === "fulfilled") {
-        const content: any[] = apptRes.value?.data?.content ?? [];
-
-        // Daily: appointments whose date matches today
-        const todayCount = content.filter((a) => {
-          const d = new Date(a.appointmentDate);
-          return !isNaN(d.getTime()) && d.toDateString() === todayStr;
-        }).length;
-        setDailyAppointments(todayCount);
-
-        // Latest 5 (sorted newest first)
-        const sorted = [...content].sort(
-          (a, b) =>
-            new Date(b.appointmentDate).getTime() -
-            new Date(a.appointmentDate).getTime()
-        );
+        const d = res.data;
+        setTotalPatients(d.totalPatients);
+        setDailyAppointments(d.todayAppointments);
+        setMonthlyRevenue(d.monthlyRevenue);
+        setSatisfaction(d.satisfactionRatePercent);
 
         setRecentAppointments(
-          sorted.slice(0, 5).map((a) => {
+          (d.latestAppointments ?? []).map((a: AdminDashboardAppointment) => {
             const { date, time } = formatDateSplit(a.appointmentDate);
             return {
               id: a.id,
@@ -94,44 +66,9 @@ export default function AdminDashboard() {
             };
           })
         );
-      }
-
-      // ── Patient Satisfaction ────────────────────────────────────────────
-      if (reviewsRes.status === "fulfilled") {
-        const content: any[] = reviewsRes.value?.data?.content ?? [];
-        if (content.length > 0) {
-          const avg =
-            content.reduce((sum: number, r: any) => sum + (r.rating ?? 0), 0) /
-            content.length;
-          // Convert 5-star scale to percentage
-          setSatisfaction(Math.round((avg / 5) * 100));
-        } else {
-          setSatisfaction(0);
-        }
-      }
-
-      // ── Monthly Revenue ─────────────────────────────────────────────────
-      if (historiesRes.status === "fulfilled") {
-        const content: any[] = historiesRes.value?.data?.content ?? [];
-        const revenue = content
-          .filter((h) => {
-            if (h.paymentStatus !== "PAID") return false;
-            const d = new Date(h.appointmentDate ?? h.createdAt);
-            return (
-              !isNaN(d.getTime()) &&
-              d.getMonth() === currentMonth &&
-              d.getFullYear() === currentYear
-            );
-          })
-          .reduce((sum: number, h: any) => sum + (h.amount ?? 0), 0);
-        setMonthlyRevenue(revenue);
-      }
-
-      setLoading(false);
-    }).catch(() => {
-      setError("Failed to load dashboard data.");
-      setLoading(false);
-    });
+      })
+      .catch(() => setError("Failed to load dashboard data."))
+      .finally(() => setLoading(false));
   }, []);
 
   const stats = [
@@ -214,7 +151,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* Recent Appointments */}
+        {/* Latest Appointments */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg sm:text-xl lg:text-2xl font-semibold text-[#0B1C30]">

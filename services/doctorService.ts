@@ -238,3 +238,19 @@ export const uploadHistoryVideo = async (
 
   return res.data;
 };
+
+export const deleteHistoryImage = async (
+  historyId: string,
+  imageId: string
+): Promise<BasicResponse> => {
+  const res = await api.delete(`/patient-history/${historyId}/image/${imageId}`);
+  return res.data;
+};
+
+export const deleteHistoryVideo = async (
+  historyId: string,
+  videoId: string
+): Promise<BasicResponse> => {
+  const res = await api.delete(`/patient-history/${historyId}/video/${videoId}`);
+  return res.data;
+};
