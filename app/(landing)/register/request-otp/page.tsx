@@ -4,32 +4,55 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequestOtp } from "@/hooks/useRequestOtp";
+import { isValidEmail, isValidPhone } from "@/lib/utils";
 
 export default function RequestOtpPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [error, setError] = useState("");
   const router = useRouter();
   const mutation = useRequestOtp();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const trimmedIdentifier = identifier.trim();
+    const isEmail = trimmedIdentifier.includes("@");
+
+    if (!trimmedIdentifier) {
+      setError("Please enter your email or phone number.");
+      return;
+    }
+
+    if (isEmail && !isValidEmail(trimmedIdentifier)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!isEmail && !isValidPhone(trimmedIdentifier)) {
+      setError("Please enter a valid phone number.");
+      return;
+    }
+
+    setError("");
+
     mutation.mutate(
-      { email },
+      isEmail
+        ? { email: trimmedIdentifier }
+        : { phoneNumber: trimmedIdentifier },
       {
         onSuccess: () => {
-          sessionStorage.setItem("reg_email", email);
+          sessionStorage.setItem("reg_identifier", trimmedIdentifier);
           router.push("/register/verify-otp");
         },
       }
     );
   };
 
-  const errorMessage =
-    mutation.isError && mutation.error instanceof Error
-      ? mutation.error.message
-      : mutation.isError
+  const errorMessage = error || (mutation.isError && mutation.error instanceof Error
+    ? mutation.error.message
+    : mutation.isError
       ? "Something went wrong. Please try again."
-      : null;
+      : null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F9FF] to-white flex flex-col">
@@ -72,7 +95,7 @@ export default function RequestOtpPage() {
             </Link>
             <h2 className="text-3xl font-bold text-[#0B1C30] mt-4">Create Your Account</h2>
             <p className="text-base text-[#485F83] mt-1">
-              Enter your email address to get started. We&apos;ll send you a verification code.
+              Enter your email address or phone number to get started. We&apos;ll send you a verification code.
             </p>
           </div>
 
@@ -87,7 +110,7 @@ export default function RequestOtpPage() {
             {/* Email */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-semibold text-[#3D4946]">
-                Email Address <span className="text-[#93000A]">*</span>
+                Email or Phone Number <span className="text-[#93000A]">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B7280]">
@@ -101,10 +124,13 @@ export default function RequestOtpPage() {
                   </svg>
                 </span>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="john.doe@example.com"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => {
+                    setIdentifier(e.target.value);
+                    if (error) setError("");
+                  }}
+                  placeholder="john.doe@example.com or +2348012345678"
                   required
                   autoFocus
                   className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-4 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"

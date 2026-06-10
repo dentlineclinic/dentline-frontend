@@ -38,8 +38,34 @@ export const assignDoctorToAppointment = async (
   id: string,
   doctorId: string
 ) => {
-  const response = await api.patch(`/appointments/${id}/assign`, {
-    doctorId,
-  });
+  const response = await api.patch(`/appointments/${id}/assign`, { doctorId });
+  return response.data;
+};
+
+// ── Change 3: Reschedule ─────────────────────────────────────────────────────
+
+export interface RescheduleAppointmentRequest {
+  newAppointmentDate: string; // YYYY-MM-DD
+}
+
+export const rescheduleAppointment = async (
+  appointmentId: string,
+  payload: RescheduleAppointmentRequest
+) => {
+  const response = await api.patch(`/appointments/${appointmentId}/reschedule`, payload);
+  return response.data;
+};
+
+// ── Change 2: Admin booking ───────────────────────────────────────────────────
+
+export interface AdminBookAppointmentRequest {
+  patientId: string;
+  appointmentDate: string; // YYYY-MM-DD
+}
+
+export const adminBookAppointment = async (
+  payload: AdminBookAppointmentRequest
+) => {
+  const response = await api.post("/appointments/admin-book", payload);
   return response.data;
 };

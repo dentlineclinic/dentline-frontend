@@ -66,7 +66,7 @@ export default function Footer() {
           <div className="flex flex-col gap-6">
             <h3 className="text-base font-semibold text-white">Legal</h3>
             <ul className="flex flex-col gap-3">
-              {["Privacy Policy", "Terms of Service", "ADA Compliance"].map((item) => (
+              {["Privacy Policy", "Terms of Service"].map((item) => (
                 <li key={item}>
                   <Link href="#" className="text-xs text-[#94A3B8] hover:text-white transition-colors">
                     {item}

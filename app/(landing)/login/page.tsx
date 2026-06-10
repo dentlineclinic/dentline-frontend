@@ -7,12 +7,12 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"PATIENT" | "DOCTOR">("PATIENT");
   const router = useRouter();
-  
+
   const loginMutation = useLogin();
 
   // Handle redirect based on role after successful login
@@ -28,9 +28,9 @@ export default function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     loginMutation.mutate({
-      email,
+      identifier,
       password,
       role: selectedRole,
     });
@@ -108,11 +108,10 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedRole("PATIENT")}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${
-                      selectedRole === "PATIENT"
-                        ? "border-[#00685C] bg-[#00685C]/5 text-[#00685C]"
-                        : "border-[#BDC9C5] bg-white text-[#485F83] hover:border-[#00685C]/50"
-                    }`}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${selectedRole === "PATIENT"
+                      ? "border-[#00685C] bg-[#00685C]/5 text-[#00685C]"
+                      : "border-[#BDC9C5] bg-white text-[#485F83] hover:border-[#00685C]/50"
+                      }`}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -122,11 +121,10 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedRole("DOCTOR")}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${
-                      selectedRole === "DOCTOR"
-                        ? "border-[#00685C] bg-[#00685C]/5 text-[#00685C]"
-                        : "border-[#BDC9C5] bg-white text-[#485F83] hover:border-[#00685C]/50"
-                    }`}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${selectedRole === "DOCTOR"
+                      ? "border-[#00685C] bg-[#00685C]/5 text-[#00685C]"
+                      : "border-[#BDC9C5] bg-white text-[#485F83] hover:border-[#00685C]/50"
+                      }`}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21v-2a4 4 0 00-4-4H9a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" />
@@ -139,7 +137,11 @@ export default function LoginPage() {
 
               {/* Email */}
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-[#3D4946]">Clinical Email</label>
+                <label className="text-sm font-semibold text-[#3D4946]">
+                  {selectedRole === "PATIENT"
+                    ? "Email Address or Phone Number"
+                    : "Doctor Email"}
+                </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B7280]">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,10 +149,14 @@ export default function LoginPage() {
                     </svg>
                   </span>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="dr.smith@dentline.com"
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder={
+                      selectedRole === "PATIENT"
+                        ? "email@example.com or +2348012345678"
+                        : "doctor@dentline.com"
+                    }
                     required
                     className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-4 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"
                   />

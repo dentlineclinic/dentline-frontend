@@ -55,7 +55,7 @@ export default function PatientDashboard() {
   const stats = [
     { label: "Total Appointments",     value: data?.totalAppointments     != null ? String(data.totalAppointments)     : "—", icon: "🦷" },
     { label: "Completed Appointments", value: data?.completedAppointments != null ? String(data.completedAppointments) : "—", icon: "📅" },
-    { label: "Next Visit",             value: data?.lastAppointmentDate ? formatDateSplit(data.lastAppointmentDate).date : "—", icon: "⏰" },
+    { label: "Next Visit",             value: data?.nextAppointmentDate ? formatDateSplit(data.nextAppointmentDate).date : "—", icon: "⏰" },
   ];
 
   return (

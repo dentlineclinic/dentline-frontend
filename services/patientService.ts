@@ -208,7 +208,7 @@ export interface PatientDashboardDto {
   today: string;
   completedAppointments: number;
   totalAppointments: number;
-  lastAppointmentDate: string | null;
+  nextAppointmentDate: string | null;
   referenceCode: string | null;
   referencePoints: number;
   recentHistories: PatientHistoryDto[];

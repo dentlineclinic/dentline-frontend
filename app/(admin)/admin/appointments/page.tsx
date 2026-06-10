@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useAppointments } from "@/hooks/useAppointments";
+import { useAppointments, useAdminBookAppointment, useRescheduleAppointment } from "@/hooks/useAppointments";
 import { fetchDoctors } from "@/services/doctorService";
+import { toast } from "react-toastify";
 import api from "@/lib/axios"
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,9 @@ export default function AppointmentsPage() {
 
   const { data, isLoading, error, refetch } = useAppointments(page, size);
 
+  const bookMutation = useAdminBookAppointment();
+  const rescheduleMutation = useRescheduleAppointment();
+
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [filter, setFilter] = useState("All");
@@ -69,6 +73,17 @@ export default function AppointmentsPage() {
 
   // Copy ID feedback
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Book Appointment modal - simplified (only patientId and date)
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [bookPatientId, setBookPatientId] = useState("");
+  const [bookDate, setBookDate] = useState("");
+
+  // Reschedule modal
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleApptId, setRescheduleApptId] = useState("");
+  const [rescheduleApptLabel, setRescheduleApptLabel] = useState("");
+  const [newDate, setNewDate] = useState("");
 
   const copyId = (rawId: string) => {
     navigator.clipboard.writeText(rawId).then(() => {
@@ -132,9 +147,13 @@ export default function AppointmentsPage() {
   }, [doctorSearch, showDoctorPanel, loadDoctors]);
 
   // Map backend data to UI shape
+  // Change 4: appointmentDate is LocalDate (date only, no time)
   const mappedAppointments: Appointment[] =
     data?.data?.content?.map((appt: any) => {
-      const dt = new Date(appt.appointmentDate);
+      // appointmentDate is "YYYY-MM-DD" — display as date only, no fake time
+      const dateDisplay = appt.appointmentDate
+        ? new Date(appt.appointmentDate + "T00:00:00").toLocaleDateString()
+        : "—";
 
       return {
         id: `APT-${appt.id.slice(0, 6).toUpperCase()}`,
@@ -149,11 +168,8 @@ export default function AppointmentsPage() {
           .toUpperCase(),
         doctorId: appt.doctorId,
         doctorName: appt.doctorName || "Unassigned",
-        date: dt.toLocaleDateString(),
-        time: dt.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        date: dateDisplay,
+        time: "",
         status: appt.status,
         observation: appt.observation ?? "No notes",
       };
@@ -230,6 +246,49 @@ export default function AppointmentsPage() {
     loadDoctors(newPage, 10, doctorSearch);
   };
 
+  // ── Book appointment handlers (simplified) ────────────────────────────────────────────
+  const openBookModal = () => {
+    setBookPatientId("");
+    setBookDate("");
+    setShowBookModal(true);
+  };
+
+  const handleBookSubmit = async () => {
+    if (!bookPatientId || !bookDate) {
+      toast.error("Please enter a patient ID and select a date.");
+      return;
+    }
+    try {
+      await bookMutation.mutateAsync({ patientId: bookPatientId, appointmentDate: bookDate });
+      toast.success("Appointment booked successfully.");
+      setShowBookModal(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to book appointment.");
+    }
+  };
+
+  // ── Reschedule handlers ──────────────────────────────────────────────────
+  const openRescheduleModal = (appt: Appointment) => {
+    setRescheduleApptId(appt.rawId);
+    setRescheduleApptLabel(`${appt.patientName} — ${appt.date}`);
+    setNewDate("");
+    setShowRescheduleModal(true);
+  };
+
+  const handleRescheduleSubmit = async () => {
+    if (!newDate) {
+      toast.error("Please select a new date.");
+      return;
+    }
+    try {
+      await rescheduleMutation.mutateAsync({ appointmentId: rescheduleApptId, newAppointmentDate: newDate });
+      toast.success("Appointment rescheduled.");
+      setShowRescheduleModal(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to reschedule.");
+    }
+  };
+
   const getTodayDate = () => {
     const today = new Date();
     return today.toLocaleDateString();
@@ -280,13 +339,25 @@ export default function AppointmentsPage() {
               </button>
             ))}
           </div>
-          <input
-            type="search"
-            placeholder="Search appointments..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-full sm:w-64"
-          />
+          <div className="flex items-center gap-3">
+            <input
+              type="search"
+              placeholder="Search appointments..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-full sm:w-64"
+            />
+            {/* Change 2: Book Appointment button */}
+            <button
+              onClick={openBookModal}
+              className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors flex-shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Book Appointment
+            </button>
+          </div>
         </div>
 
         {errorMessage && (
@@ -301,7 +372,7 @@ export default function AppointmentsPage() {
             <table className="w-full min-w-[800px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "DOCTOR", "OBSERVATION", "DATE & TIME", "STATUS", "ACTIONS"].map(h => (
+                  {["ID", "PATIENT", "DOCTOR", "OBSERVATION", "DATE", "STATUS", "ACTIONS"].map(h => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -365,7 +436,6 @@ export default function AppointmentsPage() {
                         <td className="px-6 py-4 text-sm text-[#3D4946] max-w-[180px] truncate">{appt.observation}</td>
                         <td className="px-6 py-4">
                           <p className="text-sm font-medium text-[#0B1C30]">{appt.date}</p>
-                          <p className="text-xs text-[#3D4946]">{appt.time}</p>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
@@ -373,16 +443,27 @@ export default function AppointmentsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <button
-                            onClick={() => openPanel(appt)}
-                            disabled={!canManage}
-                            className={`text-xs font-semibold transition-colors ${canManage
-                                ? "text-[#0D9488] hover:underline cursor-pointer"
-                                : "text-[#94A3B8] cursor-not-allowed"
-                              }`}
-                          >
-                            Manage
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => openPanel(appt)}
+                              disabled={!canManage}
+                              className={`text-xs font-semibold transition-colors ${canManage
+                                  ? "text-[#0D9488] hover:underline cursor-pointer"
+                                  : "text-[#94A3B8] cursor-not-allowed"
+                                }`}
+                            >
+                              Manage
+                            </button>
+                            {/* Change 3: Reschedule — only for BOOKED appointments */}
+                            {appt.status === "BOOKED" && (
+                              <button
+                                onClick={() => openRescheduleModal(appt)}
+                                className="text-xs font-semibold text-[#435B7E] hover:underline cursor-pointer"
+                              >
+                                Reschedule
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -466,10 +547,6 @@ export default function AppointmentsPage() {
               <div className="flex justify-between">
                 <span className="text-[#94A3B8] text-xs font-semibold uppercase tracking-widest">Date</span>
                 <span className="text-[#0B1C30] text-sm font-medium">{selectedAppt.date}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#94A3B8] text-xs font-semibold uppercase tracking-widest">Time</span>
-                <span className="text-[#0B1C30] text-sm font-medium">{selectedAppt.time}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[#94A3B8] text-xs font-semibold uppercase tracking-widest">Status</span>
@@ -666,6 +743,137 @@ export default function AppointmentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── MODAL: Book Appointment (simplified: patient ID + date) ── */}
+      {showBookModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]" onClick={() => setShowBookModal(false)} />
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
+                <h2 className="text-base font-bold text-[#0B1C30]">Book Appointment</h2>
+                <button onClick={() => setShowBookModal(false)} className="text-[#94A3B8] hover:text-[#475569]">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5 flex flex-col gap-5">
+                {/* Patient ID input */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-semibold text-[#3D4946]">Patient ID</label>
+                  <input
+                    type="text"
+                    placeholder="Enter patient UUID"
+                    value={bookPatientId}
+                    onChange={(e) => setBookPatientId(e.target.value)}
+                    className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+                  />
+                </div>
+
+                {/* Date picker */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-semibold text-[#3D4946]">Appointment Date</label>
+                  <input
+                    type="date"
+                    value={bookDate}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={e => setBookDate(e.target.value)}
+                    className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 px-6 py-4 border-t border-[#F1F5F9]">
+                <button
+                  onClick={() => setShowBookModal(false)}
+                  className="flex-1 py-2.5 text-sm font-semibold text-[#3D4946] border border-[#E2E8F0] rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBookSubmit}
+                  disabled={bookMutation.isPending || !bookPatientId || !bookDate}
+                  className="flex-1 py-2.5 text-sm font-semibold bg-[#00685C] text-white rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {bookMutation.isPending && (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  )}
+                  {bookMutation.isPending ? "Booking…" : "Book Appointment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── MODAL: Reschedule Appointment (Change 3) ── */}
+      {showRescheduleModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]" onClick={() => setShowRescheduleModal(false)} />
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
+                <div>
+                  <h2 className="text-base font-bold text-[#0B1C30]">Reschedule Appointment</h2>
+                  <p className="text-xs text-[#94A3B8] mt-0.5 truncate max-w-[220px]">{rescheduleApptLabel}</p>
+                </div>
+                <button onClick={() => setShowRescheduleModal(false)} className="text-[#94A3B8] hover:text-[#475569]">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5 flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-semibold text-[#3D4946]">New Appointment Date</label>
+                  <input
+                    type="date"
+                    value={newDate}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={e => setNewDate(e.target.value)}
+                    autoFocus
+                    className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 px-6 py-4 border-t border-[#F1F5F9]">
+                <button
+                  onClick={() => setShowRescheduleModal(false)}
+                  className="flex-1 py-2.5 text-sm font-semibold text-[#3D4946] border border-[#E2E8F0] rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRescheduleSubmit}
+                  disabled={rescheduleMutation.isPending || !newDate}
+                  className="flex-1 py-2.5 text-sm font-semibold bg-[#00685C] text-white rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {rescheduleMutation.isPending && (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  )}
+                  {rescheduleMutation.isPending ? "Rescheduling…" : "Confirm Reschedule"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
