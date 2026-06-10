@@ -13,17 +13,55 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.dentlineclinic.com"),
   title: {
-    default: "Dentline Clinic",
+    default: "Dentline Clinic | Dental Clinic in Ikeja & Gbagada, Lagos",
     template: "%s | Dentline Clinic",
   },
   description:
-    "Excellence in Restorative Dentistry. Precision care for your everlasting smile.",
-  keywords: ["dental clinic", "dentist", "restorative dentistry", "Dentline"],
+
+    "Dentline Clinic is a modern dental clinic in Ikeja & Gbagada, Lagos, providing preventive, cosmetic, restorative, and emergency dental care for patients of all ages.",
+
+  keywords: ["dental clinic", "dentist", "restorative dentistry", "Dentline", "dental clinic Lagos",
+    "dentist Ikeja",
+    "dentist Lagos",
+    "teeth cleaning",
+    "cosmetic dentistry",
+    "restorative dentistry",
+    "emergency dental care",
+    "Dentline Clinic",
+    "dentist Gbagada"],
+
+  openGraph: {
+  title: "Dentline Clinic | Dental Clinic in Ikeja & Gbagada, Lagos",
+  description:
+    "Dentline Clinic provides professional dental care in Ikeja and Gbagada, Lagos, including routine checkups, teeth cleaning, cosmetic dentistry, restorative treatments, and emergency dental services.",
+  url: "https://www.dentlineclinic.com",
+  siteName: "Dentline Clinic",
+  locale: "en_US",
+  type: "website",
+  images: [
+    {
+      url: "/og-image.png",
+      width: 1200,
+      height: 630,
+      alt: "Dentline Clinic",
+    },
+  ],
+},
+
+twitter: {
+  card: "summary_large_image",
+  title: "Dentline Clinic | Dental Clinic in Ikeja & Gbagada, Lagos",
+  description:
+    "Dentline Clinic provides professional dental care in Ikeja and Gbagada, Lagos, including routine checkups, teeth cleaning, cosmetic dentistry, restorative treatments, and emergency dental services.",
+  images: ["/og-image.png"],
+},
 
   icons: {
-    icon: "icon.png",
-    
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
   },
 };
 
