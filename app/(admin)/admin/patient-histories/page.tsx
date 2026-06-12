@@ -3,7 +3,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "react-toastify";
 import api from "@/lib/axios";
-import { fetchPaymentStats } from "@/services/patientHistoryService";
+import {
+  fetchPatientHistories,
+  fetchPaymentStats,
+  createPatientHistory
+} from "@/services/patientHistoryService";
 
 export const dynamic = "force-dynamic";
 
@@ -43,15 +47,15 @@ export type PaymentStats = {
 type SelectedHistory = PatientHistory;
 
 const PAYMENT_COLORS: Record<string, string> = {
-  PAID:    "bg-[#DCFCE7] text-[#166534]",
+  PAID: "bg-[#DCFCE7] text-[#166534]",
   PENDING: "bg-[#FEF3C7] text-[#92400E]",
-  UNPAID:  "bg-[#FFDAD6] text-[#93000A]",
+  UNPAID: "bg-[#FFDAD6] text-[#93000A]",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  COMPLETED:   "bg-[#F0FDFA] text-[#0F766E]",
+  COMPLETED: "bg-[#F0FDFA] text-[#0F766E]",
   IN_PROGRESS: "bg-[#E5EEFF] text-[#435B7E]",
-  PENDING:     "bg-[#FEF3C7] text-[#92400E]",
+  PENDING: "bg-[#FEF3C7] text-[#92400E]",
 };
 
 const formatCurrency = (n: number) =>
@@ -67,10 +71,10 @@ export default function PatientHistoriesPage() {
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("All");
   const [selectedHistory, setSelectedHistory] = useState<SelectedHistory | null>(null);
-  
+
   // ✅ Stats state
   const [stats, setStats] = useState<PaymentStats | null>(null);
-  
+
   // Pagination state
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -114,10 +118,10 @@ export default function PatientHistoriesPage() {
   const loadStats = useCallback(async () => {
     try {
       const res = await fetchPaymentStats();
-      
+
       // Debug log to check response structure
       console.log("STATS RESPONSE:", res);
-      
+
       if (res.success) {
         setStats(res.data);
       }
@@ -129,20 +133,19 @@ export default function PatientHistoriesPage() {
   const loadHistories = useCallback(async (pageNum: number, pageSize: number, searchTerm: string, paymentStatus: string) => {
     setLoading(true);
     setError(null);
-    
-    try {
-      const params: any = { page: pageNum, size: pageSize };
-      
-      if (paymentStatus !== "All") {
-        params.paymentStatus = paymentStatus;
-      }
-      
-      const res = await api.get("/patient-history/all", { params });
 
-      if (res.data.success) {
-        const mapped = res.data.data.content.map((h: any) => {
+    try {
+      const res = await fetchPatientHistories(
+        pageNum,
+        pageSize,
+        searchTerm,
+        paymentStatus
+      );
+
+      if (res.success) {
+        const mapped = res.data.content.map((h) => {
           const { date, time } = formatDateSafe(h.appointmentDate);
-          
+
           return {
             id: h.id,
             shortId: `HIS-${h.id.slice(0, 6).toUpperCase()}`,
@@ -154,8 +157,11 @@ export default function PatientHistoriesPage() {
             appointmentId: h.appointmentId,
             date,
             time,
-            amount: parseFloat(h.amount) || 0,
-            balance: parseFloat(h.balance) || 0,
+            amount: h.amount ?? 0,
+            balance: h.balance ?? calculateBalance(
+              h.amount ?? 0,
+              h.paymentStatus || "PENDING"
+            ),
             paymentStatus: h.paymentStatus || "PENDING",
             status: h.status || "PENDING",
             observation: h.observation || "No observation notes",
@@ -166,10 +172,10 @@ export default function PatientHistoriesPage() {
         });
 
         setHistories(mapped);
-        setTotalPages(res.data.data.totalPages);
-        setTotalElements(res.data.data.totalElements);
+        setTotalPages(res.data.totalPages);
+        setTotalElements(res.data.totalElements);
       } else {
-        setError(res.data.message || "Failed to load patient histories.");
+        setError(res.message || "Failed to load patient histories.");
       }
     } catch (err: any) {
       console.error("Error loading histories:", err);
@@ -185,11 +191,7 @@ export default function PatientHistoriesPage() {
   }, [loadStats]);
 
   // Client-side filtering for search
-  const visible = histories.filter(h =>
-    h.patientName.toLowerCase().includes(search.toLowerCase()) ||
-    h.doctorName.toLowerCase().includes(search.toLowerCase()) ||
-    h.shortId.toLowerCase().includes(search.toLowerCase())
-  );
+  const visible = histories;
 
   // Current page completion rate (for UI feedback only, not for totals)
   const currentPageCompletedCount = histories.filter(h => h.status === "COMPLETED").length;
@@ -209,16 +211,16 @@ export default function PatientHistoriesPage() {
 
   // Debounced API calls
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  
+
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    
+
     debounceTimerRef.current = setTimeout(() => {
       loadHistories(page, size, search, paymentFilter);
     }, 400);
-    
+
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -239,26 +241,26 @@ export default function PatientHistoriesPage() {
       setCreateError("Please enter an appointment ID.");
       return;
     }
-    
+
     const amount = parseFloat(createAmount);
     if (!createAmount || isNaN(amount) || amount <= 0) {
       setCreateError("Amount must be a positive number.");
       return;
     }
-    
+
     setCreating(true);
     setCreateError(null);
     setCreateSuccess(null);
-    
+
     try {
-      const res = await api.post("/patient-history", {
+      const res = await createPatientHistory({
         appointmentId: createApptId,
         amount,
       });
-      
-      if (res.data.success) {
-        setCreateSuccess(res.data.message || "Patient history created successfully!");
-        
+
+      if (res.success) {
+        setCreateSuccess(res.message || "Patient history created successfully!");
+
         setTimeout(async () => {
           await Promise.all([
             loadHistories(page, size, search, paymentFilter),
@@ -269,7 +271,7 @@ export default function PatientHistoriesPage() {
           setCreateAmount("");
         }, 1500);
       } else {
-        setCreateError(res.data.message || "Failed to create patient history.");
+        setCreateError(res.message || "Failed to create patient history.");
       }
     } catch (err: any) {
       setCreateError(err.response?.data?.message || "Failed to create patient history.");
@@ -341,7 +343,7 @@ export default function PatientHistoriesPage() {
         {/* Current Page Info (optional - shows only current page data) */}
         {!loading && histories.length > 0 && (
           <div className="text-xs text-[#94A3B8] bg-[#F8FAFC] rounded-lg px-4 py-2">
-            Current page: {histories.length} records · 
+            Current page: {histories.length} records ·
             {currentPageCompletedCount} completed ({currentPageCompletionRate}% completion rate)
           </div>
         )}
@@ -353,11 +355,10 @@ export default function PatientHistoriesPage() {
               <button
                 key={f}
                 onClick={() => handlePaymentFilterChange(f)}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                  paymentFilter === f
-                    ? "bg-[#00685C] text-white"
-                    : "bg-white border border-[#F1F5F9] text-[#3D4946] hover:bg-[#F8FAFC]"
-                }`}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${paymentFilter === f
+                  ? "bg-[#00685C] text-white"
+                  : "bg-white border border-[#F1F5F9] text-[#3D4946] hover:bg-[#F8FAFC]"
+                  }`}
               >
                 {f}
               </button>
@@ -680,7 +681,7 @@ export default function PatientHistoriesPage() {
 
       {/* Create Patient History Modal */}
       {showCreatePanel && (
-        <div 
+        <div
           className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget && !creating) {

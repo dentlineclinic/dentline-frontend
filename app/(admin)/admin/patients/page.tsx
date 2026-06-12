@@ -85,10 +85,11 @@ export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [genderFilter, setGenderFilter] = useState("All");
   const [selected, setSelected] = useState<Patient | null>(null);
-  
+
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const size = 10;
@@ -113,7 +114,7 @@ export default function PatientsPage() {
     setError(null);
     try {
       const response = await fetchPatients(pageNum, pageSize, searchTerm);
-      
+
       if (response.success && response.data) {
         const mapped = response.data.content.map((p: any) => ({
           id: p.id,
@@ -137,7 +138,7 @@ export default function PatientsPage() {
           referencePoints: p.referencePoints ?? p.reference_points ?? 0,
           lastVisit: p.lastVisit || p.last_visit || "N/A",
         }));
-        
+
         setPatients(mapped);
         setTotalPages(response.data.totalPages);
       } else {
@@ -152,22 +153,10 @@ export default function PatientsPage() {
   }, []);
 
   // Initial load and search/pagination changes
+
   useEffect(() => {
     loadPatients(page, size, search);
-  }, [page, search, loadPatients]);
-
-  // Debounced search
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      if (page !== 0) {
-        setPage(0);
-      } else {
-        loadPatients(0, size, search);
-      }
-    }, 300);
-    
-    return () => clearTimeout(delay);
-  }, [search, loadPatients, page, size]);
+  }, [page, size, search, loadPatients]);
 
   // Reset to first page when gender filter changes
   useEffect(() => {
@@ -255,7 +244,7 @@ export default function PatientsPage() {
       };
 
       const response = await createPatient(normalizedPayload);
-      
+
       if (response.success) {
         setCreateSuccess("Patient created successfully!");
         setShowPageSuccess(true);
@@ -319,13 +308,25 @@ export default function PatientsPage() {
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <input
-              type="search"
-              placeholder="Search by name, email or ref code…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-full sm:w-72"
-            />
+            <div className="flex gap-2">
+              <input
+                type="search"
+                placeholder="Search patient name..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-full sm:w-72"
+              />
+
+              <button
+                onClick={() => {
+                  setPage(0);
+                  setSearch(searchInput);
+                }}
+                className="bg-[#00685C] text-white px-4 py-2 rounded-lg hover:bg-[#008375]"
+              >
+                Search
+              </button>
+            </div>
             <select
               value={genderFilter}
               onChange={e => setGenderFilter(e.target.value)}
@@ -407,10 +408,10 @@ export default function PatientsPage() {
                       <td className="px-6 py-4 text-sm text-[#3D4946]">{p.email}</td>
                       <td className="px-6 py-4 text-sm text-[#3D4946]">{p.gender}</td>
                       <td className="px-6 py-4 text-sm text-[#3D4946]">
-                        {p.dateOfBirth !== "N/A" 
+                        {p.dateOfBirth !== "N/A"
                           ? new Date(p.dateOfBirth).toLocaleDateString("en-US", {
-                              month: "short", day: "numeric", year: "numeric",
-                            })
+                            month: "short", day: "numeric", year: "numeric",
+                          })
                           : "N/A"
                         }
                       </td>
@@ -525,14 +526,14 @@ export default function PatientsPage() {
               <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest border-b border-[#F1F5F9] pb-2">
                 Personal Information
               </p>
-              
+
               {/* ✅ NEW: Patient ID row with copy button and short ID */}
               <IdDetailRow label="Patient ID" id={selected.id} shortId={selected.shortId} />
-              
+
               <DetailRow label="Email" value={selected.email} />
               <DetailRow label="Phone Number" value={selected.phoneNumber} />
               <DetailRow label="Date of Birth" value={
-                selected.dateOfBirth !== "N/A" 
+                selected.dateOfBirth !== "N/A"
                   ? new Date(selected.dateOfBirth).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
                   : "N/A"
               } />

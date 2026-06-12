@@ -6,6 +6,7 @@ import {
   fetchPayments,
   recordPayment,
   markPaymentUnpaid,
+  searchPayments
 } from "@/services/patientHistoryService";
 import { fetchAdminPaymentSummary } from "@/services/adminService";
 
@@ -32,10 +33,10 @@ type SummaryData = {
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
-  PAID:    "bg-[#DCFCE7] text-[#166534]",
+  PAID: "bg-[#DCFCE7] text-[#166534]",
   PENDING: "bg-[#FEF3C7] text-[#92400E]",
   PARTIAL: "bg-[#FEF3C7] text-[#92400E]",
-  UNPAID:  "bg-[#FEE2E2] text-[#991B1B]", // 👈 add this
+  UNPAID: "bg-[#FEE2E2] text-[#991B1B]", // 👈 add this
 };
 
 // ✅ Move formatter outside component to avoid recreation
@@ -97,13 +98,16 @@ export default function PaymentsPage() {
   const loadPayments = useCallback(async (p: number, searchTerm?: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const res = await fetchPayments(p, size);
-      
+      const res =
+        searchTerm && searchTerm.trim()
+          ? await searchPayments(searchTerm, p, size)
+          : await fetchPayments(p, size);
+
       const mapped: HistoryRow[] = res.data.content.map((h: any) => {
         const { date, time } = formatDateSafe(h.createdAt);
-        
+
         // ✅ Safely map payment status - handle PARTIAL, remove UNPAID assumption
         const paymentStatus = h.paymentStatus || "PENDING";
 
@@ -144,6 +148,12 @@ export default function PaymentsPage() {
       });
   }, []);
 
+  // Reset pagination whenever search changes
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
+
+
   // Load payments when page or search changes (with debounce)
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -151,14 +161,10 @@ export default function PaymentsPage() {
     return () => clearTimeout(debounceRef.current);
   }, [page, search, loadPayments]);
 
+
+
   // Client-side search temporarily (until backend search is implemented)
-  const visible = search.trim() === "" 
-    ? rows 
-    : rows.filter((r) => 
-        r.patientName.toLowerCase().includes(search.toLowerCase()) ||
-        r.doctorName.toLowerCase().includes(search.toLowerCase()) ||
-        r.shortId.toLowerCase().includes(search.toLowerCase())
-      );
+  const visible = rows;
 
   // ── Actions ────────────────────────────────────────────────────────────────
 

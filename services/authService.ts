@@ -36,12 +36,13 @@ export const completeRegistration = async (payload: {
   emergencyContactName: string;
   emergencyContactPhone: string;
   medicalHistory: string;
+  hmo: string;
+  hmoId: string;
   referenceCode?: string;
 }) => {
   const response = await api.post("/auth/register", payload);
   return response;
 };
-
 export const requestAdminOtp = async (payload: { email: string }) => {
   const response = await api.post("/auth/otp/request", payload);
   return response;

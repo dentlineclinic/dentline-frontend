@@ -65,6 +65,8 @@ export interface UpdatePatientProfileRequest {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   medicalHistory?: string;
+   hmo?: string;
+  hmoId?: string;
 }
 
 export interface PatientResponse {
@@ -130,13 +132,38 @@ export const bookAppointment = async (
   return res.data;
 };
 
-export const fetchPatients = async (page = 0, size = 10, searchTerm = "") => {
-  const params: any = { page, size };
+export const fetchPatients = async (
+  page = 0,
+  size = 10,
+  searchTerm = ""
+) => {
+
   if (searchTerm.trim()) {
-    params.search = searchTerm;
+
+    const response = await api.get<PatientResponse>(
+      "/users/patients/search",
+      {
+        params: {
+          name: searchTerm,
+          page,
+          size
+        }
+      }
+    );
+
+    return response.data;
   }
-  
-  const response = await api.get<PatientResponse>("/users/patients", { params });
+
+  const response = await api.get<PatientResponse>(
+    "/users/patients",
+    {
+      params: {
+        page,
+        size
+      }
+    }
+  );
+
   return response.data;
 };
 

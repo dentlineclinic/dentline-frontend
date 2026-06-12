@@ -11,6 +11,22 @@ const GENDER_OPTIONS = [
   { value: "OTHER", label: "Other" },
 ];
 
+const HMO_OPTIONS = [
+  { value: "RELIANCE", label: "Reliance" },
+  { value: "LEADWAY", label: "Leadway" },
+  { value: "REDCARE", label: "Redcare" },
+  { value: "NOOR", label: "Noor" },
+  { value: "LIFE_WORTH", label: "Life Worth" },
+  { value: "LIFE_ACTION", label: "Life Action" },
+  { value: "PHILLIPS", label: "Phillips" },
+  { value: "VEO", label: "VEO" },
+  { value: "ASPIRE", label: "Aspire" },
+  { value: "MEDIPLAN", label: "Mediplan" },
+  { value: "AVILIA", label: "Avilia" },
+  { value: "THT", label: "THT" },
+  { value: "HCI", label: "HCI" },
+];
+
 export default function CompleteRegistrationPage() {
   const router = useRouter();
   const mutation = useRegister();
@@ -28,6 +44,8 @@ export default function CompleteRegistrationPage() {
   const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
   const [medicalHistory, setMedicalHistory] = useState("");
   const [referenceCode, setReferenceCode] = useState("");
+  const [hmo, setHmo] = useState("");
+  const [hmoId, setHmoId] = useState("");
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
 
   // Guard: redirect back if OTP not verified
@@ -56,6 +74,7 @@ export default function CompleteRegistrationPage() {
       errors.emergencyContactName = "Emergency contact name is required.";
     if (!emergencyContactPhone.trim())
       errors.emergencyContactPhone = "Emergency contact phone is required.";
+    
 
     return errors;
   };
@@ -81,6 +100,8 @@ export default function CompleteRegistrationPage() {
       emergencyContactName: emergencyContactName.trim(),
       emergencyContactPhone: emergencyContactPhone.trim(),
       medicalHistory: medicalHistory.trim(),
+      hmo,
+      hmoId: hmoId.trim(),
     };
 
     if (referenceCode.trim()) {
@@ -403,7 +424,7 @@ export default function CompleteRegistrationPage() {
               </div>
             </div>
 
-            {/* Section: Medical */}
+            {/* Section: Medical & Optional */}
             <div className="flex flex-col gap-1 pt-2 pb-1">
               <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest">
                 Medical & Optional
@@ -412,7 +433,7 @@ export default function CompleteRegistrationPage() {
 
             {/* Medical History */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-semibold text-[#3D4946]">Medical History</label>
+              <label className="text-sm font-semibold text-[#3D4946]">Medical History / Allergies</label>
               <textarea
                 value={medicalHistory}
                 onChange={(e) => setMedicalHistory(e.target.value)}
@@ -420,6 +441,46 @@ export default function CompleteRegistrationPage() {
                 rows={3}
                 className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors resize-none"
               />
+            </div>
+
+            {/* HMO Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold text-[#3D4946]">
+                  HMO <span className="text-[#93000A]">*</span>
+                </label>
+                <select
+                  value={hmo}
+                  onChange={(e) => setHmo(e.target.value)}
+                  className={`${fieldClass("hmo")} appearance-none`}
+                >
+                  <option value="">Select HMO</option>
+                  {HMO_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {clientErrors.hmo && (
+                  <p className="text-xs text-[#93000A]">{clientErrors.hmo}</p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold text-[#3D4946]">
+                  HMO ID <span className="text-[#93000A]">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={hmoId}
+                  onChange={(e) => setHmoId(e.target.value)}
+                  placeholder="Enter your HMO ID"
+                  className={fieldClass("hmoId")}
+                />
+                {clientErrors.hmoId && (
+                  <p className="text-xs text-[#93000A]">{clientErrors.hmoId}</p>
+                )}
+              </div>
             </div>
 
             {/* Reference Code */}

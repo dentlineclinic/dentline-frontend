@@ -43,3 +43,16 @@ export const assignDoctorToAppointment = async (
   });
   return response.data;
 };
+
+
+export const searchAppointments = async (
+  name: string,
+  page = 0,
+  size = 10
+): Promise<AppointmentResponse> => {
+  const response = await api.get(
+    `/appointments/search?name=${encodeURIComponent(name)}&page=${page}&size=${size}`
+  );
+
+  return response.data;
+};

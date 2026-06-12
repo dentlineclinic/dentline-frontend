@@ -3,6 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAppointments } from "@/hooks/useAppointments";
 import { fetchDoctors } from "@/services/doctorService";
+import {
+  fetchAppointments,
+  searchAppointments
+} from "@/services/appointmentService";
 import api from "@/lib/axios"
 
 export const dynamic = "force-dynamic";
@@ -46,13 +50,15 @@ const ALL_FILTERS = ["All", "TODAY", "BOOKED", "ARRIVED", "ASSIGNED", "COMPLETED
 export default function AppointmentsPage() {
   const [page, setPage] = useState(0);
   const size = 10;
-
+  
   const { data, isLoading, error, refetch } = useAppointments(page, size);
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Panel 1 — appointment detail
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
@@ -110,6 +116,31 @@ export default function AppointmentsPage() {
     }
   }, []);
 
+
+  useEffect(() => {
+  const delay = setTimeout(async () => {
+    try {
+      if (search.trim() === "") {
+        setSearchResults([]);
+        return;
+      }
+
+      setSearchLoading(true);
+
+      const response = await searchAppointments(search, 0, 10);
+
+      setSearchResults(response.data.content);
+    } catch (err) {
+      console.error(err);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, 400);
+
+  return () => clearTimeout(delay);
+}, [search]);
+
   // Load doctors only when popup opens
   useEffect(() => {
     if (showDoctorPanel) {
@@ -132,8 +163,13 @@ export default function AppointmentsPage() {
   }, [doctorSearch, showDoctorPanel, loadDoctors]);
 
   // Map backend data to UI shape
-  const mappedAppointments: Appointment[] =
-    data?.data?.content?.map((appt: any) => {
+  const appointmentSource =
+  search.trim() !== ""
+    ? searchResults
+    : data?.data?.content ?? [];
+
+const mappedAppointments: Appointment[] =
+  appointmentSource.map((appt: any) => {
       const dt = new Date(appt.appointmentDate);
 
       return {
@@ -245,11 +281,7 @@ export default function AppointmentsPage() {
       matchesFilter = a.status === filter;
     }
 
-    const matchesSearch =
-      a.patientName.toLowerCase().includes(search.toLowerCase()) ||
-      a.doctorName.toLowerCase().includes(search.toLowerCase()) ||
-      a.id.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
+    return matchesFilter;
   });
 
   // Frontend fallback filter (if backend doesn't support search)
@@ -272,8 +304,8 @@ export default function AppointmentsPage() {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${filter === f
-                    ? "bg-[#00685C] text-white"
-                    : "bg-white border border-[#F1F5F9] text-[#3D4946] hover:bg-[#F8FAFC]"
+                  ? "bg-[#00685C] text-white"
+                  : "bg-white border border-[#F1F5F9] text-[#3D4946] hover:bg-[#F8FAFC]"
                   }`}
               >
                 {f}
@@ -309,7 +341,7 @@ export default function AppointmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? (
+                {isLoading || searchLoading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
                       {[...Array(7)].map((__, j) => (
@@ -377,8 +409,8 @@ export default function AppointmentsPage() {
                             onClick={() => openPanel(appt)}
                             disabled={!canManage}
                             className={`text-xs font-semibold transition-colors ${canManage
-                                ? "text-[#0D9488] hover:underline cursor-pointer"
-                                : "text-[#94A3B8] cursor-not-allowed"
+                              ? "text-[#0D9488] hover:underline cursor-pointer"
+                              : "text-[#94A3B8] cursor-not-allowed"
                               }`}
                           >
                             Manage
@@ -519,8 +551,8 @@ export default function AppointmentsPage() {
                     onClick={handleAssignClick}
                     disabled={assigning}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${showDoctorPanel
-                        ? "bg-[#FEF3C7] border-[#92400E] text-[#92400E]"
-                        : "bg-white border-[#E2E8F0] text-[#0B1C30] hover:bg-[#FEF3C7] hover:border-[#92400E] hover:text-[#92400E]"
+                      ? "bg-[#FEF3C7] border-[#92400E] text-[#92400E]"
+                      : "bg-white border-[#E2E8F0] text-[#0B1C30] hover:bg-[#FEF3C7] hover:border-[#92400E] hover:text-[#92400E]"
                       }`}
                   >
                     <span className="w-8 h-8 rounded-full bg-[#FEF3C7] flex items-center justify-center flex-shrink-0">

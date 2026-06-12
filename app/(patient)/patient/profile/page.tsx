@@ -8,6 +8,22 @@ import { avatarMedium } from "@/lib/cloudinary";
 
 export const dynamic = "force-dynamic";
 
+const HMO_OPTIONS = [
+  { value: "RELIANCE", label: "Reliance" },
+  { value: "LEADWAY", label: "Leadway" },
+  { value: "REDCARE", label: "Redcare" },
+  { value: "NOOR", label: "Noor" },
+  { value: "LIFE_WORTH", label: "Life Worth" },
+  { value: "LIFE_ACTION", label: "Life Action" },
+  { value: "PHILLIPS", label: "Phillips" },
+  { value: "VEO", label: "VEO" },
+  { value: "ASPIRE", label: "Aspire" },
+  { value: "MEDIPLAN", label: "Mediplan" },
+  { value: "AVILIA", label: "Avilia" },
+  { value: "THT", label: "THT" },
+  { value: "HCI", label: "HCI" },
+];
+
 export default function PatientProfilePage() {
   const [patientId, setPatientId] = useState<string | null>(null);
   
@@ -18,6 +34,8 @@ export default function PatientProfilePage() {
   const [emergencyContactName, setEmergencyContactName] = useState("");
   const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
   const [medicalHistory, setMedicalHistory] = useState("");
+  const [hmo, setHmo] = useState("");
+  const [hmoId, setHmoId] = useState("");
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -58,6 +76,8 @@ export default function PatientProfilePage() {
     const savedEmergencyName = localStorage.getItem("emergencyContactName") || "";
     const savedEmergencyPhone = localStorage.getItem("emergencyContactPhone") || "";
     const savedMedicalHistory = localStorage.getItem("medicalHistory") || "";
+    const savedHmo = localStorage.getItem("hmo") || "";
+    const savedHmoId = localStorage.getItem("hmoId") || "";
 
     setPatientId(id);
     setName(userName);
@@ -67,6 +87,8 @@ export default function PatientProfilePage() {
     setEmergencyContactName(savedEmergencyName);
     setEmergencyContactPhone(savedEmergencyPhone);
     setMedicalHistory(savedMedicalHistory);
+    setHmo(savedHmo);
+    setHmoId(savedHmoId);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,6 +107,8 @@ export default function PatientProfilePage() {
         emergencyContactName,
         emergencyContactPhone,
         medicalHistory,
+        hmo,
+        hmoId,
       });
 
       if (result.success) {
@@ -93,6 +117,8 @@ export default function PatientProfilePage() {
         localStorage.setItem("emergencyContactName", emergencyContactName);
         localStorage.setItem("emergencyContactPhone", emergencyContactPhone);
         localStorage.setItem("medicalHistory", medicalHistory);
+        localStorage.setItem("hmo", hmo);
+        localStorage.setItem("hmoId", hmoId);
       } else {
         toast.error(result.message || "Failed to update profile");
       }
@@ -340,6 +366,36 @@ export default function PatientProfilePage() {
                   placeholder="Any known allergies, conditions, or previous treatments…"
                   className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] resize-none"
                 />
+              </div>
+
+              {/* HMO Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-semibold text-[#3D4946]">HMO</label>
+                  <select
+                    value={hmo}
+                    onChange={(e) => setHmo(e.target.value)}
+                    className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+                  >
+                    <option value="">Select HMO</option>
+                    {HMO_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-semibold text-[#3D4946]">HMO ID</label>
+                  <input
+                    type="text"
+                    value={hmoId}
+                    onChange={(e) => setHmoId(e.target.value)}
+                    placeholder="Enter HMO ID"
+                    className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+                  />
+                </div>
               </div>
 
               <button
