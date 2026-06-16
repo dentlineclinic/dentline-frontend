@@ -503,7 +503,7 @@ export default function MedicalHistoryPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-[#94A3B8]">Amount</p>
-                    <p className="text-lg font-bold text-[#0B1C30]">${selectedHistory.amount.toLocaleString()}</p>
+                    <p className="text-lg font-bold text-[#0B1C30]">₦{selectedHistory.amount.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Payment Status</p>

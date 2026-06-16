@@ -21,6 +21,8 @@ type Patient = {
   referencePoints: number;
   lastVisit: string;
   status: string;
+  hmo: string;
+  hmoId: string;
 };
 
 type CreatePatientForm = {
@@ -41,7 +43,6 @@ function DetailRow({ label, value }: { label: string; value: string | number }) 
   );
 }
 
-// ✅ New component for ID row with copy button
 function IdDetailRow({ label, id, shortId }: { label: string; id: string; shortId: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -137,6 +138,8 @@ export default function PatientsPage() {
           referenceCode: p.referenceCode || p.reference_code || "N/A",
           referencePoints: p.referencePoints ?? p.reference_points ?? 0,
           lastVisit: p.lastVisit || p.last_visit || "N/A",
+          hmo: p.hmo || "N/A",
+          hmoId: p.hmoId || "N/A",
         }));
 
         setPatients(mapped);
@@ -152,8 +155,17 @@ export default function PatientsPage() {
     }
   }, []);
 
-  // Initial load and search/pagination changes
+  // ✅ NEW: Debounce search input – wait 500ms after typing stops
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(0);
+      setSearch(searchInput);
+    }, 500);
 
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Initial load and search/pagination changes
   useEffect(() => {
     loadPatients(page, size, search);
   }, [page, size, search, loadPatients]);
@@ -180,7 +192,6 @@ export default function PatientsPage() {
     setShowCreatePanel(true);
   };
 
-  // Close create patient panel
   const closeCreatePanel = () => {
     if (!creating) {
       setShowCreatePanel(false);
@@ -189,21 +200,17 @@ export default function PatientsPage() {
     }
   };
 
-  // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setCreateForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Strong password validation
   const validatePassword = (password: string) => {
     const strongPasswordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
     return strongPasswordRegex.test(password);
   };
 
-  // Handle form submission
   const handleCreatePatient = async () => {
-    // Validation
     if (!createForm.name.trim()) {
       setCreateError("Name is required.");
       return;
@@ -305,7 +312,7 @@ export default function PatientsPage() {
           </div>
         )}
 
-        {/* Toolbar */}
+        {/* Toolbar – Search button removed, input now auto‑searches */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <div className="flex gap-2">
@@ -316,16 +323,7 @@ export default function PatientsPage() {
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-full sm:w-72"
               />
-
-              <button
-                onClick={() => {
-                  setPage(0);
-                  setSearch(searchInput);
-                }}
-                className="bg-[#00685C] text-white px-4 py-2 rounded-lg hover:bg-[#008375]"
-              >
-                Search
-              </button>
+              {/* Search button removed – search happens automatically after 500ms of no typing */}
             </div>
             <select
               value={genderFilter}
@@ -527,7 +525,6 @@ export default function PatientsPage() {
                 Personal Information
               </p>
 
-              {/* ✅ NEW: Patient ID row with copy button and short ID */}
               <IdDetailRow label="Patient ID" id={selected.id} shortId={selected.shortId} />
 
               <DetailRow label="Email" value={selected.email} />
@@ -538,6 +535,8 @@ export default function PatientsPage() {
                   : "N/A"
               } />
               <DetailRow label="Gender" value={selected.gender} />
+              <DetailRow label="HMO" value={selected.hmo} />
+              <DetailRow label="HMO ID" value={selected.hmoId} />
             </div>
 
             {/* Emergency contact */}
@@ -612,14 +611,11 @@ export default function PatientsPage() {
 
           {/* Body - Form */}
           <div className="flex-1 overflow-y-auto px-6 py-6">
-            {/* Success Message */}
             {createSuccess && (
               <div className="mb-4 bg-[#DCFCE7] text-[#166534] text-sm font-semibold px-4 py-3 rounded-lg">
                 {createSuccess}
               </div>
             )}
-
-            {/* Error Message */}
             {createError && (
               <div className="mb-4 bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
                 {createError}
@@ -627,7 +623,6 @@ export default function PatientsPage() {
             )}
 
             <form className="flex flex-col gap-5" onSubmit={(e) => e.preventDefault()}>
-              {/* Full Name */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Full Name <span className="text-[#93000A]">*</span>
@@ -644,7 +639,6 @@ export default function PatientsPage() {
                 />
               </div>
 
-              {/* Email */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Email Address <span className="text-[#93000A]">*</span>
@@ -661,7 +655,6 @@ export default function PatientsPage() {
                 />
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Password <span className="text-[#93000A]">*</span>
@@ -681,7 +674,6 @@ export default function PatientsPage() {
                 </p>
               </div>
 
-              {/* Phone Number */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Phone Number <span className="text-[#93000A]">*</span>
@@ -699,7 +691,6 @@ export default function PatientsPage() {
                 <p className="text-xs text-[#94A3B8] mt-1">Format: +2348012345678 (no spaces)</p>
               </div>
 
-              {/* Date of Birth */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Date of Birth <span className="text-[#93000A]">*</span>
@@ -715,7 +706,6 @@ export default function PatientsPage() {
                 />
               </div>
 
-              {/* Gender */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Gender <span className="text-[#93000A]">*</span>

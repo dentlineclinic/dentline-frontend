@@ -1,20 +1,25 @@
 import api from "@/lib/axios";
 
-export interface Patient {
+type Patient = {
   id: string;
-  name: string;
+  shortId: string;
+  fullName: string;
+  initials: string;
   email: string;
+  phoneNumber: string;
+  dateOfBirth: string;
+  gender: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  medicalHistory: string;
+  referenceCode: string;
+  referencePoints: number;
+  lastVisit: string;
   status: string;
-  phoneNumber?: string;
-  dateOfBirth?: string;
-  gender?: string;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  medicalHistory?: string;
-  referenceCode?: string;
-  referencePoints?: number;
-  lastVisit?: string;
-}
+
+  hmo: string;
+  hmoId: string;
+};
 
 export interface CreatePatientRequest {
   name: string;

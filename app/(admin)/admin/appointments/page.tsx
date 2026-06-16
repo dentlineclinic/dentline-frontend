@@ -298,7 +298,7 @@ const mappedAppointments: Appointment[] =
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
-          <div className="flex gap-2 flex-wrap">
+          {/* <div className="flex gap-2 flex-wrap">
             {ALL_FILTERS.map(f => (
               <button
                 key={f}
@@ -311,7 +311,7 @@ const mappedAppointments: Appointment[] =
                 {f}
               </button>
             ))}
-          </div>
+          </div> */}
           <input
             type="search"
             placeholder="Search appointments..."

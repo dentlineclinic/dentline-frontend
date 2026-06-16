@@ -350,7 +350,7 @@ export default function PatientHistoriesPage() {
 
         {/* Filters */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex gap-2">
+          {/* <div className="flex gap-2">
             {["All", "PAID", "PENDING", "UNPAID"].map(f => (
               <button
                 key={f}
@@ -363,7 +363,7 @@ export default function PatientHistoriesPage() {
                 {f}
               </button>
             ))}
-          </div>
+          </div> */}
           <div className="flex items-center gap-3">
             <input
               type="search"
