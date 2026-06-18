@@ -36,4 +36,10 @@ export const queryKeys = {
     page !== undefined ? ["reviews", page] : ["reviews"],
   notifications: (page?: number) =>
     page !== undefined ? ["notifications", page] : ["notifications"],
+
+  // Calendar
+  appointmentCalendar: (year: number, month: number) =>
+    ["appointments", "calendar", year, month] as const,
+  appointmentsByDate: (date: string) =>
+    ["appointments", "calendar", "day", date] as const,
 } as const;
