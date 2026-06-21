@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
-import { fetchMyAppointments, Appointment } from "@/services/patientService";
+import { fetchMyAppointments, cancelAppointment, Appointment } from "@/services/patientService";
+import { toast } from "react-toastify";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,26 @@ export default function AppointmentHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("All");
+  // Cancel state
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+
+  const handleCancel = async (id: string) => {
+    setCancellingId(id);
+    try {
+      await cancelAppointment(id);
+      toast.success("Appointment cancelled.");
+      // Update local state immediately — no need to refetch
+      setHistories(prev =>
+        prev.map(h => h.id === id ? { ...h, status: "CANCELLED" } : h)
+      );
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to cancel appointment.");
+    } finally {
+      setCancellingId(null);
+      setConfirmCancelId(null);
+    }
+  };
 
   useEffect(() => {
     const loadAppointments = async () => {
@@ -293,6 +314,44 @@ export default function AppointmentHistoryPage() {
                         {history.status}
                       </span>
                     </div>
+
+                    {/* Cancel — only for BOOKED appointments */}
+                    {history.status === "BOOKED" && (
+                      <div className="flex flex-col items-end gap-1">
+                        {confirmCancelId === history.id ? (
+                          // Inline confirmation
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-[#93000A] font-semibold">Confirm cancel?</span>
+                            <button
+                              onClick={() => handleCancel(history.id)}
+                              disabled={cancellingId === history.id}
+                              className="text-xs font-bold text-white bg-[#93000A] px-3 py-1 rounded-lg hover:bg-[#BA1A1A] transition-colors disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {cancellingId === history.id && (
+                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                </svg>
+                              )}
+                              Yes, cancel
+                            </button>
+                            <button
+                              onClick={() => setConfirmCancelId(null)}
+                              className="text-xs font-semibold text-[#3D4946] px-3 py-1 rounded-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors"
+                            >
+                              Keep
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmCancelId(history.id)}
+                            className="text-xs font-semibold text-[#93000A] hover:underline"
+                          >
+                            Cancel appointment
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -4,11 +4,12 @@ import { useAppointmentsByDate } from "@/hooks/useAppointments";
 import { mapToUIAppointment, STATUS_COLORS, UIAppointment } from "./types";
 
 interface Props {
-  date: string;               // "YYYY-MM-DD"
-  dateLabel: string;          // human-readable label e.g. "Monday, June 17"
+  date: string;
+  dateLabel: string;
   onClose: () => void;
   onSelectAppointment: (appt: UIAppointment) => void;
   onRefresh: () => void;
+  onReschedule?: (appt: UIAppointment) => void;
 }
 
 function Spinner() {
@@ -20,7 +21,7 @@ function Spinner() {
   );
 }
 
-export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelectAppointment }: Props) {
+export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelectAppointment, onReschedule }: Props) {
   const { data, isLoading, isError } = useAppointmentsByDate(date);
 
   const appointments = (data?.data?.content ?? []).map(mapToUIAppointment);
@@ -69,10 +70,9 @@ export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelec
           </div>
         ) : (
           appointments.map(appt => (
-            <button
+            <div
               key={appt.rawId}
-              onClick={() => onSelectAppointment(appt)}
-              className="w-full text-left bg-white border border-[#F1F5F9] rounded-xl p-4 hover:border-[#00685C]/30 hover:shadow-sm transition-all flex items-start gap-3 group"
+              className="bg-white border border-[#F1F5F9] rounded-xl p-4 hover:border-[#00685C]/30 hover:shadow-sm transition-all flex items-start gap-3"
             >
               {/* Avatar */}
               <div className="w-10 h-10 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0 mt-0.5">
@@ -91,12 +91,26 @@ export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelec
                 {appt.observation && appt.observation !== "No notes" && (
                   <p className="text-xs text-[#94A3B8] mt-1 truncate">{appt.observation}</p>
                 )}
-              </div>
 
-              <svg className="w-4 h-4 text-[#94A3B8] group-hover:text-[#0D9488] flex-shrink-0 mt-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+                {/* Actions row */}
+                <div className="flex items-center gap-3 mt-2">
+                  <button
+                    onClick={() => onSelectAppointment(appt)}
+                    className="text-xs font-semibold text-[#0D9488] hover:underline"
+                  >
+                    {appt.status === "BOOKED" || appt.status === "ARRIVED" ? "Manage →" : "View →"}
+                  </button>
+                  {(appt.status === "BOOKED" || appt.status === "ARRIVED") && onReschedule && (
+                    <button
+                      onClick={() => onReschedule(appt)}
+                      className="text-xs font-semibold text-[#435B7E] hover:underline"
+                    >
+                      Reschedule
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           ))
         )}
       </div>

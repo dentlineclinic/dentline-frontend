@@ -8,7 +8,7 @@ import {
   useRequestPasswordOtp,
   useResetForgottenPassword,
 } from "@/hooks/useForgotPassword";
-import { isValidEmail } from "@/lib/utils";
+import { isValidEmail, isValidPhone } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const RESEND_COOLDOWN = 60; // seconds
@@ -73,8 +73,8 @@ export default function ForgotPasswordPage() {
   const router = useRouter();
 
   // Step 1 state
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [identifierError, setIdentifierError] = useState("");
 
   // Step 2 state
   const [step, setStep] = useState<1 | 2>(1);
@@ -129,30 +129,41 @@ export default function ForgotPasswordPage() {
   // ── Step 1 submit ───────────────────────────────────────────────────────────
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEmailError("");
+    setIdentifierError("");
 
-    if (!email.trim()) {
-      setEmailError("Email is required.");
+    const trimmedIdentifier = identifier.trim();
+    const isEmail = trimmedIdentifier.includes("@");
+
+    if (!trimmedIdentifier) {
+      setIdentifierError("Please enter your email or phone number.");
       return;
     }
-    if (!isValidEmail(email)) {
-      setEmailError("Please enter a valid email address.");
+
+    if (isEmail && !isValidEmail(trimmedIdentifier)) {
+      setIdentifierError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!isEmail && !isValidPhone(trimmedIdentifier)) {
+      setIdentifierError("Please enter a valid phone number.");
       return;
     }
 
     try {
-      const res = await requestOtpMutation.mutateAsync({ email });
+      const res = await requestOtpMutation.mutateAsync(
+        isEmail ? { email: trimmedIdentifier } : { phoneNumber: trimmedIdentifier }
+      );
       if (res.success) {
         setStep(2);
         startResendTimer();
       } else {
-        setEmailError(res.message || "Failed to send OTP. Please try again.");
+        setIdentifierError(res.message || "Failed to send OTP. Please try again.");
       }
     } catch (err: any) {
       const msg = err?.response?.data?.message;
-      setEmailError(
+      setIdentifierError(
         msg === "User not found"
-          ? "No account found with that email address."
+          ? "No account found with that email or phone number."
           : msg || "Unable to send OTP. Please try again."
       );
     }
@@ -163,7 +174,10 @@ export default function ForgotPasswordPage() {
     if (resendTimer > 0 || requestOtpMutation.isPending) return;
     setFormError("");
     try {
-      const res = await requestOtpMutation.mutateAsync({ email });
+      const isEmail = identifier.includes("@");
+      const res = await requestOtpMutation.mutateAsync(
+        isEmail ? { email: identifier.trim() } : { phoneNumber: identifier.trim() }
+      );
       if (res.success) {
         startResendTimer();
       } else {
@@ -203,8 +217,9 @@ export default function ForgotPasswordPage() {
     }
 
     try {
+      const isEmail = identifier.includes("@");
       const res = await resetMutation.mutateAsync({
-        email,
+        ...(isEmail ? { email: identifier.trim() } : { phoneNumber: identifier.trim() }),
         otp: trimmedOtp,
         newPassword,
         confirmPassword,
@@ -261,7 +276,7 @@ export default function ForgotPasswordPage() {
               {/* Step indicator */}
               <div className="flex flex-col gap-3">
                 {[
-                  { n: 1, label: "Enter your email", sub: "We'll send a one-time code" },
+                  { n: 1, label: "Enter your contact", sub: "We'll send a one-time code" },
                   { n: 2, label: "Reset your password", sub: "Enter the OTP and new password" },
                 ].map(({ n, label, sub }) => (
                   <div key={n} className="flex items-start gap-3">
@@ -342,7 +357,7 @@ export default function ForgotPasswordPage() {
                 <div className="mb-8">
                   <h2 className="text-3xl font-bold text-[#0B1C30]">Forgot Password</h2>
                   <p className="text-base text-[#485F83] mt-1">
-                    Enter your registered email and we'll send you a one-time code.
+                    Enter your registered email or phone number and we&apos;ll send you a one-time code.
                   </p>
                 </div>
 
@@ -350,7 +365,7 @@ export default function ForgotPasswordPage() {
                   {/* Email */}
                   <div className="flex flex-col gap-1">
                     <label htmlFor="fp-email" className="text-sm font-semibold text-[#3D4946]">
-                      Registered Email
+                      Registered Email or Phone Number
                     </label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B7280]" aria-hidden="true">
@@ -360,19 +375,19 @@ export default function ForgotPasswordPage() {
                       </span>
                       <input
                         id="fp-email"
-                        type="email"
-                        autoComplete="email"
-                        value={email}
-                        onChange={(e) => { setEmail(e.target.value); setEmailError(""); }}
-                        placeholder="you@example.com"
-                        className={`${inputBase} pl-12 ${emailError ? "border-[#93000A] focus:border-[#93000A] focus:ring-[#93000A]" : ""}`}
-                        aria-describedby={emailError ? "fp-email-error" : undefined}
-                        aria-invalid={!!emailError}
+                        type="text"
+                        autoComplete="username"
+                        value={identifier}
+                        onChange={(e) => { setIdentifier(e.target.value); setIdentifierError(""); }}
+                        placeholder="you@example.com or +2348012345678"
+                        className={`${inputBase} pl-12 ${identifierError ? "border-[#93000A] focus:border-[#93000A] focus:ring-[#93000A]" : ""}`}
+                        aria-describedby={identifierError ? "fp-email-error" : undefined}
+                        aria-invalid={!!identifierError}
                       />
                     </div>
-                    {emailError && (
+                    {identifierError && (
                       <p id="fp-email-error" className="text-xs text-[#93000A] font-medium mt-0.5">
-                        {emailError}
+                        {identifierError}
                       </p>
                     )}
                   </div>
@@ -420,13 +435,13 @@ export default function ForgotPasswordPage() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    Change email
+                    Change contact details
                   </button>
 
                   <h2 className="text-3xl font-bold text-[#0B1C30]">Reset Password</h2>
                   <p className="text-base text-[#485F83] mt-1">
                     Enter the 6-digit code sent to{" "}
-                    <span className="font-semibold text-[#0B1C30]">{email}</span>
+                    <span className="font-semibold text-[#0B1C30]">{identifier}</span>
                   </p>
                 </div>
 
@@ -477,7 +492,7 @@ export default function ForgotPasswordPage() {
                       placeholder="123456"
                       className={`${inputBase} tracking-[0.4em] text-center font-bold text-lg`}
                     />
-                    <p className="text-xs text-[#94A3B8]">Enter the 6-digit code from your email.</p>
+                    <p className="text-xs text-[#94A3B8]">Enter the 6-digit code from your email or phone.</p>
                   </div>
 
                   {/* New password */}

@@ -11,7 +11,7 @@ const RESEND_COOLDOWN = 60;
 
 export default function VerifyOtpPage() {
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [countdown, setCountdown] = useState(RESEND_COOLDOWN);
   const [canResend, setCanResend] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -20,13 +20,13 @@ export default function VerifyOtpPage() {
   const verifyMutation = useVerifyOtp();
   const resendMutation = useRequestOtp();
 
-  // Guard: redirect back if no email in session
+  // Guard: redirect back if no identifier in session
   useEffect(() => {
-    const stored = sessionStorage.getItem("reg_email");
+    const stored = sessionStorage.getItem("reg_identifier");
     if (!stored) {
       router.replace("/register/request-otp");
     } else {
-      setEmail(stored);
+      setIdentifier(stored);
     }
   }, [router]);
 
@@ -78,8 +78,12 @@ export default function VerifyOtpPage() {
     const otp = digits.join("");
     if (otp.length < OTP_LENGTH) return;
 
+    const isEmail = identifier.includes("@");
+
     verifyMutation.mutate(
-      { email, otp },
+      isEmail
+        ? { email: identifier, otp }
+        : { phoneNumber: identifier, otp },
       {
         onSuccess: () => {
           sessionStorage.setItem("reg_otp_verified", "true");
@@ -91,8 +95,12 @@ export default function VerifyOtpPage() {
 
   const handleResend = () => {
     if (!canResend || resendMutation.isPending) return;
+    const isEmail = identifier.includes("@");
+
     resendMutation.mutate(
-      { email },
+      isEmail
+        ? { email: identifier }
+        : { phoneNumber: identifier },
       {
         onSuccess: () => {
           setDigits(Array(OTP_LENGTH).fill(""));
@@ -111,15 +119,17 @@ export default function VerifyOtpPage() {
     verifyMutation.isError && verifyMutation.error instanceof Error
       ? verifyMutation.error.message
       : verifyMutation.isError
-      ? "Invalid or expired code. Please try again."
-      : null;
+        ? "Invalid or expired code. Please try again."
+        : null;
 
   const resendError =
     resendMutation.isError && resendMutation.error instanceof Error
       ? resendMutation.error.message
       : resendMutation.isError
-      ? "Failed to resend code. Please try again."
-      : null;
+        ? "Failed to resend code. Please try again."
+        : null;
+
+  const isEmail = identifier.includes("@");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F9FF] to-white flex flex-col">
@@ -139,7 +149,7 @@ export default function VerifyOtpPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
               </span>
-              <span className="text-xs font-semibold text-[#0F766E]">Email</span>
+              <span className="text-xs font-semibold text-[#0F766E]">Contact</span>
             </div>
             <div className="flex-1 h-px bg-[#00685C]" />
             <div className="flex items-center gap-1.5">
@@ -157,25 +167,36 @@ export default function VerifyOtpPage() {
             </div>
           </div>
 
-          {/* Icon */}
+          {/* Icon - dynamic based on identifier type */}
           <div className="w-16 h-16 bg-[#F0FDFA] rounded-full flex items-center justify-center mb-6">
-            <svg className="w-8 h-8 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
+            {isEmail ? (
+              <svg className="w-8 h-8 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+            ) : (
+              <svg className="w-8 h-8 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm2 0l8 5 8-5M5 19l5-5m10 0l-5-5"
+                />
+              </svg>
+            )}
           </div>
 
           {/* Header */}
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-[#0B1C30]">Check Your Email</h2>
+            <h2 className="text-3xl font-bold text-[#0B1C30]">Verify Your Account</h2>
             <p className="text-base text-[#485F83] mt-2">
               We sent a 6-digit verification code to{" "}
-              {email && (
-                <span className="font-semibold text-[#0B1C30]">{email}</span>
+              {identifier && (
+                <span className="font-semibold text-[#0B1C30]">{identifier}</span>
               )}
               . Enter it below to continue.
             </p>
@@ -197,7 +218,7 @@ export default function VerifyOtpPage() {
 
             {resendMutation.isSuccess && (
               <div className="bg-[#DCFCE7] border border-[#86EFAC] text-[#166534] px-4 py-3 rounded-lg text-sm font-semibold">
-                A new code has been sent to your email.
+                A new verification code has been sent.
               </div>
             )}
 
@@ -220,8 +241,8 @@ export default function VerifyOtpPage() {
                     verifyMutation.isError
                       ? "border-[#93000A] focus:border-[#BA1A1A]"
                       : digit
-                      ? "border-[#00685C] bg-[#F0FDFA]"
-                      : "border-[#BDC9C5] focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C]"
+                        ? "border-[#00685C] bg-[#F0FDFA]"
+                        : "border-[#BDC9C5] focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C]"
                   }`}
                 />
               ))}
@@ -294,7 +315,7 @@ export default function VerifyOtpPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              Change email address
+              Change email or phone number
             </Link>
           </div>
         </div>

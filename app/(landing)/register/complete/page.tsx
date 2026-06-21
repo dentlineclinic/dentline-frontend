@@ -31,6 +31,7 @@ export default function CompleteRegistrationPage() {
   const router = useRouter();
   const mutation = useRegister();
 
+  const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -50,15 +51,21 @@ export default function CompleteRegistrationPage() {
 
   // Guard: redirect back if OTP not verified
   useEffect(() => {
-    const storedEmail = sessionStorage.getItem("reg_email");
+    const storedIdentifier = sessionStorage.getItem("reg_identifier");
     const verified = sessionStorage.getItem("reg_otp_verified");
 
-    if (!storedEmail || !verified) {
+    if (!storedIdentifier || !verified) {
       router.replace("/register/request-otp");
     } else {
-      setEmail(storedEmail);
+      setIdentifier(storedIdentifier);
+      // If identifier is a phone number, prefill the phone field
+      if (!storedIdentifier.includes("@")) {
+        setPhoneNumber(storedIdentifier);
+      }
     }
   }, [router]);
+
+  const isIdentifierEmail = identifier.includes("@");
 
   const validate = () => {
     const errors: Record<string, string> = {};
@@ -67,7 +74,20 @@ export default function CompleteRegistrationPage() {
     if (!password) errors.password = "Password is required.";
     else if (password.length < 8) errors.password = "Password must be at least 8 characters.";
     if (password !== confirmPassword) errors.confirmPassword = "Passwords do not match.";
-    if (!phoneNumber.trim()) errors.phoneNumber = "Phone number is required.";
+
+    // ✅ Fixed: if identifier is email, user must provide a separate phone number
+    if (isIdentifierEmail && !phoneNumber.trim()) {
+      errors.phoneNumber = "Phone number is required.";
+    }
+
+    if (!isIdentifierEmail && email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailRegex.test(email.trim())) {
+        errors.email = "Please enter a valid email address.";
+      }
+    }
+
     if (!dateOfBirth) errors.dateOfBirth = "Date of birth is required.";
     if (!gender) errors.gender = "Please select a gender.";
     if (!emergencyContactName.trim())
@@ -90,11 +110,24 @@ export default function CompleteRegistrationPage() {
 
     setClientErrors({});
 
-    const payload: Parameters<typeof mutation.mutate>[0] = {
+    const payload: {
+      name: string;
+      password: string;
+      verifiedIdentifier: string;
+      dateOfBirth: string;
+      gender: string;
+      emergencyContactName: string;
+      emergencyContactPhone: string;
+      medicalHistory: string;
+      hmo: string;
+      hmoId: string;
+      referenceCode?: string;
+      email?: string;
+      phoneNumber?: string;
+    } = {
       name: name.trim(),
-      email,
       password,
-      phoneNumber: phoneNumber.trim(),
+      verifiedIdentifier: identifier.trim(),
       dateOfBirth,
       gender,
       emergencyContactName: emergencyContactName.trim(),
@@ -103,6 +136,17 @@ export default function CompleteRegistrationPage() {
       hmo,
       hmoId: hmoId.trim(),
     };
+    // Handle identifier type
+    if (isIdentifierEmail) {
+      payload.email = identifier.trim();
+      payload.phoneNumber = phoneNumber.trim();
+    } else {
+      payload.phoneNumber = identifier.trim();
+
+      if (email.trim()) {
+        payload.email = email.trim();
+      }
+    }
 
     if (referenceCode.trim()) {
       payload.referenceCode = referenceCode.trim();
@@ -110,7 +154,7 @@ export default function CompleteRegistrationPage() {
 
     mutation.mutate(payload, {
       onSuccess: () => {
-        sessionStorage.removeItem("reg_email");
+        sessionStorage.removeItem("reg_identifier");
         sessionStorage.removeItem("reg_otp_verified");
         router.push("/login");
       },
@@ -121,14 +165,13 @@ export default function CompleteRegistrationPage() {
     mutation.isError && mutation.error instanceof Error
       ? mutation.error.message
       : mutation.isError
-      ? "Registration failed. Please check your details and try again."
-      : null;
+        ? "Registration failed. Please check your details and try again."
+        : null;
 
   const fieldClass = (field: string) =>
-    `w-full bg-[#EFF4FF] border rounded-lg px-4 py-3 text-base text-[#0B1C30] outline-none transition-colors ${
-      clientErrors[field]
-        ? "border-[#93000A] focus:border-[#BA1A1A]"
-        : "border-[#BDC9C5] focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C]"
+    `w-full bg-[#EFF4FF] border rounded-lg px-4 py-3 text-base text-[#0B1C30] outline-none transition-colors ${clientErrors[field]
+      ? "border-[#93000A] focus:border-[#BA1A1A]"
+      : "border-[#BDC9C5] focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C]"
     }`;
 
   return (
@@ -149,7 +192,7 @@ export default function CompleteRegistrationPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
               </span>
-              <span className="text-xs font-semibold text-[#0F766E]">Email</span>
+              <span className="text-xs font-semibold text-[#0F766E]">Contact</span>
             </div>
             <div className="flex-1 h-px bg-[#00685C]" />
             <div className="flex items-center gap-1.5">
@@ -212,23 +255,36 @@ export default function CompleteRegistrationPage() {
               )}
             </div>
 
-            {/* Email (read-only) */}
+            {/* Identifier (read-only) */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-semibold text-[#3D4946]">Email Address</label>
+              <label className="text-sm font-semibold text-[#3D4946]">
+                {isIdentifierEmail ? "Email Address" : "Phone Number"} (verified)
+              </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B7280]">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
+                  {isIdentifierEmail ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm2 0l8 5 8-5M5 19l5-5m10 0l-5-5"
+                      />
+                    </svg>
+                  )}
                 </span>
                 <input
-                  type="email"
-                  value={email}
+                  type="text"
+                  value={identifier}
                   readOnly
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg pl-12 pr-4 py-3 text-base text-[#6B7280] outline-none cursor-not-allowed"
                 />
@@ -238,7 +294,7 @@ export default function CompleteRegistrationPage() {
                   </svg>
                 </span>
               </div>
-              <p className="text-xs text-[#94A3B8] mt-0.5">Verified email — cannot be changed.</p>
+              <p className="text-xs text-[#94A3B8] mt-0.5">Verified — cannot be changed.</p>
             </div>
 
             {/* Password */}
@@ -320,24 +376,53 @@ export default function CompleteRegistrationPage() {
               </p>
             </div>
 
-            {/* Phone Number */}
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-semibold text-[#3D4946]">
-                Phone Number <span className="text-[#93000A]">*</span>
-              </label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+1234567890"
-                className={fieldClass("phoneNumber")}
-              />
-              {clientErrors.phoneNumber && (
-                <p className="text-xs text-[#93000A] mt-0.5">{clientErrors.phoneNumber}</p>
-              )}
-            </div>
+            {/* Phone Number - only shown if identifier is email */}
+            {isIdentifierEmail && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold text-[#3D4946]">
+                  Phone Number <span className="text-[#93000A]">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="+1234567890"
+                  className={fieldClass("phoneNumber")}
+                />
+                {clientErrors.phoneNumber && (
+                  <p className="text-xs text-[#93000A] mt-0.5">{clientErrors.phoneNumber}</p>
+                )}
+              </div>
+            )}
 
-            {/* Date of Birth + Gender (side by side on md+) */}
+            {/* Email Address - only shown if identifier is phone */}
+            {!isIdentifierEmail && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold text-[#3D4946]">
+                  Email Address
+                  <span className="text-xs font-normal text-[#94A3B8]">
+                    {" "}
+                    (optional)
+                  </span>
+                </label>
+
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="john.doe@example.com"
+                  className={fieldClass("email")}
+                />
+
+                {clientErrors.email && (
+                  <p className="text-xs text-[#93000A] mt-0.5">
+                    {clientErrors.email}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Date of Birth + Gender */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">
@@ -364,13 +449,9 @@ export default function CompleteRegistrationPage() {
                   onChange={(e) => setGender(e.target.value)}
                   className={`${fieldClass("gender")} appearance-none`}
                 >
-                  <option value="" disabled>
-                    Select gender
-                  </option>
+                  <option value="" disabled>Select gender</option>
                   {GENDER_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
                 {clientErrors.gender && (
@@ -379,7 +460,7 @@ export default function CompleteRegistrationPage() {
               </div>
             </div>
 
-            {/* Section: Emergency Contact */}
+            {/* Emergency Contact */}
             <div className="flex flex-col gap-1 pt-2 pb-1">
               <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest">
                 Emergency Contact
@@ -399,9 +480,7 @@ export default function CompleteRegistrationPage() {
                   className={fieldClass("emergencyContactName")}
                 />
                 {clientErrors.emergencyContactName && (
-                  <p className="text-xs text-[#93000A] mt-0.5">
-                    {clientErrors.emergencyContactName}
-                  </p>
+                  <p className="text-xs text-[#93000A] mt-0.5">{clientErrors.emergencyContactName}</p>
                 )}
               </div>
 
@@ -417,21 +496,18 @@ export default function CompleteRegistrationPage() {
                   className={fieldClass("emergencyContactPhone")}
                 />
                 {clientErrors.emergencyContactPhone && (
-                  <p className="text-xs text-[#93000A] mt-0.5">
-                    {clientErrors.emergencyContactPhone}
-                  </p>
+                  <p className="text-xs text-[#93000A] mt-0.5">{clientErrors.emergencyContactPhone}</p>
                 )}
               </div>
             </div>
 
-            {/* Section: Medical & Optional */}
+            {/* Medical & Optional */}
             <div className="flex flex-col gap-1 pt-2 pb-1">
               <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest">
                 Medical & Optional
               </p>
             </div>
 
-            {/* Medical History */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-semibold text-[#3D4946]">Medical History / Allergies</label>
               <textarea
@@ -486,8 +562,7 @@ export default function CompleteRegistrationPage() {
             {/* Reference Code */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-semibold text-[#3D4946]">
-                Reference Code{" "}
-                <span className="text-xs font-normal text-[#94A3B8]">(optional)</span>
+                Reference Code <span className="text-xs font-normal text-[#94A3B8]">(optional)</span>
               </label>
               <input
                 type="text"
@@ -498,7 +573,6 @@ export default function CompleteRegistrationPage() {
               />
             </div>
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={mutation.isPending}
@@ -507,19 +581,8 @@ export default function CompleteRegistrationPage() {
               {mutation.isPending ? (
                 <>
                   <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                   Creating account...
                 </>
@@ -527,12 +590,7 @@ export default function CompleteRegistrationPage() {
                 <>
                   Create Account
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M14 5l7 7m0 0l-7 7m7-7H3"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </>
               )}

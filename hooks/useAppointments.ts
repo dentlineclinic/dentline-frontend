@@ -20,7 +20,7 @@ export const useAppointmentCalendar = (year: number, month: number) => {
   return useQuery({
     queryKey: queryKeys.appointmentCalendar(year, month),
     queryFn: () => fetchMonthlyCalendar(year, month),
-    staleTime: 1000 * 60 * 2, // 2 min — calendar changes infrequently
+    staleTime: 1000 * 60 * 2,
   });
 };
 
@@ -38,7 +38,6 @@ export const useAdminBookAppointment = () => {
     mutationFn: adminBookAppointment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.appointments() });
-      // also bust any cached calendar data
       queryClient.invalidateQueries({ queryKey: ["appointments", "calendar"] });
     },
   });

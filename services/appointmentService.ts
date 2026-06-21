@@ -1,6 +1,6 @@
 import api from "@/lib/axios";
 
-// ── Existing types ────────────────────────────────────────────────────────────
+// ── Core types ────────────────────────────────────────────────────────────────
 
 export interface Appointment {
   id: string;
@@ -21,7 +21,7 @@ export interface AppointmentResponse {
   };
 }
 
-// ── Existing service functions ────────────────────────────────────────────────
+// ── Core service functions ────────────────────────────────────────────────────
 
 export const fetchAppointments = async (
   page = 0,
@@ -52,10 +52,20 @@ export const searchAppointments = async (
   return response.data;
 };
 
-// ── Reschedule & admin-book (added previously) ────────────────────────────────
+// ── Admin booking & reschedule ────────────────────────────────────────────────
+
+export interface AdminBookAppointmentRequest {
+  patientId: string;
+  appointmentDate: string; // YYYY-MM-DD
+}
+
+export const adminBookAppointment = async (payload: AdminBookAppointmentRequest) => {
+  const response = await api.post("/appointments/admin-book", payload);
+  return response.data;
+};
 
 export interface RescheduleAppointmentRequest {
-  newAppointmentDate: string;
+  newAppointmentDate: string; // YYYY-MM-DD
 }
 
 export const rescheduleAppointment = async (
@@ -66,17 +76,7 @@ export const rescheduleAppointment = async (
   return response.data;
 };
 
-export interface AdminBookAppointmentRequest {
-  patientId: string;
-  appointmentDate: string;
-}
-
-export const adminBookAppointment = async (payload: AdminBookAppointmentRequest) => {
-  const response = await api.post("/appointments/admin-book", payload);
-  return response.data;
-};
-
-// ── Calendar API (new) ────────────────────────────────────────────────────────
+// ── Calendar API ──────────────────────────────────────────────────────────────
 
 export interface CalendarDay {
   date: string;

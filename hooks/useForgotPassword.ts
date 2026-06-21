@@ -4,10 +4,14 @@ import {
   resetForgottenPassword,
 } from "@/services/authService";
 
-/** Step 1 — request OTP to the given email */
 export const useRequestPasswordOtp = () =>
-  useMutation({ mutationFn: requestPasswordOtp });
+  useMutation({
+    mutationFn: requestPasswordOtp,
+    retry: false,
+  });
 
-/** Step 2 — verify OTP + set new password */
 export const useResetForgottenPassword = () =>
-  useMutation({ mutationFn: resetForgottenPassword });
+  useMutation({
+    mutationFn: resetForgottenPassword,
+    retry: false,
+  });

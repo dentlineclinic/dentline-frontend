@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import TopBar from "@/components/layout/TopBar";
-import { updatePatientProfile, changePassword, uploadProfilePhoto } from "@/services/patientService";
+import {
+  updatePatientProfile,
+  changePassword,
+  uploadProfilePhoto,
+  fetchPatientProfile,
+} from "@/services/patientService";
 import { avatarMedium } from "@/lib/cloudinary";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +31,8 @@ const HMO_OPTIONS = [
 
 export default function PatientProfilePage() {
   const [patientId, setPatientId] = useState<string | null>(null);
-  
-  // Profile form state — matches backend fields exactly
+
+  // Profile form state
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -36,64 +41,75 @@ export default function PatientProfilePage() {
   const [medicalHistory, setMedicalHistory] = useState("");
   const [hmo, setHmo] = useState("");
   const [hmoId, setHmoId] = useState("");
-  
+
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  
+
   // Photo upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string>("");
-  
+
   // UI state
   const [loading, setLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
 
-  // Load user data from localStorage
+  // Login type for conditional editing
+  const [lastVerificationType, setLastVerificationType] = useState<"EMAIL" | "PHONE">("EMAIL");
+
+  // Load user data from backend
   useEffect(() => {
-    // Try localStorage first; fall back to decoding the JWT
-    let id = localStorage.getItem("userId");
-    if (!id) {
-      const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split(".")[1]));
-          id = payload?.id || payload?.userId || null;
-          if (id) localStorage.setItem("userId", id);
-        } catch {
-          // ignore malformed token
+    const loadProfile = async () => {
+      try {
+        let id = localStorage.getItem("userId");
+
+        if (!id) {
+          const token = localStorage.getItem("token");
+          if (token) {
+            try {
+              const payload = JSON.parse(atob(token.split(".")[1]));
+              id = payload?.id || payload?.userId || null;
+              if (id) localStorage.setItem("userId", id);
+            } catch {
+              // ignore
+            }
+          }
         }
+
+        if (!id) return;
+
+        setPatientId(id);
+
+        const result = await fetchPatientProfile(id);
+        if (!result.success) return;
+
+        const patient = result.data;
+        setName(patient.name);
+        setEmail(patient.email);
+        setPhoneNumber(patient.phoneNumber ?? "");
+        setEmergencyContactName(patient.emergencyContactName ?? "");
+        setEmergencyContactPhone(patient.emergencyContactPhone ?? "");
+        setMedicalHistory(patient.medicalHistory ?? "");
+        setHmo(patient.hmo ?? "");
+        setHmoId(patient.hmoId ?? "");
+        setProfilePhotoUrl(patient.profilePhotoUrl ?? "");
+        setLastVerificationType(patient.lastVerificationType!);
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load profile.");
       }
-    }
+    };
 
-    const userName = localStorage.getItem("userName") || "";
-    const userEmail = localStorage.getItem("userEmail") || "";
-    const userPhone = localStorage.getItem("userPhone") || "";
-    const savedPhotoUrl = localStorage.getItem("profilePhotoUrl") || "";
-    const savedEmergencyName = localStorage.getItem("emergencyContactName") || "";
-    const savedEmergencyPhone = localStorage.getItem("emergencyContactPhone") || "";
-    const savedMedicalHistory = localStorage.getItem("medicalHistory") || "";
-    const savedHmo = localStorage.getItem("hmo") || "";
-    const savedHmoId = localStorage.getItem("hmoId") || "";
-
-    setPatientId(id);
-    setName(userName);
-    setEmail(userEmail);
-    setPhoneNumber(userPhone);
-    setProfilePhotoUrl(savedPhotoUrl);
-    setEmergencyContactName(savedEmergencyName);
-    setEmergencyContactPhone(savedEmergencyPhone);
-    setMedicalHistory(savedMedicalHistory);
-    setHmo(savedHmo);
-    setHmoId(savedHmoId);
+    loadProfile();
   }, []);
 
+  // --- Profile update ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!patientId) {
       toast.error("User not found");
       return;
@@ -102,8 +118,13 @@ export default function PatientProfilePage() {
     setLoading(true);
 
     try {
+      const updatePayload =
+        lastVerificationType === "EMAIL"
+          ? { phoneNumber }
+          : { email };
+
       const result = await updatePatientProfile(patientId, {
-        phoneNumber,
+        ...updatePayload,
         emergencyContactName,
         emergencyContactPhone,
         medicalHistory,
@@ -113,12 +134,24 @@ export default function PatientProfilePage() {
 
       if (result.success) {
         toast.success(result.message || "Profile updated successfully");
-        localStorage.setItem("userPhone", phoneNumber);
-        localStorage.setItem("emergencyContactName", emergencyContactName);
-        localStorage.setItem("emergencyContactPhone", emergencyContactPhone);
-        localStorage.setItem("medicalHistory", medicalHistory);
-        localStorage.setItem("hmo", hmo);
-        localStorage.setItem("hmoId", hmoId);
+
+        const patient = result.data;
+        setEmail(patient.email);
+        setPhoneNumber(patient.phoneNumber ?? "");
+        setEmergencyContactName(patient.emergencyContactName ?? "");
+        setEmergencyContactPhone(patient.emergencyContactPhone ?? "");
+        setMedicalHistory(patient.medicalHistory ?? "");
+        setHmo(patient.hmo ?? "");
+        setHmoId(patient.hmoId ?? "");
+        setProfilePhotoUrl(patient.profilePhotoUrl ?? "");
+
+        localStorage.setItem("userEmail", patient.email);
+        localStorage.setItem("userPhone", patient.phoneNumber ?? "");
+        localStorage.setItem("emergencyContactName", patient.emergencyContactName ?? "");
+        localStorage.setItem("emergencyContactPhone", patient.emergencyContactPhone ?? "");
+        localStorage.setItem("medicalHistory", patient.medicalHistory ?? "");
+        localStorage.setItem("hmo", patient.hmo ?? "");
+        localStorage.setItem("hmoId", patient.hmoId ?? "");
       } else {
         toast.error(result.message || "Failed to update profile");
       }
@@ -129,9 +162,10 @@ export default function PatientProfilePage() {
     }
   };
 
+  // --- Password change ---
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmPassword) {
       toast.error("New passwords do not match");
       return;
@@ -151,7 +185,6 @@ export default function PatientProfilePage() {
       const result = await changePassword({ currentPassword, newPassword });
       if (result.success) {
         toast.success("Password changed. Logging you out…");
-        // Clear all session data and redirect to login
         setTimeout(() => {
           localStorage.clear();
           document.cookie = "token=; path=/; max-age=0; samesite=strict";
@@ -168,9 +201,10 @@ export default function PatientProfilePage() {
     }
   };
 
+  // --- Photo upload ---
   const handlePhotoUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedFile) {
       toast.error("Please select a file to upload");
       return;
@@ -219,21 +253,20 @@ export default function PatientProfilePage() {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      // Generate local preview immediately
       const reader = new FileReader();
       reader.onloadend = () => setPhotoPreview(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
-  // Get user initials for avatar
   const userInitials = name
     .split(" ")
-    .map(n => n[0])
+    .map((n) => n[0])
     .slice(0, 2)
     .join("")
     .toUpperCase() || "U";
 
+  // --- Render ---
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar title="My Profile" subtitle="Manage your personal information" />
@@ -243,11 +276,10 @@ export default function PatientProfilePage() {
           {/* Profile Photo Upload */}
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 shadow-sm">
             <h3 className="text-lg font-semibold text-[#0B1C30] mb-6">Profile Photo</h3>
-            
+
             <div className="flex items-center gap-6 mb-6">
               <div className="w-20 h-20 rounded-full bg-[#CCFBF1] flex items-center justify-center overflow-hidden flex-shrink-0">
                 {photoPreview || profilePhotoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={photoPreview || avatarMedium(profilePhotoUrl)}
                     alt="Profile"
@@ -281,9 +313,7 @@ export default function PatientProfilePage() {
                 </p>
               </div>
               {selectedFile && (
-                <div className="text-sm text-[#00685C]">
-                  Selected: {selectedFile.name}
-                </div>
+                <div className="text-sm text-[#00685C]">Selected: {selectedFile.name}</div>
               )}
               <button
                 type="submit"
@@ -300,7 +330,7 @@ export default function PatientProfilePage() {
             <h3 className="text-lg font-semibold text-[#0B1C30] mb-6">Personal Information</h3>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              {/* Name — read-only, comes from backend */}
+              {/* Name — read‑only */}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">Full Name</label>
                 <input
@@ -312,26 +342,42 @@ export default function PatientProfilePage() {
                 <p className="text-xs text-[#94A3B8]">Name cannot be changed here</p>
               </div>
 
+              {/* Login identifier (read‑only) */}
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-[#3D4946]">Email</label>
+                <label className="text-sm font-semibold text-[#3D4946]">User Login</label>
                 <input
-                  type="email"
-                  value={email}
+                  type={lastVerificationType === "EMAIL" ? "email" : "tel"}
+                  value={lastVerificationType === "EMAIL" ? email : phoneNumber}
                   disabled
                   className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-lg px-4 py-3 text-sm text-[#94A3B8] cursor-not-allowed"
                 />
-                <p className="text-xs text-[#94A3B8]">Email cannot be changed</p>
+                <p className="text-xs text-[#94A3B8]">
+                  {lastVerificationType === "EMAIL"
+                    ? "You log in with your email address."
+                    : "You log in with your phone number."}
+                </p>
               </div>
 
+              {/* Editable identifier */}
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-[#3D4946]">Phone Number</label>
+                <label className="text-sm font-semibold text-[#3D4946]">
+                  {lastVerificationType === "EMAIL" ? "Phone Number" : "Email Address"}
+                </label>
                 <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+234 800 000 0000"
+                  type={lastVerificationType === "EMAIL" ? "tel" : "email"}
+                  value={lastVerificationType === "EMAIL" ? phoneNumber : email}
+                  onChange={(e) =>
+                    lastVerificationType === "EMAIL"
+                      ? setPhoneNumber(e.target.value)
+                      : setEmail(e.target.value)
+                  }
                   className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
                 />
+                <p className="text-xs text-[#94A3B8]">
+                  {lastVerificationType === "EMAIL"
+                    ? "You may update your phone number because you log in with your email."
+                    : "You may update your email because you log in with your phone number."}
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -368,7 +414,6 @@ export default function PatientProfilePage() {
                 />
               </div>
 
-              {/* HMO Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-semibold text-[#3D4946]">HMO</label>
@@ -385,7 +430,6 @@ export default function PatientProfilePage() {
                     ))}
                   </select>
                 </div>
-
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-semibold text-[#3D4946]">HMO ID</label>
                   <input
@@ -417,7 +461,7 @@ export default function PatientProfilePage() {
           {/* Change Password */}
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 shadow-sm">
             <h3 className="text-lg font-semibold text-[#0B1C30] mb-6">Change Password</h3>
-            
+
             <form onSubmit={handlePasswordChange} className="flex flex-col gap-5">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">Current Password</label>
@@ -430,7 +474,7 @@ export default function PatientProfilePage() {
                   className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C]"
                 />
               </div>
-              
+
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">New Password</label>
                 <input
@@ -441,11 +485,9 @@ export default function PatientProfilePage() {
                   required
                   className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C]"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Password must be at least 8 characters long
-                </p>
+                <p className="text-xs text-gray-500 mt-1">Password must be at least 8 characters long</p>
               </div>
-              
+
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">Confirm New Password</label>
                 <input
@@ -457,7 +499,7 @@ export default function PatientProfilePage() {
                   className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C]"
                 />
               </div>
-              
+
               <button
                 type="submit"
                 disabled={passwordLoading}

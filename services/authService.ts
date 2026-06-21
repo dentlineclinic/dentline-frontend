@@ -2,7 +2,7 @@ import api from "@/lib/axios";
 import { clearAuthState } from "@/lib/auth";
 
 export const loginUser = async (payload: {
-  email: string;
+  identifier: string;
   password: string;
   role: string;
 }) => {
@@ -13,24 +13,36 @@ export interface BasicResponse {
   success: boolean;
   message: string;
 }
-export const requestRegistrationOtp = async (payload: { email: string }) => {
-  const response = await api.post("/auth/register/request-otp", payload);
+export const requestRegistrationOtp = async (payload: {
+  email?: string;
+  phoneNumber?: string;
+}) => {
+  const response = await api.post(
+    "/auth/register/request-otp",
+    payload
+  );
+
   return response;
 };
-
 export const verifyRegistrationOtp = async (payload: {
-  email: string;
+  email?: string;
+  phoneNumber?: string;
   otp: string;
 }) => {
-  const response = await api.post("/auth/register/verify-otp", payload);
+  const response = await api.post(
+    "/auth/register/verify-otp",
+    payload
+  );
+
   return response;
 };
 
 export const completeRegistration = async (payload: {
   name: string;
-  email: string;
+  email?: string;
   password: string;
-  phoneNumber: string;
+  phoneNumber?: string;
+  verifiedIdentifier: string;
   dateOfBirth: string;
   gender: string;
   emergencyContactName: string;
@@ -88,14 +100,16 @@ export const logoutUser = async (): Promise<BasicResponse> => {
 };
 
 export const requestPasswordOtp = async (payload: {
-  email: string;
+  email?: string;
+  phoneNumber?: string;
 }): Promise<BasicResponse> => {
   const res = await api.post("/auth/forgot-password/request-otp", payload);
   return res.data;
 };
 
 export const resetForgottenPassword = async (payload: {
-  email: string;
+  email?: string;
+  phoneNumber?: string;
   otp: string;
   newPassword: string;
   confirmPassword: string;

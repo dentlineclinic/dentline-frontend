@@ -40,39 +40,40 @@ export interface CreatePatientResponse {
     role: string;
   };
 }
+// patientService.ts (partial – only changed interfaces)
+
 export interface PatientDto {
-  id: string; // UUID → string
+  id: string;
   name: string;
   email: string;
-
   role: string;
-  status: string; 
-
+  status: string;
   mustChangePassword: boolean;
   profilePhotoUrl?: string;
-
-  // Patient-specific fields
   phoneNumber?: string;
-  dateOfBirth?: string; 
+  dateOfBirth?: string;
   gender?: string;
-
   emergencyContactName?: string;
   emergencyContactPhone?: string;
-
   medicalHistory?: string;
-
   referenceCode?: string;
   referencePoints?: number;
+hmo: string;
+  hmoId: string;
+  lastVerificationType?: "EMAIL" | "PHONE";
 }
 
 export interface UpdatePatientProfileRequest {
+  email?: string; 
   phoneNumber?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   medicalHistory?: string;
-   hmo?: string;
+  hmo?: string;
   hmoId?: string;
 }
+
+
 
 export interface PatientResponse {
   success: boolean;
@@ -107,6 +108,14 @@ export interface BookAppointmentResponse {
   data: Appointment;
 }
 
+
+export const fetchPatientProfile = async (
+  patientId: string
+): Promise<{ success: boolean; data: PatientDto }> => {
+  const res = await api.get(`/users/patients/${patientId}/profile`);
+  return res.data;
+};
+
 export interface FetchAppointmentsResponse {
   success: boolean;
   message: string;
@@ -118,6 +127,11 @@ export interface FetchAppointmentsResponse {
     number: number;
   };
 }
+
+export const cancelAppointment = async (appointmentId: string) => {
+  const res = await api.patch(`/appointments/${appointmentId}/cancel`);
+  return res.data;
+};
 
 export const fetchMyAppointments = async (
   page = 0,
@@ -240,7 +254,7 @@ export interface PatientDashboardDto {
   today: string;
   completedAppointments: number;
   totalAppointments: number;
-  lastAppointmentDate: string | null;
+  nextAppointmentDate: string | null;
   referenceCode: string | null;
   referencePoints: number;
   recentHistories: PatientHistoryDto[];
@@ -263,5 +277,6 @@ export const updatePatientProfile = async (
   payload: UpdatePatientProfileRequest
 ): Promise<{ success: boolean; message: string; data: PatientDto }> => {
   const res = await api.patch(`/users/patients/${patientId}/profile`, payload);
+  
   return res.data;
 };

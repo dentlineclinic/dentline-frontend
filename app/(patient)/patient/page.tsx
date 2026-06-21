@@ -10,16 +10,21 @@ import { formatDateSplit } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 export default function PatientDashboard() {
   const { data: response, isLoading: loading, isError } = usePatientDashboard();
   const [copied, setCopied] = useState(false);
+  // Defer time-based greeting and localStorage read to client-only to prevent hydration mismatch
+  const [greeting, setGreeting] = useState("Hello");
+  const [localName, setLocalName] = useState("");
+
+  useEffect(() => {
+    const h = new Date().getHours();
+    if (h < 12) setGreeting("Good morning");
+    else if (h < 17) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
+
+    setLocalName(localStorage.getItem("userName") ?? "");
+  }, []);
 
   const copyReferenceCode = (code: string) => {
     navigator.clipboard.writeText(code).then(() => {
@@ -38,7 +43,7 @@ export default function PatientDashboard() {
   }, [response]);
 
   const data = response?.data;
-  const displayName = data?.patientName || (typeof window !== "undefined" ? localStorage.getItem("userName") : null) || "there";
+  const displayName = data?.patientName || localName || "there";
 
   const recentHistories = (data?.recentHistories ?? []).map((h: PatientHistoryDto) => {
     const { date, time } = formatDateSplit(h.appointmentDate);
@@ -55,7 +60,7 @@ export default function PatientDashboard() {
   const stats = [
     { label: "Total Appointments",     value: data?.totalAppointments     != null ? String(data.totalAppointments)     : "—", icon: "🦷" },
     { label: "Completed Appointments", value: data?.completedAppointments != null ? String(data.completedAppointments) : "—", icon: "📅" },
-    { label: "Next Visit",             value: data?.lastAppointmentDate ? formatDateSplit(data.lastAppointmentDate).date : "—", icon: "⏰" },
+    { label: "Next Visit",             value: data?.nextAppointmentDate ? formatDateSplit(data.nextAppointmentDate).date : "—", icon: "⏰" },
   ];
 
   return (
@@ -75,7 +80,7 @@ export default function PatientDashboard() {
         <div className="bg-gradient-to-r from-[#00685C] to-[#008375] rounded-xl p-6 sm:p-8 text-white relative overflow-hidden">
           <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
           <h2 className="text-xl sm:text-2xl font-bold mb-1">
-            {getGreeting()}, {displayName}! 👋
+            {greeting}, {displayName}! 👋
           </h2>
           <p className="text-white/80 text-sm sm:text-base">
             {loading
