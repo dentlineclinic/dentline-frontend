@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useVerifyOtp } from "@/hooks/useVerifyOtp";
 import { useRequestOtp } from "@/hooks/useRequestOtp";
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 60;
@@ -14,6 +15,7 @@ export default function VerifyOtpPage() {
   const [identifier, setIdentifier] = useState("");
   const [countdown, setCountdown] = useState(RESEND_COOLDOWN);
   const [canResend, setCanResend] = useState(false);
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
 
@@ -93,24 +95,36 @@ export default function VerifyOtpPage() {
     );
   };
 
-  const handleResend = () => {
-    if (!canResend || resendMutation.isPending) return;
-    const isEmail = identifier.includes("@");
+  
+const handleResend = async () => {
+  if (!canResend || resendMutation.isPending) return;
 
-    resendMutation.mutate(
-      isEmail
-        ? { email: identifier }
-        : { phoneNumber: identifier },
-      {
-        onSuccess: () => {
-          setDigits(Array(OTP_LENGTH).fill(""));
-          setCountdown(RESEND_COOLDOWN);
-          setCanResend(false);
-          focusInput(0);
+  if (!executeRecaptcha) return;
+
+  const captchaToken = await executeRecaptcha("register_resend");
+
+  const isEmail = identifier.includes("@");
+
+  resendMutation.mutate(
+    isEmail
+      ? {
+          email: identifier,
+          captchaToken,
+        }
+      : {
+          phoneNumber: identifier,
+          captchaToken,
         },
-      }
-    );
-  };
+    {
+      onSuccess: () => {
+        setDigits(Array(OTP_LENGTH).fill(""));
+        setCountdown(RESEND_COOLDOWN);
+        setCanResend(false);
+        focusInput(0);
+      },
+    }
+  );
+};
 
   const otp = digits.join("");
   const isComplete = otp.length === OTP_LENGTH;
