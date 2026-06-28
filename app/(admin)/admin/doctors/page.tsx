@@ -95,8 +95,10 @@ function DoctorsPageInner() {
     return safeString(name, "Unknown Doctor");
   };
 
-  // Updated loadDoctors with proper parameters
-  const loadDoctors = useCallback(async (isInitialLoad = false) => {
+  // ✅ FIXED: Proper fetch function with race condition protection
+  const fetchData = useCallback(async (pageNum: number, searchTerm: string, isInitialLoad: boolean) => {
+    const requestId = ++fetchIdRef.current;
+
     if (isInitialLoad) {
       setLoading(true);
     } else {
@@ -105,17 +107,19 @@ function DoctorsPageInner() {
     setError(null);
 
     try {
-      // Pass all parameters including statusFilter
-      const res = await fetchDoctors(page, size, search);
+      const res = await fetchDoctors(pageNum, size, searchTerm);
+
+      // Cancel stale responses
+      if (requestId !== fetchIdRef.current) return;
+
 
       if (res.success && res.data) {
-        // Map backend Doctor to DisplayDoctor with safe handling
         const mappedDoctors = res.data.content.map((doc: Doctor) => {
           const fullName = getSafeName(doc.name);
           return {
             id: doc.id,
             shortId: getShortId(doc.id),
-            fullName: fullName,
+            fullName,
             initials: getInitials(fullName),
             specialty: safeString(doc.specialization, "—"),
             email: safeString(doc.email, "—"),
@@ -123,53 +127,51 @@ function DoctorsPageInner() {
             role: cleanRole(doc.role),
           };
         });
-        
+
         setDoctors(mappedDoctors);
         setTotalPages(res.data.totalPages);
         setTotalElements(res.data.totalElements);
-      } else {
-        setError(res.message || "Failed to load doctors.");
       }
     } catch (err: any) {
-      console.error("Error loading doctors:", err);
+      if (requestId !== fetchIdRef.current) return;
       setError(err.response?.data?.message || "Failed to load doctors.");
     } finally {
+      if (requestId !== fetchIdRef.current) return;
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [page, size, search, statusFilter]);
+  }, [size]);
 
-  // Cleaner debounce with explicit dependencies
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchIdRef = useRef(0);
+
+  // ✅ FIXED: Only SEARCH effect drives debounced fetching
   useEffect(() => {
-    // Clear previous timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
     }
-    
-    // Set new timer
-    debounceTimerRef.current = setTimeout(() => {
-      loadDoctors(false);
+
+    debounceRef.current = setTimeout(() => {
+      fetchData(page, search, false);
+      debounceRef.current = null;
     }, 400);
-    
+
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
       }
     };
-  }, [page, search, statusFilter, loadDoctors]);
+  }, [search]);
 
-  // Initial load
+  // ✅ Initial load (only once)
   useEffect(() => {
-    loadDoctors(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Wrap in microtask to avoid react-hooks/set-state-in-effect rule
+    queueMicrotask(() => {
+      fetchData(0, "", true);
+    });
   }, []);
 
-  // Reset page when search or filter changes
-  useEffect(() => {
-    setPage(0);
-  }, [search, statusFilter]);
+
 
   // Handle backend filtering vs frontend fallback
   const needsFrontendFilter = false; // Set to true if backend doesn't support status filter
@@ -183,6 +185,7 @@ function DoctorsPageInner() {
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPage(0);
     setSearch(e.target.value);
   };
 

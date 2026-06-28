@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
+
 import "./globals.css";
 import "react-toastify/dist/ReactToastify.css";
+
 import Providers from "./providers";
-import { ToastContainer } from "react-toastify";
 import OfflineBanner from "@/components/ui/OfflineBanner";
 
 const manrope = Manrope({
@@ -14,15 +15,21 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.dentlineclinic.com"),
+
   title: {
     default: "Dentline Clinic | Dental Clinic in Ikeja & Gbagada, Lagos",
     template: "%s | Dentline Clinic",
   },
-  description:
 
+  description:
     "Dentline Clinic is a modern dental clinic in Ikeja & Gbagada, Lagos, providing preventive, cosmetic, restorative, and emergency dental care for patients of all ages.",
 
-  keywords: ["dental clinic", "dentist", "restorative dentistry", "Dentline", "dental clinic Lagos",
+  keywords: [
+    "dental clinic",
+    "dentist",
+    "restorative dentistry",
+    "Dentline",
+    "dental clinic Lagos",
     "dentist Ikeja",
     "dentist Lagos",
     "teeth cleaning",
@@ -30,33 +37,35 @@ export const metadata: Metadata = {
     "restorative dentistry",
     "emergency dental care",
     "Dentline Clinic",
-    "dentist Gbagada"],
+    "dentist Gbagada",
+  ],
 
   openGraph: {
-  title: "Dentline Clinic | Dental Clinic in Ikeja & Gbagada, Lagos",
-  description:
-    "Dentline Clinic provides professional dental care in Ikeja and Gbagada, Lagos, including routine checkups, teeth cleaning, cosmetic dentistry, restorative treatments, and emergency dental services.",
-  url: "https://www.dentlineclinic.com",
-  siteName: "Dentline Clinic",
-  locale: "en_US",
-  type: "website",
-  images: [
-    {
-      url: "/og-image.png",
-      width: 1200,
-      height: 630,
-      alt: "Dentline Clinic",
-    },
-  ],
-},
+    title: "Dentline Clinic | Dental Clinic in Ikeja & Gbagada, Lagos",
+    description:
+      "Dentline Clinic provides professional dental care in Ikeja and Gbagada, Lagos, including routine checkups, teeth cleaning, cosmetic dentistry, restorative treatments, and emergency dental services.",
+    url: "https://www.dentlineclinic.com",
+    siteName: "Dentline Clinic",
+    locale: "en_US",
+    type: "website",
 
-twitter: {
-  card: "summary_large_image",
-  title: "Dentline Clinic | Dental Clinic in Ikeja & Gbagada, Lagos",
-  description:
-    "Dentline Clinic provides professional dental care in Ikeja and Gbagada, Lagos, including routine checkups, teeth cleaning, cosmetic dentistry, restorative treatments, and emergency dental services.",
-  images: ["/og-image.png"],
-},
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Dentline Clinic",
+      },
+    ],
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "Dentline Clinic | Dental Clinic in Ikeja & Gbagada, Lagos",
+    description:
+      "Dentline Clinic provides professional dental care in Ikeja and Gbagada, Lagos, including routine checkups, teeth cleaning, cosmetic dentistry, restorative treatments, and emergency dental services.",
+    images: ["/og-image.png"],
+  },
 
   icons: {
     icon: "/favicon.ico",
@@ -74,17 +83,8 @@ export default function RootLayout({
     <html lang="en" className={`${manrope.variable} h-full`}>
       <body className="min-h-full font-sans antialiased">
         <OfflineBanner />
+
         <Providers>{children}</Providers>
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          pauseOnHover
-          draggable
-          theme="light"
-        />
       </body>
     </html>
   );

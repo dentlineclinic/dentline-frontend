@@ -1,18 +1,24 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
+import { ToastContainer } from "react-toastify";
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function Providers({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 1000 * 60,        // 1 min — data stays fresh, avoids redundant refetches
-            gcTime: 1000 * 60 * 10,      // 10 min — keep unused cache alive
+            staleTime: 1000 * 60, // 1 minute
+            gcTime: 1000 * 60 * 10, // 10 minutes
             retry: 2,
-            refetchOnWindowFocus: false, // prevents surprise refetches on tab switch
+            refetchOnWindowFocus: false,
             refetchOnReconnect: true,
           },
         },
@@ -21,7 +27,22 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <GoogleReCaptchaProvider
+        reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+      >
+        {children}
+
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="light"
+        />
+      </GoogleReCaptchaProvider>
     </QueryClientProvider>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import axios from "axios";
 import TopBar from "@/components/layout/TopBar";
 import { bookAppointment } from "@/services/patientService";
 
@@ -37,7 +38,19 @@ export default function BookAppointmentPage() {
         setMessage({ type: "error", text: res.message || "Booking failed" });
       }
     } catch (err) {
-      setMessage({ type: "error", text: "Something went wrong. Please try again." });
+      if (axios.isAxiosError(err)) {
+        setMessage({
+          type: "error",
+          text:
+            err.response?.data?.message ??
+            "Something went wrong. Please try again."
+        });
+      } else {
+        setMessage({
+          type: "error",
+          text: "Something went wrong. Please try again."
+        });
+      }
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,8 @@ import {
   useResetForgottenPassword,
 } from "@/hooks/useForgotPassword";
 import { isValidEmail, isValidPhone } from "@/lib/utils";
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const RESEND_COOLDOWN = 60; // seconds
@@ -96,6 +98,8 @@ export default function ForgotPasswordPage() {
 
   const requestOtpMutation = useRequestPasswordOtp();
   const resetMutation = useResetForgottenPassword();
+  const { executeRecaptcha } = useGoogleReCaptcha();
+
 
   // ── Resend timer ────────────────────────────────────────────────────────────
   const startResendTimer = useCallback(() => {
@@ -149,9 +153,18 @@ export default function ForgotPasswordPage() {
       return;
     }
 
+    if (!executeRecaptcha) {
+      setIdentifierError("Captcha not ready");
+      return;
+    }
+
+    const captchaToken = await executeRecaptcha("forgot_password");
+
     try {
       const res = await requestOtpMutation.mutateAsync(
-        isEmail ? { email: trimmedIdentifier } : { phoneNumber: trimmedIdentifier }
+        isEmail
+          ? { email: trimmedIdentifier, captchaToken }
+          : { phoneNumber: trimmedIdentifier, captchaToken }
       );
       if (res.success) {
         setStep(2);
@@ -173,10 +186,20 @@ export default function ForgotPasswordPage() {
   const handleResend = async () => {
     if (resendTimer > 0 || requestOtpMutation.isPending) return;
     setFormError("");
+
+    if (!executeRecaptcha) {
+      setFormError("Captcha not ready");
+      return;
+    }
+
+    const captchaToken = await executeRecaptcha("forgot_password");
+
     try {
       const isEmail = identifier.includes("@");
       const res = await requestOtpMutation.mutateAsync(
-        isEmail ? { email: identifier.trim() } : { phoneNumber: identifier.trim() }
+        isEmail
+          ? { email: identifier.trim(), captchaToken }
+          : { phoneNumber: identifier.trim(), captchaToken }
       );
       if (res.success) {
         startResendTimer();

@@ -5,14 +5,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequestOtp } from "@/hooks/useRequestOtp";
 import { isValidEmail, isValidPhone } from "@/lib/utils";
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
+
 
 export default function RequestOtpPage() {
   const [identifier, setIdentifier] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
   const mutation = useRequestOtp();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const trimmedIdentifier = identifier.trim();
@@ -35,10 +38,17 @@ export default function RequestOtpPage() {
 
     setError("");
 
+    if (!executeRecaptcha) {
+      setError("Captcha not ready");
+      return;
+    }
+
+    const captchaToken = await executeRecaptcha("register_otp");
+
     mutation.mutate(
       isEmail
-        ? { email: trimmedIdentifier }
-        : { phoneNumber: trimmedIdentifier },
+        ? { email: trimmedIdentifier, captchaToken }
+        : { phoneNumber: trimmedIdentifier, captchaToken },
       {
         onSuccess: () => {
           sessionStorage.setItem("reg_identifier", trimmedIdentifier);

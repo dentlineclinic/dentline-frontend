@@ -22,7 +22,7 @@ interface Props {
 export default function AppointmentManagementDrawer({ appointment, onClose, onRefresh }: Props) {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
-
+  const [copied, setCopied] = useState(false);
   const [showDoctorPanel, setShowDoctorPanel] = useState(false);
   const [doctorSearch, setDoctorSearch] = useState("");
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -66,10 +66,7 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
     return () => clearTimeout(t);
   }, [doctorSearch, showDoctorPanel, loadDoctors]);
 
-  const filteredDoctors = doctors.filter(d =>
-    d.fullName.toLowerCase().includes(doctorSearch.toLowerCase()) ||
-    d.specialty.toLowerCase().includes(doctorSearch.toLowerCase())
-  );
+  const filteredDoctors = doctors;
 
   const markArrival = async () => {
     setUpdatingStatus(true);
@@ -95,6 +92,19 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
     } finally { setAssigning(false); }
   };
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(appointment.rawId);
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy appointment ID", err);
+    }
+  };
   const canManage = appointment.status === "BOOKED" || appointment.status === "ARRIVED";
 
   return (
@@ -126,13 +136,64 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
           <div className="flex flex-col gap-3">
             {[
               { label: "Doctor", value: appointment.doctorName },
-              { label: "Date",   value: appointment.date },
+              { label: "Date", value: appointment.date },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between">
                 <span className="text-[#94A3B8] text-xs font-semibold uppercase tracking-widest">{label}</span>
                 <span className="text-[#0B1C30] text-sm font-medium text-right max-w-[200px]">{value}</span>
               </div>
             ))}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[#94A3B8] text-xs font-semibold uppercase tracking-widest">
+                Appointment ID
+              </span>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[#0B1C30] font-medium font-mono break-all">
+                  {appointment.rawId}
+                </span>
+
+                <button
+                  onClick={handleCopy}
+                  className="p-1 hover:bg-[#F1F5F9] rounded transition-colors group flex-shrink-0"
+                  title="Copy Appointment ID"
+                >
+                  {copied ? (
+                    <svg
+                      className="w-4 h-4 text-[#0F766E]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-4 h-4 text-[#94A3B8] group-hover:text-[#3D4946]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              <span className="text-xs text-[#94A3B8]">
+                Short ID: {appointment.id}
+              </span>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-[#94A3B8] text-xs font-semibold uppercase tracking-widest">Status</span>
               <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[appointment.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
@@ -178,11 +239,10 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
                 <button
                   onClick={() => { setDoctorSearch(""); setAssignError(null); setShowDoctorPanel(true); }}
                   disabled={assigning}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
-                    showDoctorPanel
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${showDoctorPanel
                       ? "bg-[#FEF3C7] border-[#92400E] text-[#92400E]"
                       : "bg-white border-[#E2E8F0] text-[#0B1C30] hover:bg-[#FEF3C7] hover:border-[#92400E] hover:text-[#92400E]"
-                  }`}
+                    }`}
                 >
                   <span className="w-8 h-8 rounded-full bg-[#FEF3C7] flex items-center justify-center flex-shrink-0">
                     <svg className="w-4 h-4 text-[#92400E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

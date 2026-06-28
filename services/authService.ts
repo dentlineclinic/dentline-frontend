@@ -16,6 +16,7 @@ export interface BasicResponse {
 export const requestRegistrationOtp = async (payload: {
   email?: string;
   phoneNumber?: string;
+  captchaToken: string;
 }) => {
   const response = await api.post(
     "/auth/register/request-otp",
@@ -102,6 +103,7 @@ export const logoutUser = async (): Promise<BasicResponse> => {
 export const requestPasswordOtp = async (payload: {
   email?: string;
   phoneNumber?: string;
+  captchaToken: string;
 }): Promise<BasicResponse> => {
   const res = await api.post("/auth/forgot-password/request-otp", payload);
   return res.data;
