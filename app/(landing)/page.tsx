@@ -1,6 +1,7 @@
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
 import Link from "next/link";
+import FeaturedProducts from "@/components/shop/FeaturedProducts";
 
 export default function LandingPage() {
   return (
@@ -253,22 +254,16 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                quote:
-                  "The level of precision in their restorative work is unmatched. I felt completely informed and comfortable throughout my implant procedure.",
-                name: "Marcus Thorne",
-                role: "Restorative Patient",
+                quote: "I wasn't quite sure what to expect going in because my last dental appointment elsewhere wasn't a great experience, but this visit turned out to be completely different. I was really impressed by the appointment reminders, they set a positive tone even before I arrived. On getting there, everyone was polite, professional, and attentive, from the front desk right through to the doctors. I had three procedures done, and all of them went smoothly. I was especially worried about the filling, but to my surprise, I didn't feel a thing (very different from my previous experience). The environment was clean and comfortable. The waiting area looks like it's still a work in progress, and I think adding some plants or artwork would really lift the ambience. Special shoutout to Dr. Nene, Nurse Ayomide, and Dr. Taiwo for the excellent care. I truly hope they keep up the great work. I would definitely recommend this place.",
+                name: "Florence Adeoye",
               },
               {
-                quote:
-                  "As someone with high dental anxiety, Dentline completely changed my outlook. The clinical calm environment actually works.",
-                name: "Sarah Jenkins",
-                role: "Routine Care",
+                quote: "Absolutely amazing experience! The service was excellent from start to finish. The clinic has such a lovely ambiance — clean, modern, and very welcoming. The staff were professional, kind, and incredibly sweet, making me feel comfortable throughout my visit. You can really tell they care about their patients and pay attention to detail. Highly recommend this dental clinic to anyone looking for quality care and a great overall experience!",
+                name: "Kenneth Lucy",
               },
               {
-                quote:
-                  "Highly recommend for families. They were so patient with my children, making the whole visit feel like a positive learning experience.",
-                name: "David Chen",
-                role: "Family Care",
+                quote: "Trust me when I say I had the best time going there. All the staffs were exceptional and very friendly. So accommodating and down to earth. The doctor was very very nice to me. I strongly recommend the clinic anytime, any day!!",
+                name: "Uloma Immaculate",
               },
             ].map((testimonial) => (
               <div
@@ -287,16 +282,32 @@ export default function LandingPage() {
                 {/* Quote */}
                 <p className="text-base text-white/90">{testimonial.quote}</p>
 
-                {/* Name and Role - Removed profile picture */}
+                {/* Name only - Role removed */}
                 <div className="pt-4">
                   <h5 className="text-base font-semibold text-white">{testimonial.name}</h5>
-                  <p className="text-xs text-white/60">{testimonial.role}</p>
                 </div>
               </div>
             ))}
           </div>
+
+          {/* Leave a Review Link with spacing */}
+          <div className="text-center mt-16 pt-8 border-t border-white/10">
+            <a
+              href="https://g.page/r/CQehAbW6ozmdEAE/review"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-white text-[#435B7E] font-semibold text-sm px-8 py-4 rounded-lg shadow-lg hover:bg-[#8EF5E2] hover:text-[#0B1C30] transition-all"
+            >
+              <span>⭐</span>
+              Leave a Review on Google
+              <span>→</span>
+            </a>
+          </div>
         </div>
       </section>
+
+      {/* Featured Products */}
+      <FeaturedProducts />
 
       <Footer />
     </div >

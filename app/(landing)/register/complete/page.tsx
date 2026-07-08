@@ -25,6 +25,8 @@ const HMO_OPTIONS = [
   { value: "AVILIA", label: "Avilia" },
   { value: "THT", label: "THT" },
   { value: "HCI", label: "HCI" },
+  { value: "NOVO", label: "Novo" },
+  { value: "R2", label: "R2" },
 ];
 
 export default function CompleteRegistrationPage() {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
 import { ToastContainer } from "react-toastify";
+import { CartProvider } from "@/context/CartContext";
 
 export default function Providers({
   children,
@@ -27,21 +28,11 @@ export default function Providers({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GoogleReCaptchaProvider
-        reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
-      >
-        {children}
-
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          pauseOnHover
-          draggable
-          theme="light"
-        />
+      <GoogleReCaptchaProvider reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}>
+        <CartProvider>
+          {children}
+        </CartProvider>
+        <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick pauseOnHover draggable theme="light" />
       </GoogleReCaptchaProvider>
     </QueryClientProvider>
   );
