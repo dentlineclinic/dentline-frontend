@@ -26,7 +26,7 @@ const HMO_OPTIONS = [
   { value: "THT", label: "THT" },
   { value: "HCI", label: "HCI" },
   { value: "NOVO", label: "Novo" },
-  { value: "R2", label: "R2" },
+  { value: "ALTU", label: "Altu" },
 ];
 
 export default function CompleteRegistrationPage() {
@@ -525,7 +525,7 @@ export default function CompleteRegistrationPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">
-                  HMO <span className="text-[#93000A]">*</span>
+                  HMO 
                 </label>
                 <select
                   value={hmo}
@@ -546,7 +546,7 @@ export default function CompleteRegistrationPage() {
 
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">
-                  HMO ID <span className="text-[#93000A]">*</span>
+                  HMO ID 
                 </label>
                 <input
                   type="text"
