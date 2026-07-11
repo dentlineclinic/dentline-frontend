@@ -27,6 +27,7 @@ const HMO_OPTIONS = [
   { value: "HCI", label: "HCI" },
   { value: "NOVO", label: "Novo" },
   { value: "ALTU", label: "Altu" },
+  { value: "AXAMANSARD", label: "Axamansard" },
 ];
 
 export default function CompleteRegistrationPage() {
