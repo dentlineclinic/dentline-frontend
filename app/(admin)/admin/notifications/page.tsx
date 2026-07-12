@@ -64,7 +64,7 @@ export default function NotificationsPage() {
     } catch (err: any) {
       console.error("Error loading notifications:", err);
       // ✅ Safer error message extraction
-      const errorMessage = err?.response?.data?.message || "Failed to load notifications.";
+      const errorMessage = err.message || "Failed to load notifications.";
       setError(errorMessage);
     } finally {
       setLoading(false);

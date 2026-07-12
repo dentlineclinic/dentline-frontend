@@ -85,7 +85,7 @@ export default function AdminOrdersPage() {
       toast.success(`Payment ${status.toLowerCase()}.`);
       await refreshSelected(selectedOrder.id);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to update payment.");
+      toast.error(err.message || "Failed to update payment.");
     } finally {
       setActionLoading(null);
     }
@@ -99,7 +99,7 @@ export default function AdminOrdersPage() {
       toast.success(`Shipping updated to ${status.toLowerCase()}.`);
       await refreshSelected(selectedOrder.id);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to update shipping.");
+      toast.error(err.message || "Failed to update shipping.");
     } finally {
       setActionLoading(null);
     }

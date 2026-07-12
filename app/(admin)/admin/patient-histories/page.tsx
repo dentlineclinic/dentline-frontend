@@ -179,7 +179,7 @@ export default function PatientHistoriesPage() {
       }
     } catch (err: any) {
       console.error("Error loading histories:", err);
-      setError(err.response?.data?.message || "Failed to load patient histories.");
+      setError(err.message || "Failed to load patient histories.");
     } finally {
       setLoading(false);
     }
@@ -274,7 +274,7 @@ export default function PatientHistoriesPage() {
         setCreateError(res.message || "Failed to create patient history.");
       }
     } catch (err: any) {
-      setCreateError(err.response?.data?.message || "Failed to create patient history.");
+      setCreateError(err.message || "Failed to create patient history.");
     } finally {
       setCreating(false);
     }

@@ -91,7 +91,7 @@ export default function DoctorAppointmentsPage() {
       setTotalPages(res.data?.totalPages ?? 0);
       setTotalElements(res.data?.totalElements ?? 0);
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to load appointments.");
+      setError(e.message || "Failed to load appointments.");
     } finally {
       setLoading(false);
     }

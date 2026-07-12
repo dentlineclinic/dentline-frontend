@@ -76,7 +76,7 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
       if (res.data.success) { onRefresh(); onClose(); }
       else setStatusError(res.data.message || "Failed to update status");
     } catch (err: any) {
-      setStatusError(err.response?.data?.message || "Failed to update status");
+      setStatusError(err.message || "Failed to update status");
     } finally { setUpdatingStatus(false); }
   };
 
@@ -88,7 +88,7 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
       if (res.data.success) { onRefresh(); onClose(); }
       else setAssignError(res.data.message || "Failed to assign doctor");
     } catch (err: any) {
-      setAssignError(err.response?.data?.message || "Failed to assign doctor");
+      setAssignError(err.message || "Failed to assign doctor");
     } finally { setAssigning(false); }
   };
 

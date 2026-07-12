@@ -35,7 +35,7 @@ export default function AppointmentHistoryPage() {
         prev.map(h => h.id === id ? { ...h, status: "CANCELLED" } : h)
       );
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to cancel appointment.");
+      toast.error(err.message || "Failed to cancel appointment.");
     } finally {
       setCancellingId(null);
       setConfirmCancelId(null);

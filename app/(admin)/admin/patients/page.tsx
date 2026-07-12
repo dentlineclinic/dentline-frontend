@@ -274,7 +274,7 @@ export default function PatientsPage() {
         setCreateError(response.message || "Failed to create patient.");
       }
     } catch (err: any) {
-      setCreateError(err?.response?.data?.message || "Failed to create patient.");
+      setCreateError(err.message || "Failed to create patient.");
     } finally {
       setCreating(false);
     }

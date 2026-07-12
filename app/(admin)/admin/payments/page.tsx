@@ -131,7 +131,7 @@ export default function PaymentsPage() {
       setTotalElements(res.data.totalElements);
     } catch (err: any) {
       console.error("Failed to load payments:", err);
-      setError(err?.response?.data?.message || "Failed to load payments.");
+      setError(err.message || "Failed to load payments.");
     } finally {
       setLoading(false);
     }
@@ -187,7 +187,7 @@ export default function PaymentsPage() {
       await refreshAllData();
       setSelected(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to record payment.");
+      toast.error(e.message || "Failed to record payment.");
     } finally {
       setActionLoading(false);
     }
@@ -202,7 +202,7 @@ export default function PaymentsPage() {
       await loadPayments(page, search);
       setSelected((prev) => prev ? { ...prev, paymentStatus: "UNPAID" } : null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Failed to mark as unpaid.");
+      toast.error(e.message || "Failed to mark as unpaid.");
     } finally {
       setActionLoading(false);
     }

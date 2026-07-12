@@ -78,7 +78,7 @@ export default function DoctorReviewsPage() {
       setTotalPages(res?.data?.totalPages ?? 0);
       setTotalElements(res?.data?.totalElements ?? 0);
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to load reviews.");
+      setError(e.message || "Failed to load reviews.");
     } finally {
       setLoading(false);
     }

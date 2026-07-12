@@ -153,7 +153,7 @@ export default function AppointmentCalendar() {
       toast.success("Appointment booked successfully.");
       setShowBookModal(false);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to book appointment.");
+      toast.error(err.message || "Failed to book appointment.");
     }
   };
 
@@ -179,7 +179,7 @@ export default function AppointmentCalendar() {
       // If day drawer is open for the old date, refresh it
       handleRefresh();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to reschedule.");
+      toast.error(err.message || "Failed to reschedule.");
     }
   };
 

@@ -150,7 +150,7 @@ export default function MedicalHistoryPage() {
     } catch (err: any) {
       // Handle backend error message if available
       const message =
-        err?.response?.data?.message ||
+        err.message ||
         "Failed to submit review. Please try again.";
 
       setReviewError(message);

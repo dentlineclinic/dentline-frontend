@@ -92,8 +92,7 @@ export default function CreateDoctorPage() {
       }
     } catch (err: any) {
       const message =
-        err?.response?.data?.message ||
-        err?.message ||
+        err.message ||
         "Failed to create doctor.";
       setError(message);
     } finally {

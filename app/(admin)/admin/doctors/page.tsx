@@ -134,7 +134,7 @@ function DoctorsPageInner() {
       }
     } catch (err: any) {
       if (requestId !== fetchIdRef.current) return;
-      setError(err.response?.data?.message || "Failed to load doctors.");
+      setError(err.message || "Failed to load doctors.");
     } finally {
       if (requestId !== fetchIdRef.current) return;
       setLoading(false);

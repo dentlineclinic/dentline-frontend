@@ -27,6 +27,9 @@ const HMO_OPTIONS = [
   { value: "AVILIA", label: "Avilia" },
   { value: "THT", label: "THT" },
   { value: "HCI", label: "HCI" },
+  { value: "NOVO", label: "Novo" },
+  { value: "ALTU", label: "Altu" },
+  { value: "AXAMANSARD", label: "Axamansard" },
 ];
 
 export default function PatientProfilePage() {
@@ -156,7 +159,7 @@ export default function PatientProfilePage() {
         toast.error(result.message || "Failed to update profile");
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Something went wrong. Please try again.");
+      toast.error(err.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -196,7 +199,7 @@ export default function PatientProfilePage() {
         setPasswordLoading(false);
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Something went wrong. Please try again.");
+      toast.error(err.message || "Something went wrong. Please try again.");
       setPasswordLoading(false);
     }
   };
@@ -243,7 +246,7 @@ export default function PatientProfilePage() {
         toast.error(result.message || "Failed to upload profile photo");
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Upload failed. Please try again.");
+      toast.error(err.message || "Upload failed. Please try again.");
     } finally {
       setPhotoLoading(false);
     }

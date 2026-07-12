@@ -73,6 +73,37 @@ api.interceptors.response.use(
       }
     }
 
+    // ── Extract human-readable message from backend GlobalExceptionHandler ────
+    // All backend exceptions serialize to: { success: false, message: "..." }
+    // MethodArgumentNotValidException adds: { data: { field: "message" } }
+    const data = error.response?.data as any;
+
+    let backendMessage: string | null = null;
+
+    if (data?.message) {
+      // Standard ApiException / all other handlers
+      backendMessage = data.message;
+
+      // If it's a validation error, append the first field error for context
+      if (
+        data.message === "Validation failed" &&
+        data.data &&
+        typeof data.data === "object"
+      ) {
+        const fieldErrors = Object.values(data.data as Record<string, string>);
+        if (fieldErrors.length > 0) {
+          backendMessage = fieldErrors[0] as string;
+        }
+      }
+    }
+
+    if (backendMessage) {
+      const friendly = new Error(backendMessage);
+      // Keep the original response attached so callers can still inspect status
+      (friendly as any).response = error.response;
+      return Promise.reject(friendly);
+    }
+
     return Promise.reject(error);
   }
 );

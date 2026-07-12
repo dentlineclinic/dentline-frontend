@@ -147,7 +147,7 @@ export default function AdminProductsPage() {
       load(page);
     } catch (err: any) {
       toast.error(
-        err?.response?.data?.message || "Failed to save product."
+        err.message || "Failed to save product."
       );
     } finally {
       setSaving(false);

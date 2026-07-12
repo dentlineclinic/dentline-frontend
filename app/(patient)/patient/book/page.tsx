@@ -42,7 +42,7 @@ export default function BookAppointmentPage() {
         setMessage({
           type: "error",
           text:
-            err.response?.data?.message ??
+            err.message ??
             "Something went wrong. Please try again."
         });
       } else {

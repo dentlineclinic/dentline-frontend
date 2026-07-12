@@ -12,7 +12,7 @@ export default function DoctorDashboard() {
   const { data: response, isLoading: loading, error: queryError } = useDoctorDashboard();
 
   const dashboard = response?.data ?? null;
-  const error = queryError ? (queryError as any)?.response?.data?.message || "Failed to load dashboard." : null;
+  const error = queryError ? (queryError as Error).message || "Failed to load dashboard." : null;
 
   // Sync name + photo to localStorage so TopBar updates
   useEffect(() => {

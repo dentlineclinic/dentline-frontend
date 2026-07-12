@@ -173,7 +173,7 @@ export default function ForgotPasswordPage() {
         setIdentifierError(res.message || "Failed to send OTP. Please try again.");
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.message;
+      const msg = err.message;
       setIdentifierError(
         msg === "User not found"
           ? "No account found with that email or phone number."
@@ -254,7 +254,7 @@ export default function ForgotPasswordPage() {
         setFormError(res.message || "Password reset failed. Please try again.");
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "";
+      const msg = err.message ?? "";
       if (msg.toLowerCase().includes("otp") || msg.toLowerCase().includes("invalid")) {
         setFormError("Invalid or expired OTP. Please request a new one.");
       } else if (msg.toLowerCase().includes("locked") || msg.toLowerCase().includes("account")) {

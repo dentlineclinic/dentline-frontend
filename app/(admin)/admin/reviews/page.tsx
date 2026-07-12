@@ -179,7 +179,7 @@ export default function ReviewsPage() {
       }
     } catch (err: any) {
       console.error("Error loading reviews:", err);
-      setError(err.response?.data?.message || "Failed to load reviews.");
+      setError(err.message || "Failed to load reviews.");
     } finally {
       setLoading(false);
     }
