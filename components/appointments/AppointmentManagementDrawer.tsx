@@ -19,6 +19,12 @@ interface Props {
   onRefresh: () => void;
 }
 
+// ✅ Safe slice helper
+const safeSlice = (str: string | undefined | null, length: number = 8): string => {
+  if (!str) return 'N/A';
+  return str.slice(0, length);
+};
+
 export default function AppointmentManagementDrawer({ appointment, onClose, onRefresh }: Props) {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -44,6 +50,7 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
     };
   }, []);
 
+  // ✅ Guard against null appointment
   if (!appointment) {
     return null;
   }
@@ -190,14 +197,16 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
                   Head Patient: {appointment.headPatientName}
                 </p>
               )}
+              {/* ✅ FIXED: Added null check for familyMemberId */}
               {appointment.appointmentType === "FAMILY" && appointment.familyMemberId && (
                 <p className="text-xs text-[#94A3B8] mt-0.5">
-                  Family Member ID: {appointment.familyMemberId.slice(0, 8)}...
+                  Family Member ID: {safeSlice(appointment.familyMemberId)}...
                 </p>
               )}
+              {/* ✅ FIXED: Added null check for patientId */}
               {appointment.patientId && appointment.appointmentType !== "FAMILY" && (
                 <p className="text-xs text-[#94A3B8]">
-                  Patient ID: {appointment.patientId.slice(0, 8)}...
+                  Patient ID: {safeSlice(appointment.patientId)}...
                 </p>
               )}
             </div>

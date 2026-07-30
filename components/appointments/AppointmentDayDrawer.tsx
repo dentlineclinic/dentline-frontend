@@ -21,7 +21,19 @@ function Spinner() {
   );
 }
 
-export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelectAppointment, onReschedule }: Props) {
+// ✅ Safe slice helper to prevent undefined errors
+const safeSlice = (str: string | undefined | null, length: number = 8): string => {
+  if (!str) return 'N/A';
+  return str.slice(0, length);
+};
+
+export default function AppointmentDayDrawer({ 
+  date, 
+  dateLabel, 
+  onClose, 
+  onSelectAppointment, 
+  onReschedule 
+}: Props) {
   // ✅ Guard against undefined date
   if (!date) {
     return (
@@ -45,6 +57,7 @@ export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelec
 
   const { data, isLoading, isError } = useAppointmentsByDate(date);
 
+  // ✅ Safe mapping with fallback
   const appointments = (data?.data?.content ?? []).map(mapToUIAppointment);
 
   return (
@@ -125,9 +138,10 @@ export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelec
                 
                 <p className="text-xs text-[#3D4946] mt-0.5">{appt.doctorName || "Unassigned"}</p>
                 
+                {/* ✅ FIXED: Added null check for familyMemberId */}
                 {appt.appointmentType === "FAMILY" && appt.familyMemberId && (
                   <p className="text-xs text-[#94A3B8] mt-0.5">
-                    Family Member ID: {appt.familyMemberId.slice(0, 8)}...
+                    Family Member ID: {safeSlice(appt.familyMemberId)}...
                   </p>
                 )}
                 

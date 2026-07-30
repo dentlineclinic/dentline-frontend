@@ -25,6 +25,12 @@ export const STATUS_COLORS: Record<string, string> = {
   MISSED:    "bg-[#FFDAD6] text-[#93000A]",
 };
 
+// ✅ Safe slice helper
+const safeSlice = (str: string | undefined | null, length: number = 6): string => {
+  if (!str) return '';
+  return str.slice(0, length);
+};
+
 export function mapToUIAppointment(appt: any): UIAppointment {
   // Guard against null/undefined appointment object
   if (!appt) {
@@ -46,11 +52,15 @@ export function mapToUIAppointment(appt: any): UIAppointment {
   // ✅ FIX: Use familyMemberName if available for display
   const displayName = appt.familyMemberName || appt.patientName || "Unknown";
   
+  // ✅ FIX: Safely get the ID for the display ID
+  const rawId = appt.id || appt.appointmentId || '';
+  const shortId = rawId ? safeSlice(rawId, 6) : '';
+  
   return {
-    id: `APT-${appt.id.slice(0, 6).toUpperCase()}`,
-    rawId: appt.id,
+    id: shortId ? `APT-${shortId.toUpperCase()}` : `APT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+    rawId: rawId,
     patientId: appt.patientId ?? "",
-    patientName: displayName, // ✅ Use familyMemberName here
+    patientName: displayName,
     initials: (displayName)
       .split(" ")
       .map((n: string) => n[0])
@@ -65,6 +75,6 @@ export function mapToUIAppointment(appt: any): UIAppointment {
     appointmentType: appt.type ?? appt.appointmentType ?? "INDIVIDUAL",
     familyMemberId: appt.familyMemberId,
     familyMemberName: appt.familyMemberName,
-    headPatientName: appt.patientName || "Unknown", // Store head patient name for reference
+    headPatientName: appt.patientName || "Unknown",
   };
 }
