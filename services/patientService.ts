@@ -16,7 +16,6 @@ type Patient = {
   referencePoints: number;
   lastVisit: string;
   status: string;
-
   hmo: string;
   hmoId: string;
 };
@@ -40,7 +39,6 @@ export interface CreatePatientResponse {
     role: string;
   };
 }
-// patientService.ts (partial – only changed interfaces)
 
 export interface PatientDto {
   id: string;
@@ -58,7 +56,7 @@ export interface PatientDto {
   medicalHistory?: string;
   referenceCode?: string;
   referencePoints?: number;
-hmo: string;
+  hmo: string;
   hmoId: string;
   lastVerificationType?: "EMAIL" | "PHONE";
 }
@@ -73,8 +71,6 @@ export interface UpdatePatientProfileRequest {
   hmoId?: string;
 }
 
-
-
 export interface PatientResponse {
   success: boolean;
   data: {
@@ -88,7 +84,7 @@ export interface PatientResponse {
 }
 
 export interface BookAppointmentRequest {
-  appointmentDate: string; // ISO format
+  appointmentDate: string;
 }
 
 export interface Appointment {
@@ -108,7 +104,7 @@ export interface BookAppointmentResponse {
   data: Appointment;
 }
 
-
+// DEPRECATED: Use fetchMyPatientProfile() instead
 export const fetchPatientProfile = async (
   patientId: string
 ): Promise<{ success: boolean; data: PatientDto }> => {
@@ -140,7 +136,6 @@ export const fetchMyAppointments = async (
   const res = await api.get("/appointments/my", {
     params: { page, size },
   });
-
   return res.data;
 };
 
@@ -151,39 +146,77 @@ export const bookAppointment = async (
   return res.data;
 };
 
+export const fetchMyPatientProfile = async (): Promise<{ success: boolean; data: PatientDto }> => {
+  const res = await api.get("/users/patients/me/profile");
+  return res.data;
+};
+
 export const fetchPatients = async (
   page = 0,
   size = 10,
   searchTerm = ""
 ) => {
+  try {
+    if (searchTerm.trim()) {
+      const response = await api.get<PatientResponse>(
+        "/users/patients/search",
+        {
+          params: {
+            name: searchTerm,
+            page,
+            size
+          }
+        }
+      );
 
-  if (searchTerm.trim()) {
+      return {
+        success: response.data.success ?? true,
+        data: {
+          content: response.data?.data?.content || [],
+          totalElements: response.data?.data?.totalElements || 0,
+          totalPages: response.data?.data?.totalPages || 0,
+          size: response.data?.data?.size || size,
+          number: response.data?.data?.number || page,
+        },
+        message: response.data?.message || "Patients retrieved"
+      };
+    }
 
     const response = await api.get<PatientResponse>(
-      "/users/patients/search",
+      "/users/patients",
       {
         params: {
-          name: searchTerm,
           page,
           size
         }
       }
     );
 
-    return response.data;
+    return {
+      success: response.data.success ?? true,
+      data: {
+        content: response.data?.data?.content || [],
+        totalElements: response.data?.data?.totalElements || 0,
+        totalPages: response.data?.data?.totalPages || 0,
+        size: response.data?.data?.size || size,
+        number: response.data?.data?.number || page,
+      },
+      message: response.data?.message || "Patients retrieved"
+    };
+  } catch (error) {
+    console.error("Error fetching patients:", error);
+    return {
+      success: false,
+      data: {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        size: size,
+        number: page,
+      },
+      message: "Failed to fetch patients"
+    };
   }
-
-  const response = await api.get<PatientResponse>(
-    "/users/patients",
-    {
-      params: {
-        page,
-        size
-      }
-    }
-  );
-
-  return response.data;
 };
 
 export const createPatient = async (payload: CreatePatientRequest) => {
@@ -207,32 +240,28 @@ export const changePassword = async (data: {
   return response.data;
 };
 
-
-
 export interface UploadPhotoResponse {
   success: boolean;
   message: string;
   data: PatientDto;
 }
 
-// ✅ Upload Profile Photo
+// CHANGED: Now uses userId instead of patientId
 export const uploadProfilePhoto = async (
-  patientId: string,
+  userId: string,
   file: File
 ): Promise<UploadPhotoResponse> => {
   const formData = new FormData();
   formData.append("file", file);
 
-  // Do NOT set Content-Type manually — axios sets it with the correct boundary
   const response = await api.post(
-    `/users/patients/${patientId}/profile/photo`,
+    `/users/patients/user/${userId}/profile/photo`,
     formData
   );
 
   return response.data;
 };
 
-// ✅ Patient Dashboard Types
 export interface PatientHistoryDto {
   id: string;
   patientId: string;
@@ -266,17 +295,16 @@ export interface PatientDashboardResponse {
   data: PatientDashboardDto;
 }
 
-// ✅ Fetch Patient Dashboard
 export const fetchPatientDashboard = async (): Promise<PatientDashboardResponse> => {
   const res = await api.get("/patient/dashboard");
   return res.data;
 };
 
+// CHANGED: Now uses userId instead of patientId
 export const updatePatientProfile = async (
-  patientId: string,
+  userId: string,
   payload: UpdatePatientProfileRequest
 ): Promise<{ success: boolean; message: string; data: PatientDto }> => {
-  const res = await api.patch(`/users/patients/${patientId}/profile`, payload);
-  
+  const res = await api.patch(`/users/patients/user/${userId}/profile`, payload);
   return res.data;
 };

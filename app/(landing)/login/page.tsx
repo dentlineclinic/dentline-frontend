@@ -1,4 +1,5 @@
-"use client";
+// app/(landing)/login/page.tsx
+'use client';
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -19,20 +20,30 @@ export default function LoginPage() {
   useEffect(() => {
     if (loginMutation.isSuccess) {
       const role = localStorage.getItem("userRole");
+      const mustChangePassword = localStorage.getItem("mustChangePassword") === "true";
 
-      if (role === "DOCTOR") router.push("/doctor");
-      else if (role === "PATIENT") router.push("/patient");
-      else router.push("/");
+      // If patient must change password, redirect to profile with reason
+      if (mustChangePassword && role === "PATIENT") {
+        router.push("/patient/profile?reason=must_change_password");
+        return;
+      }
+
+      // Normal redirect based on role
+      if (role === "DOCTOR") {
+        router.push("/doctor");
+      } else if (role === "PATIENT") {
+        router.push("/patient");
+      } else {
+        router.push("/");
+      }
     }
   }, [loginMutation.isSuccess, router]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Trim both fields before sending to the backend
     loginMutation.mutate({
       identifier: identifier.trim(),
-      password: password.trim(),   // trimmed only on submit, not while typing
+      password: password.trim(),
       role: selectedRole,
     });
   };
@@ -153,7 +164,7 @@ export default function LoginPage() {
                   <input
                     type="text"
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value.trimStart())} // Trim leading spaces on every keystroke
+                    onChange={(e) => setIdentifier(e.target.value.trimStart())}
                     placeholder={
                       selectedRole === "PATIENT"
                         ? "email@example.com or +2348012345678"
@@ -177,7 +188,7 @@ export default function LoginPage() {
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)} // No trimming while typing (password can contain spaces)
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
                     className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-12 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"

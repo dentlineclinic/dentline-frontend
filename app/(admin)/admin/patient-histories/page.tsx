@@ -30,6 +30,11 @@ type PatientHistory = {
   createdAt: string;
   imageUrls: string[];
   videoUrls: string[];
+  // Family appointment fields
+  familyMemberId?: string;
+  familyMemberName?: string;
+  appointmentType?: "INDIVIDUAL" | "FAMILY";
+  headPatientName?: string;
 };
 
 export type PaymentStats = {
@@ -114,6 +119,15 @@ export default function PatientHistoriesPage() {
       .toUpperCase();
   };
 
+  // Helper to get display name for history
+  const getDisplayName = (history: any) => {
+    // For family appointments, show the family member name
+    if (history.appointmentType === "FAMILY" && history.familyMemberName) {
+      return history.familyMemberName;
+    }
+    return history.patientName || "Unknown Patient";
+  };
+
   // ✅ Load stats from backend - using imported service (NO duplicate /api)
   const loadStats = useCallback(async () => {
     try {
@@ -145,13 +159,14 @@ export default function PatientHistoriesPage() {
       if (res.success) {
         const mapped = res.data.content.map((h) => {
           const { date, time } = formatDateSafe(h.appointmentDate);
+          const displayName = getDisplayName(h);
 
           return {
             id: h.id,
             shortId: `HIS-${h.id.slice(0, 6).toUpperCase()}`,
             patientId: h.patientId,
-            patientName: h.patientName || "Unknown Patient",
-            initials: getInitials(h.patientName),
+            patientName: displayName,
+            initials: getInitials(displayName),
             doctorId: h.doctorId,
             doctorName: h.doctorName || "Unknown Doctor",
             appointmentId: h.appointmentId,
@@ -168,6 +183,11 @@ export default function PatientHistoriesPage() {
             createdAt: h.createdAt ? new Date(h.createdAt).toLocaleString() : "—",
             imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
             videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
+            // Family fields
+            familyMemberId: h.familyMemberId,
+            familyMemberName: h.familyMemberName,
+            appointmentType: h.appointmentType || "INDIVIDUAL",
+            headPatientName: h.patientName,
           };
         });
 
@@ -350,20 +370,6 @@ export default function PatientHistoriesPage() {
 
         {/* Filters */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          {/* <div className="flex gap-2">
-            {["All", "PAID", "PENDING", "UNPAID"].map(f => (
-              <button
-                key={f}
-                onClick={() => handlePaymentFilterChange(f)}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${paymentFilter === f
-                  ? "bg-[#00685C] text-white"
-                  : "bg-white border border-[#F1F5F9] text-[#3D4946] hover:bg-[#F8FAFC]"
-                  }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div> */}
           <div className="flex items-center gap-3">
             <input
               type="search"
@@ -394,10 +400,10 @@ export default function PatientHistoriesPage() {
         {/* Table */}
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
+                  {["ID", "PATIENT", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -408,7 +414,7 @@ export default function PatientHistoriesPage() {
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(8)].map((__, j) => (
+                      {[...Array(9)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -417,50 +423,72 @@ export default function PatientHistoriesPage() {
                   ))
                 ) : visible.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={9} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No patient history records found.
                     </td>
                   </tr>
                 ) : (
-                  visible.map((h) => (
-                    <tr key={h.id} className="hover:bg-[#F8FAFC] transition-colors border-t border-[#F8FAFC]">
-                      <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{h.shortId}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
-                            {h.initials}
+                  visible.map((h) => {
+                    const isFamily = h.appointmentType === "FAMILY";
+                    
+                    return (
+                      <tr key={h.id} className="hover:bg-[#F8FAFC] transition-colors border-t border-[#F8FAFC]">
+                        <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{h.shortId}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
+                              {h.initials}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-[#0B1C30]">{h.patientName}</p>
+                              {isFamily && h.headPatientName && (
+                                <p className="text-xs text-[#94A3B8]">
+                                  Head: {h.headPatientName}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <span className="text-sm font-semibold text-[#0B1C30]">{h.patientName}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[#3D4946]">{h.doctorName}</td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-[#0B1C30]">{h.date}</p>
-                        <p className="text-xs text-[#3D4946]">{h.time}</p>
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-[#0B1C30]">
-                        {formatCurrency(h.amount)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                          {h.paymentStatus}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[h.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                          {h.status.replace("_", " ")}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => openDetails(h)}
-                          className="text-xs text-[#0D9488] hover:underline font-semibold"
-                        >
-                          View Details
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="px-6 py-4">
+                          {isFamily ? (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                              Family
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                              Individual
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[#3D4946]">{h.doctorName}</td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-medium text-[#0B1C30]">{h.date}</p>
+                          <p className="text-xs text-[#3D4946]">{h.time}</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-[#0B1C30]">
+                          {formatCurrency(h.amount)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                            {h.paymentStatus}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[h.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                            {h.status.replace("_", " ")}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => openDetails(h)}
+                            className="text-xs text-[#0D9488] hover:underline font-semibold"
+                          >
+                            View Details
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -544,6 +572,9 @@ export default function PatientHistoriesPage() {
                     <div>
                       <p className="text-sm font-semibold text-[#0B1C30]">{selectedHistory.patientName}</p>
                       <p className="text-xs text-[#3D4946]">Patient ID: {selectedHistory.patientId?.slice(-8) || 'N/A'}</p>
+                      {selectedHistory.appointmentType === "FAMILY" && selectedHistory.headPatientName && (
+                        <p className="text-xs text-[#94A3B8]">Head Patient: {selectedHistory.headPatientName}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -570,10 +601,16 @@ export default function PatientHistoriesPage() {
                     <p className="text-sm font-medium text-[#0B1C30]">{selectedHistory.time}</p>
                   </div>
                   <div>
+                    <p className="text-xs text-[#94A3B8]">Type</p>
+                    <p className="text-sm font-medium text-[#0B1C30]">
+                      {selectedHistory.appointmentType === "FAMILY" ? "Family Appointment" : "Individual Appointment"}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-xs text-[#94A3B8]">Recorded On</p>
                     <p className="text-sm font-medium text-[#0B1C30]">{selectedHistory.createdAt}</p>
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <p className="text-xs text-[#94A3B8]">History Status</p>
                     <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[selectedHistory.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
                       {selectedHistory.status.replace("_", " ")}

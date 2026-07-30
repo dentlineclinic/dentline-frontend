@@ -1,10 +1,21 @@
-# TODO (Doctor admin page fetch de-dupe + race fix)
+# Fix PatientHistoriesPage Error - TODO
 
-- [ ] Remove PAGE change effect that immediately fetches with debounceRef cleanup (the “duplicates API calls” issue).
-- [ ] Remove initial-load mount effect that calls fetchData(0, "", true) (double fetch issue).
-- [ ] Fix race-condition code by adding a `requestId` guard inside fetchData and removing the currently-unused increment.
-- [ ] Correct isInitialLoad logic: only allow true once via a single initial load effect.
-- [ ] Replace the SEARCH effect with the exact debounced version provided (depends only on [search]).
-- [ ] Update `handleSearchChange` to setPage(0) before setSearch.
-- [ ] Run TypeScript/Next build or lint to ensure no errors.
+## Issue
+`PatientHistory` interface in `services/patientHistoryService.ts` is missing family-related fields causing TypeScript error in `app/(admin)/admin/patient-histories/page.tsx`.
+
+## Steps
+
+- [x] 1. Add family fields to `PatientHistory` interface in `services/patientHistoryService.ts`
+- [x] 2. Add family fields to mock data in `app/api/routes.ts` for consistency
+
+## Changes Made
+
+**`services/patientHistoryService.ts`**
+- Added optional family fields to the `PatientHistory` interface:
+  - `familyMemberId?: string`
+  - `familyMemberName?: string`
+  - `appointmentType?: "INDIVIDUAL" | "FAMILY"`
+
+**`app/api/routes.ts`**
+- Added `familyMemberId`, `familyMemberName`, and `appointmentType` fields to the mock `getPatientHistories()` return data (set to `undefined` / `"INDIVIDUAL"` for mock consistency)
 

@@ -29,6 +29,10 @@ export interface PatientHistory {
   createdAt: string;
   imageUrls: string[];
   videoUrls: string[];
+  // Family appointment fields
+  familyMemberId?: string;
+  familyMemberName?: string;
+  appointmentType?: "INDIVIDUAL" | "FAMILY";
 }
 
 export const fetchPatientHistories = async (
@@ -140,6 +144,32 @@ export const fetchPaymentStats = async (): Promise<PaymentStatsResponse> => {
   return res.data;
 };
 
+
+// In patientHistoryService.ts - add these functions
+
+export const fetchIndividualHistoriesById = async (
+  patientId: string,
+  page = 0,
+  size = 10
+): Promise<PatientHistoryResponse> => {
+  const res = await api.get<PatientHistoryResponse>(
+    `/patient-history/patient/${patientId}/individual`,
+    { params: { page, size } }
+  );
+  return res.data;
+};
+
+export const fetchFamilyHistoriesById = async (
+  patientId: string,
+  page = 0,
+  size = 10
+): Promise<PatientHistoryResponse> => {
+  const res = await api.get<PatientHistoryResponse>(
+    `/patient-history/patient/${patientId}/family`,
+    { params: { page, size } }
+  );
+  return res.data;
+};
 
 
 export const fetchMyPatientHistories = async (

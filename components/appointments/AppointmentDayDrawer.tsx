@@ -22,6 +22,27 @@ function Spinner() {
 }
 
 export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelectAppointment, onReschedule }: Props) {
+  // ✅ Guard against undefined date
+  if (!date) {
+    return (
+      <div className="fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white shadow-2xl z-40 flex flex-col">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
+          <div>
+            <h2 className="text-base font-bold text-[#0B1C30]">Invalid Date</h2>
+          </div>
+          <button onClick={onClose} className="text-[#94A3B8] hover:text-[#475569]">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <p className="text-sm text-[#94A3B8]">No date selected</p>
+        </div>
+      </div>
+    );
+  }
+
   const { data, isLoading, isError } = useAppointmentsByDate(date);
 
   const appointments = (data?.data?.content ?? []).map(mapToUIAppointment);
@@ -31,7 +52,7 @@ export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelec
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
         <div>
-          <h2 className="text-base font-bold text-[#0B1C30]">{dateLabel}</h2>
+          <h2 className="text-base font-bold text-[#0B1C30]">{dateLabel || "Select a date"}</h2>
           <p className="text-xs text-[#94A3B8] mt-0.5">
             {isLoading ? "Loading…" : `${appointments.length} appointment${appointments.length !== 1 ? "s" : ""}`}
           </p>
@@ -69,25 +90,47 @@ export default function AppointmentDayDrawer({ date, dateLabel, onClose, onSelec
             <p className="text-sm text-[#94A3B8]">No appointments on this day.</p>
           </div>
         ) : (
-          appointments.map(appt => (
+          appointments.map((appt) => (
             <div
-              key={appt.rawId}
+              key={appt.rawId || `appt-${appt.id}`}
               className="bg-white border border-[#F1F5F9] rounded-xl p-4 hover:border-[#00685C]/30 hover:shadow-sm transition-all flex items-start gap-3"
             >
               {/* Avatar */}
               <div className="w-10 h-10 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0 mt-0.5">
-                {appt.initials}
+                {appt.initials || "?"}
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-[#0B1C30] truncate">{appt.patientName}</p>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                    {appt.status}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#0B1C30] truncate">{appt.patientName || "Unknown"}</p>
+                    {appt.appointmentType === "FAMILY" && appt.headPatientName && (
+                      <p className="text-xs text-[#94A3B8] truncate">
+                        Head patient: {appt.headPatientName}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {appt.appointmentType === "FAMILY" && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                        Family
+                      </span>
+                    )}
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                      {appt.status || "UNKNOWN"}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-[#3D4946] mt-0.5">{appt.doctorName}</p>
+                
+                <p className="text-xs text-[#3D4946] mt-0.5">{appt.doctorName || "Unassigned"}</p>
+                
+                {appt.appointmentType === "FAMILY" && appt.familyMemberId && (
+                  <p className="text-xs text-[#94A3B8] mt-0.5">
+                    Family Member ID: {appt.familyMemberId.slice(0, 8)}...
+                  </p>
+                )}
+                
                 {appt.observation && appt.observation !== "No notes" && (
                   <p className="text-xs text-[#94A3B8] mt-1 truncate">{appt.observation}</p>
                 )}

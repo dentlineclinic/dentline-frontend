@@ -48,6 +48,15 @@ const adminNavItems = [
     ),
   },
   {
+    label: "Families",
+    href: "/admin/families",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m16 0v-2a4 4 0 00-3-3.87M9 7a4 4 0 10-8 0 4 4 0 008 0m10 0a4 4 0 100-8 4 4 0 000 8z" />
+      </svg>
+    ),
+  },
+  {
     label: "Payments",
     href: "/admin/payments",
     icon: (

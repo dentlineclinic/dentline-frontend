@@ -9,6 +9,9 @@ export interface Appointment {
   appointmentDate: string;
   status: string;
   reason?: string;
+  patientId?: string;
+  familyMemberId?: string;
+  type?: "INDIVIDUAL" | "FAMILY";
 }
 
 export interface AppointmentResponse {
@@ -19,6 +22,39 @@ export interface AppointmentResponse {
     size: number;
     number: number;
   };
+}
+
+export interface FamilyAppointmentResult {
+  id: string;
+  patientId: string;
+  patientName: string;
+  familyMemberId?: string;
+  familyMemberName?: string;
+  appointmentDate: string;
+  status: string;
+  type: "INDIVIDUAL" | "FAMILY";
+  createdAt: string;
+}
+
+// ── Family Appointment Request Types ──────────────────────────────────────────
+
+export interface BookFamilyAppointmentRequest {
+  appointmentDate: string; // YYYY-MM-DD
+  includeHeadPatient: boolean;
+  familyMemberIds: string[];
+}
+
+export interface AdminBookFamilyAppointmentRequest {
+  headPatientId: string;
+  appointmentDate: string; // YYYY-MM-DD
+  includeHeadPatient: boolean;
+  familyMemberIds: string[];
+}
+
+export interface BookFamilyAppointmentResponse {
+  success: boolean;
+  message: string;
+  data: FamilyAppointmentResult[];
 }
 
 // ── Core service functions ────────────────────────────────────────────────────
@@ -61,6 +97,30 @@ export interface AdminBookAppointmentRequest {
 
 export const adminBookAppointment = async (payload: AdminBookAppointmentRequest) => {
   const response = await api.post("/appointments/admin-book", payload);
+  return response.data;
+};
+
+// ── Family Appointment Booking ────────────────────────────────────────────────
+
+/**
+ * Patient books a family appointment (POST /appointments/family)
+ * The logged-in patient's family group is used as the source of members.
+ */
+export const bookFamilyAppointment = async (
+  payload: BookFamilyAppointmentRequest
+): Promise<BookFamilyAppointmentResponse> => {
+  const response = await api.post("/appointments/family", payload);
+  return response.data;
+};
+
+/**
+ * Admin books a family appointment (POST /appointments/admin/family-book)
+ * Admin specifies the head patient ID in the request.
+ */
+export const adminBookFamilyAppointment = async (
+  payload: AdminBookFamilyAppointmentRequest
+): Promise<BookFamilyAppointmentResponse> => {
+  const response = await api.post("/appointments/admin/family-book", payload);
   return response.data;
 };
 
@@ -117,6 +177,17 @@ export interface CalendarAppointment {
   status: string;
   observation?: string;
   createdAt: string;
+  familyMemberId?: string | null;
+  familyMemberName?: string | null;
+  appointmentType?: "INDIVIDUAL" | "FAMILY";
+  patient?: {
+    id: string;
+    name: string;
+  };
+  familyMember?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface CalendarDayResponse {
@@ -145,5 +216,10 @@ export const fetchAppointmentsByDate = async (
   size = 20
 ): Promise<CalendarDayResponse> => {
   const response = await api.get(`/appointments/calendar/${date}`, { params: { page, size } });
+  return response.data;
+};
+
+export const cancelAppointment = async (appointmentId: string) => {
+  const response = await api.patch(`/appointments/${appointmentId}/cancel`);
   return response.data;
 };

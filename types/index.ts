@@ -141,3 +141,72 @@ export interface ReviewForm {
   rating: number;
   comment: string;
 }
+
+
+// types.ts
+
+export const STATUS_COLORS: Record<string, string> = {
+  BOOKED: "bg-blue-50 text-blue-700",
+  ARRIVED: "bg-yellow-50 text-yellow-700",
+  ASSIGNED: "bg-purple-50 text-purple-700",
+  COMPLETED: "bg-green-50 text-green-700",
+  CANCELLED: "bg-red-50 text-red-700",
+  MISSED: "bg-gray-50 text-gray-700",
+};
+
+export interface UIAppointment {
+  rawId: string;
+  id: string;
+  patientName: string;
+  patientId: string;
+  familyMemberId?: string;
+  familyMemberName?: string;
+  doctorName: string;
+  date: string;
+  status: string;
+  observation: string;
+  initials: string;
+  appointmentType: string;
+}
+
+function getInitials(name: string): string {
+  if (!name) return "??";
+  return name
+    .split(" ")
+    .map(word => word[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "N/A";
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export function mapToUIAppointment(apiAppt: any): UIAppointment {
+  // Use familyMemberName if available, otherwise use patientName
+  const displayName = apiAppt.familyMemberName || apiAppt.patientName || "Unknown Patient";
+  
+  return {
+    rawId: apiAppt.id,
+    id: apiAppt.id?.slice(0, 8) || "",
+    patientName: displayName,
+    patientId: apiAppt.patientId,
+    familyMemberId: apiAppt.familyMemberId,
+    familyMemberName: apiAppt.familyMemberName,
+    doctorName: apiAppt.doctorName || "Not assigned",
+    date: formatDate(apiAppt.appointmentDate),
+    status: apiAppt.status || "UNKNOWN",
+    observation: apiAppt.observation || "No notes",
+    initials: getInitials(displayName),
+    appointmentType: apiAppt.appointmentType || "INDIVIDUAL",
+  };
+}
+

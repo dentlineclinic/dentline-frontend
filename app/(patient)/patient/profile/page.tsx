@@ -7,9 +7,10 @@ import {
   updatePatientProfile,
   changePassword,
   uploadProfilePhoto,
-  fetchPatientProfile,
+  fetchMyPatientProfile,
 } from "@/services/patientService";
 import { avatarMedium } from "@/lib/cloudinary";
+import { useSearchParams } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ const HMO_OPTIONS = [
   { value: "LIFE_WORTH", label: "Life Worth" },
   { value: "LIFE_ACTION", label: "Life Action" },
   { value: "PHILLIPS", label: "Phillips" },
-  { value: "VEO", label: "VEO" },
+  { value: "VEO", label: "Veo" },
   { value: "ASPIRE", label: "Aspire" },
   { value: "MEDIPLAN", label: "Mediplan" },
   { value: "AVILIA", label: "Avilia" },
@@ -34,6 +35,7 @@ const HMO_OPTIONS = [
 
 export default function PatientProfilePage() {
   const [patientId, setPatientId] = useState<string | null>(null);
+  const [passwordChangeReason, setPasswordChangeReason] = useState<string | null>(null);
 
   // Profile form state
   const [name, setName] = useState("");
@@ -59,37 +61,59 @@ export default function PatientProfilePage() {
   const [loading, setLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
+  const [showLogoutCountdown, setShowLogoutCountdown] = useState(false);
+  const [countdown, setCountdown] = useState(5);
 
   // Login type for conditional editing
   const [lastVerificationType, setLastVerificationType] = useState<"EMAIL" | "PHONE">("EMAIL");
+  
+  // MUST CHANGE PASSWORD FLAG
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+
+  const searchParams = useSearchParams();
+
+  // Handle logout countdown
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (showLogoutCountdown && countdown > 0) {
+      timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+    } else if (showLogoutCountdown && countdown === 0) {
+      // Perform logout
+      performLogout();
+    }
+    return () => clearTimeout(timer);
+  }, [showLogoutCountdown, countdown]);
+
+  const performLogout = () => {
+    // Clear all auth data
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Clear cookies
+    document.cookie = "token=; path=/; max-age=0; samesite=strict";
+    document.cookie = "role=; path=/; max-age=0; samesite=strict";
+    document.cookie = "refreshToken=; path=/; max-age=0; samesite=strict";
+    
+    // Redirect to login
+    window.location.href = "/login?reason=password_changed";
+  };
 
   // Load user data from backend
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        let id = localStorage.getItem("userId");
-
-        if (!id) {
-          const token = localStorage.getItem("token");
-          if (token) {
-            try {
-              const payload = JSON.parse(atob(token.split(".")[1]));
-              id = payload?.id || payload?.userId || null;
-              if (id) localStorage.setItem("userId", id);
-            } catch {
-              // ignore
-            }
-          }
+        const result = await fetchMyPatientProfile();
+        
+        if (!result.success) {
+          toast.error("Failed to load profile");
+          return;
         }
 
-        if (!id) return;
-
-        setPatientId(id);
-
-        const result = await fetchPatientProfile(id);
-        if (!result.success) return;
-
         const patient = result.data;
+        
+        setPatientId(patient.id);
         setName(patient.name);
         setEmail(patient.email);
         setPhoneNumber(patient.phoneNumber ?? "");
@@ -100,6 +124,36 @@ export default function PatientProfilePage() {
         setHmoId(patient.hmoId ?? "");
         setProfilePhotoUrl(patient.profilePhotoUrl ?? "");
         setLastVerificationType(patient.lastVerificationType!);
+
+        // Check if user must change password
+        const mustChange = localStorage.getItem("mustChangePassword") === "true";
+        setMustChangePassword(mustChange);
+
+        // Check if redirected from login with reason
+        const reason = searchParams.get("reason");
+        if (reason === "must_change_password") {
+          setPasswordChangeReason("You were redirected here because you need to change your temporary password.");
+          toast.warning("🔒 Please change your temporary password to continue", {
+            position: "top-center",
+            autoClose: false,
+            toastId: "must-change-password",
+          });
+        } else if (mustChange) {
+          setPasswordChangeReason("For security reasons, you must change your temporary password before accessing the dashboard.");
+          toast.warning("🔒 Temporary password detected - Please change it now", {
+            position: "top-center",
+            autoClose: 5000,
+            toastId: "temp-password-warning",
+          });
+        }
+
+        // Check if redirected after password change
+        if (reason === "password_changed") {
+          toast.success("✅ Password changed successfully! Please login with your new password.", {
+            position: "top-center",
+            autoClose: 5000,
+          });
+        }
       } catch (err) {
         console.error(err);
         toast.error("Failed to load profile.");
@@ -107,7 +161,7 @@ export default function PatientProfilePage() {
     };
 
     loadProfile();
-  }, []);
+  }, [searchParams]);
 
   // --- Profile update ---
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,13 +241,25 @@ export default function PatientProfilePage() {
     try {
       const result = await changePassword({ currentPassword, newPassword });
       if (result.success) {
-        toast.success("Password changed. Logging you out…");
-        setTimeout(() => {
-          localStorage.clear();
-          document.cookie = "token=; path=/; max-age=0; samesite=strict";
-          document.cookie = "role=; path=/; max-age=0; samesite=strict";
-          window.location.href = "/login";
-        }, 2000);
+        // Clear the must change password flag
+        localStorage.removeItem("mustChangePassword");
+        setMustChangePassword(false);
+        setPasswordChangeReason(null);
+        
+        // Show success message
+        toast.success("✅ Password changed successfully! You will be logged out for security.", {
+          position: "top-center",
+          autoClose: 3000,
+        });
+        
+        // Start logout countdown
+        setShowLogoutCountdown(true);
+        setCountdown(5);
+        
+        // Clear form
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
       } else {
         toast.error(result.message || "Failed to change password");
         setPasswordLoading(false);
@@ -276,6 +342,73 @@ export default function PatientProfilePage() {
 
       <main className="flex-1 p-10">
         <div className="max-w-2xl flex flex-col gap-6">
+          {/* Logout Countdown Overlay */}
+          {showLogoutCountdown && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-[#0B1C30] mb-2">Password Changed Successfully!</h3>
+                <p className="text-[#485F83] mb-4">
+                  For security reasons, you will be logged out in <span className="font-bold text-[#00685C]">{countdown}</span> seconds.
+                </p>
+                <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                  <div 
+                    className="bg-[#00685C] h-2.5 rounded-full transition-all duration-1000"
+                    style={{ width: `${(countdown / 5) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-[#94A3B8]">
+                  Please login again with your new password.
+                </p>
+                <button
+                  onClick={() => performLogout()}
+                  className="mt-4 text-sm text-[#00685C] hover:underline font-semibold"
+                >
+                  Logout now
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MUST CHANGE PASSWORD - CONTEXTUAL BANNER */}
+          {passwordChangeReason && !showLogoutCountdown && (
+            <div className="bg-[#FFF3CD] border-2 border-[#FFEAA7] rounded-xl p-6 shadow-lg animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 bg-[#FFEAA7] rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-8 h-8 text-[#856404]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-[#856404]">🔒 Password Change Required</h3>
+                  <p className="text-sm text-[#856404] mt-1">
+                    {passwordChangeReason}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="inline-block bg-[#856404]/10 text-[#856404] text-xs font-semibold px-3 py-1 rounded-full">
+                      ⏳ Temporary password detected
+                    </span>
+                    <span className="inline-block bg-[#856404]/10 text-[#856404] text-xs font-semibold px-3 py-1 rounded-full">
+                      🔑 One-time change required
+                    </span>
+                    <span className="inline-block bg-[#856404]/10 text-[#856404] text-xs font-semibold px-3 py-1 rounded-full">
+                      ⚡ Immediate action needed
+                    </span>
+                  </div>
+                  <div className="mt-4 p-3 bg-white/50 rounded-lg border border-[#FFEAA7]">
+                    <p className="text-sm text-[#856404]">
+                      <span className="font-bold">💡 How to proceed:</span> Enter your current temporary password below, then create and confirm a new secure password. Your password must be at least 8 characters long.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Profile Photo Upload */}
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 shadow-sm">
             <h3 className="text-lg font-semibold text-[#0B1C30] mb-6">Profile Photo</h3>
@@ -297,6 +430,9 @@ export default function PatientProfilePage() {
                 <p className="text-sm text-[#3D4946]">Patient ID: {patientId || "Loading..."}</p>
                 {profilePhotoUrl && !photoPreview && (
                   <p className="text-xs text-[#0D9488] mt-1">✓ Profile photo set</p>
+                )}
+                {mustChangePassword && !showLogoutCountdown && (
+                  <p className="text-xs text-[#856404] mt-1 font-semibold">⚠️ Please change your password below</p>
                 )}
               </div>
             </div>
@@ -461,9 +597,16 @@ export default function PatientProfilePage() {
             </form>
           </div>
 
-          {/* Change Password */}
-          <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 shadow-sm">
-            <h3 className="text-lg font-semibold text-[#0B1C30] mb-6">Change Password</h3>
+          {/* Change Password - HIGHLIGHTED when must change password */}
+          <div className={`bg-white border ${mustChangePassword ? 'border-2 border-[#FFEAA7] shadow-lg' : 'border-[#F1F5F9] shadow-sm'} rounded-xl p-8`}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-[#0B1C30]">Change Password</h3>
+              {mustChangePassword && !showLogoutCountdown && (
+                <span className="bg-[#FFF3CD] text-[#856404] text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+                  ⚠️ Required
+                </span>
+              )}
+            </div>
 
             <form onSubmit={handlePasswordChange} className="flex flex-col gap-5">
               <div className="flex flex-col gap-1">
@@ -474,8 +617,13 @@ export default function PatientProfilePage() {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
-                  className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C]"
+                  className={`bg-[#EFF4FF] border ${mustChangePassword ? 'border-[#FFEAA7] focus:border-[#856404] focus:ring-2 focus:ring-[#856404]/20' : 'border-[#BDC9C5] focus:border-[#00685C]'} rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none transition-all`}
                 />
+                {mustChangePassword && !showLogoutCountdown && (
+                  <p className="text-xs text-[#856404] mt-1 flex items-center gap-1">
+                    <span>🔑</span> Enter the temporary password you received from the clinic
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1">
@@ -486,7 +634,7 @@ export default function PatientProfilePage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
-                  className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C]"
+                  className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C] focus:ring-2 focus:ring-[#00685C]/20 transition-all"
                 />
                 <p className="text-xs text-gray-500 mt-1">Password must be at least 8 characters long</p>
               </div>
@@ -499,17 +647,36 @@ export default function PatientProfilePage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C]"
+                  className="bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg px-4 py-3 text-sm text-[#6B7280] outline-none focus:border-[#00685C] focus:ring-2 focus:ring-[#00685C]/20 transition-all"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={passwordLoading}
-                className="bg-[#00685C] text-white font-semibold text-sm px-6 py-3 rounded-lg hover:bg-[#008375] transition-colors w-fit disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`${mustChangePassword ? 'bg-[#856404] hover:bg-[#6B5300]' : 'bg-[#00685C] hover:bg-[#008375]'} text-white font-semibold text-sm px-6 py-3 rounded-lg transition-colors w-fit disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
               >
-                {passwordLoading ? "Updating..." : "Update Password"}
+                {passwordLoading ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Updating...
+                  </>
+                ) : (
+                  mustChangePassword ? "⚠️ Change Temporary Password" : "Update Password"
+                )}
               </button>
+
+              {mustChangePassword && !showLogoutCountdown && (
+                <div className="mt-2 p-3 bg-[#FFF3CD] border border-[#FFEAA7] rounded-lg">
+                  <p className="text-xs text-[#856404]">
+                    <span className="font-bold">⚠️ Important:</span> You must change your temporary password to continue using the system. 
+                    After changing, you will be logged out for security reasons and must log in again with your new password.
+                  </p>
+                </div>
+              )}
             </form>
           </div>
         </div>

@@ -492,6 +492,10 @@ export async function getPatientHistories() {
     createdAt: new Date(h.createdAt).toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
     }),
+    // Family appointment fields (mock data - all individual)
+    familyMemberId: undefined,
+    familyMemberName: undefined,
+    appointmentType: "INDIVIDUAL",
   }));
 }
 

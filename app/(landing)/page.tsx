@@ -13,12 +13,7 @@ export default function LandingPage() {
         <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-16 items-center">
           {/* Left: Content */}
           <div className="flex flex-col gap-6">
-            <div className="inline-flex items-center gap-2 bg-[#F0FDFA] border border-[#00685C]/20 rounded-full px-3 py-1 w-fit">
-              <span className="text-sm">✨</span>
-              <span className="text-sm font-semibold text-[#00685C] tracking-wide">
-                Excellence in Restorative Dentistry
-              </span>
-            </div>
+            
 
             <h1 className="text-5xl font-bold text-[#0B1C30] leading-tight">
               Precision Care for Your <span className="text-[#00685C]">Everlasting</span> Smile

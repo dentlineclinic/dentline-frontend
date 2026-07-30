@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "react-toastify";
@@ -100,6 +100,7 @@ export default function AppointmentCalendar() {
   }, []);
 
   const handleSelectSearchResult = (appt: UIAppointment) => {
+    if (!appt) return;
     setSearch("");
     setShowSearchDropdown(false);
     setSelectedAppt(appt);
@@ -217,9 +218,9 @@ export default function AppointmentCalendar() {
 
             {showSearchDropdown && searchResults.length > 0 && (
               <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-[#E2E8F0] rounded-xl shadow-lg z-[70] max-h-72 overflow-y-auto">
-                {searchResults.map(appt => (
+                {searchResults.map((appt, index) => (
                   <button
-                    key={appt.rawId}
+                    key={appt.rawId || `search-${index}`}
                     onClick={() => handleSelectSearchResult(appt)}
                     className="w-full text-left px-4 py-3 hover:bg-[#F0FDFA] transition-colors flex items-center gap-3 border-b border-[#F9FAFB] last:border-0"
                   >
@@ -350,9 +351,9 @@ export default function AppointmentCalendar() {
                   )}
                   {!loadingBookPatients && bookPatients.length > 0 && (
                     <div className="border border-[#E2E8F0] rounded-lg overflow-hidden max-h-44 overflow-y-auto">
-                      {bookPatients.map(p => (
+                      {bookPatients.map((p, index) => (
                         <button
-                          key={p.id}
+                          key={p.id || `book-patient-${index}`}
                           onClick={() => { setBookPatientId(p.id); setBookPatientName(p.name); setBookPatientSearch(p.name); setBookPatients([]); }}
                           className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0FDFA] transition-colors border-b border-[#F1F5F9] last:border-0 ${bookPatientId === p.id ? "bg-[#F0FDFA] font-semibold text-[#00685C]" : "text-[#0B1C30]"}`}
                         >

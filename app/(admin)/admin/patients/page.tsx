@@ -38,7 +38,7 @@ function DetailRow({ label, value }: { label: string; value: string | number }) 
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest">{label}</span>
-      <span className="text-sm text-[#0B1C30] font-medium">{value}</span>
+      <span className="text-sm text-[#0B1C30] font-medium">{value || 'N/A'}</span>
     </div>
   );
 }
@@ -60,24 +60,26 @@ function IdDetailRow({ label, id, shortId }: { label: string; id: string; shortI
     <div className="flex flex-col gap-0.5">
       <span className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest">{label}</span>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-[#0B1C30] font-medium font-mono">{id}</span>
-        <button
-          onClick={handleCopy}
-          className="p-1 hover:bg-[#F1F5F9] rounded transition-colors group"
-          title="Copy ID"
-        >
-          {copied ? (
-            <svg className="w-4 h-4 text-[#0F766E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4 text-[#94A3B8] group-hover:text-[#3D4946]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          )}
-        </button>
+        <span className="text-sm text-[#0B1C30] font-medium font-mono break-all">{id || 'N/A'}</span>
+        {id && id !== 'N/A' && (
+          <button
+            onClick={handleCopy}
+            className="p-1 hover:bg-[#F1F5F9] rounded transition-colors group flex-shrink-0"
+            title="Copy ID"
+          >
+            {copied ? (
+              <svg className="w-4 h-4 text-[#0F766E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-[#94A3B8] group-hover:text-[#3D4946]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
-      <span className="text-xs text-[#94A3B8]">Short ID: {shortId}</span>
+      <span className="text-xs text-[#94A3B8]">Short ID: {shortId || 'N/A'}</span>
     </div>
   );
 }
@@ -117,33 +119,40 @@ export default function PatientsPage() {
       const response = await fetchPatients(pageNum, pageSize, searchTerm);
 
       if (response.success && response.data) {
-        const mapped = response.data.content.map((p: any) => ({
-          id: p.id,
-          shortId: `PAT-${p.id.slice(0, 6).toUpperCase()}`,
-          fullName: p.name,
-          initials: p.name
-            .split(" ")
-            .map((n: string) => n[0])
-            .slice(0, 2)
-            .join("")
-            .toUpperCase(),
-          email: p.email,
-          status: p.status || "Active",
-          phoneNumber: p.phoneNumber || p.phone || "N/A",
-          dateOfBirth: p.dateOfBirth || p.dob || new Date().toISOString(),
-          gender: p.gender || "Unknown",
-          emergencyContactName: p.emergencyContactName || p.emergency_contact_name || "N/A",
-          emergencyContactPhone: p.emergencyContactPhone || p.emergency_contact_phone || "N/A",
-          medicalHistory: p.medicalHistory || p.medical_history || "No history",
-          referenceCode: p.referenceCode || p.reference_code || "N/A",
-          referencePoints: p.referencePoints ?? p.reference_points ?? 0,
-          lastVisit: p.lastVisit || p.last_visit || "N/A",
-          hmo: p.hmo || "N/A",
-          hmoId: p.hmoId || "N/A",
-        }));
+        const mapped = response.data.content.map((p: any) => {
+          // Get the ID from various possible field names
+          const patientId = p?.id || p?.patientId || p?.userId || `unknown-${Math.random().toString(36).substr(2, 9)}`;
+          
+          return {
+            id: patientId,
+            shortId: patientId !== 'unknown' ? `PAT-${String(patientId).slice(0, 6).toUpperCase()}` : 'PAT-UNKNOWN',
+            fullName: p?.name || p?.fullName || 'Unknown Patient',
+            initials: p?.name || p?.fullName
+              ? (p?.name || p?.fullName)
+                  .split(" ")
+                  .map((n: string) => n?.[0] || '')
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase() || 'UN'
+              : 'UN',
+            email: p?.email || 'No email',
+            status: p?.status || 'Active',
+            phoneNumber: p?.phoneNumber || p?.phone || 'N/A',
+            dateOfBirth: p?.dateOfBirth || p?.dob || new Date().toISOString(),
+            gender: p?.gender || 'Unknown',
+            emergencyContactName: p?.emergencyContactName || p?.emergency_contact_name || 'N/A',
+            emergencyContactPhone: p?.emergencyContactPhone || p?.emergency_contact_phone || 'N/A',
+            medicalHistory: p?.medicalHistory || p?.medical_history || 'No history',
+            referenceCode: p?.referenceCode || p?.reference_code || 'N/A',
+            referencePoints: p?.referencePoints ?? p?.reference_points ?? 0,
+            lastVisit: p?.lastVisit || p?.last_visit || 'N/A',
+            hmo: p?.hmo || 'N/A',
+            hmoId: p?.hmoId || 'N/A',
+          };
+        });
 
         setPatients(mapped);
-        setTotalPages(response.data.totalPages);
+        setTotalPages(response.data.totalPages || 0);
       } else {
         setError(response.message || "Failed to load patients.");
       }
@@ -155,7 +164,7 @@ export default function PatientsPage() {
     }
   }, []);
 
-  // ✅ NEW: Debounce search input – wait 500ms after typing stops
+  // Debounce search input – wait 500ms after typing stops
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(0);
@@ -312,7 +321,7 @@ export default function PatientsPage() {
           </div>
         )}
 
-        {/* Toolbar – Search button removed, input now auto‑searches */}
+        {/* Toolbar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <div className="flex gap-2">
@@ -323,7 +332,6 @@ export default function PatientsPage() {
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-full sm:w-72"
               />
-              {/* Search button removed – search happens automatically after 500ms of no typing */}
             </div>
             <select
               value={genderFilter}
@@ -386,45 +394,51 @@ export default function PatientsPage() {
                     </td>
                   </tr>
                 ) : (
-                  visible.map((p, i) => (
-                    <tr
-                      key={p.id}
-                      onClick={() => setSelected(p)}
-                      className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors cursor-pointer ${selected?.id === p.id ? "bg-[#F0FDFA]" : ""}`}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
-                            {p.initials}
+                  visible.map((p, i) => {
+                    // Skip rendering if patient data is invalid
+                    if (!p || !p.id) {
+                      return null;
+                    }
+                    return (
+                      <tr
+                        key={p.id}
+                        onClick={() => setSelected(p)}
+                        className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors cursor-pointer ${selected?.id === p.id ? "bg-[#F0FDFA]" : ""}`}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
+                              {p.initials}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-[#0B1C30]">{p.fullName}</p>
+                              <p className="text-xs text-[#94A3B8]">{p.shortId}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-[#0B1C30]">{p.fullName}</p>
-                            <p className="text-xs text-[#94A3B8]">{p.shortId}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[#3D4946]">{p.email}</td>
-                      <td className="px-6 py-4 text-sm text-[#3D4946]">{p.gender}</td>
-                      <td className="px-6 py-4 text-sm text-[#3D4946]">
-                        {p.dateOfBirth !== "N/A"
-                          ? new Date(p.dateOfBirth).toLocaleDateString("en-US", {
-                            month: "short", day: "numeric", year: "numeric",
-                          })
-                          : "N/A"
-                        }
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${p.status === "Active" ? "bg-[#F0FDFA] text-[#0F766E]" : "bg-[#F1F5F9] text-[#64748B]"}`}>
-                          {p.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <svg className="w-4 h-4 text-[#94A3B8] inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[#3D4946]">{p.email}</td>
+                        <td className="px-6 py-4 text-sm text-[#3D4946]">{p.gender}</td>
+                        <td className="px-6 py-4 text-sm text-[#3D4946]">
+                          {p.dateOfBirth !== "N/A" && p.dateOfBirth
+                            ? new Date(p.dateOfBirth).toLocaleDateString("en-US", {
+                              month: "short", day: "numeric", year: "numeric",
+                            })
+                            : "N/A"
+                          }
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${p.status === "Active" ? "bg-[#F0FDFA] text-[#0F766E]" : "bg-[#F1F5F9] text-[#64748B]"}`}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <svg className="w-4 h-4 text-[#94A3B8] inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -480,7 +494,7 @@ export default function PatientsPage() {
       )}
 
       {/* DETAIL PANEL */}
-      {selected && (
+      {selected && selected.id && (
         <div className="fixed top-0 right-0 bottom-0 w-full sm:w-96 bg-white shadow-2xl z-50 flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
@@ -530,7 +544,7 @@ export default function PatientsPage() {
               <DetailRow label="Email" value={selected.email} />
               <DetailRow label="Phone Number" value={selected.phoneNumber} />
               <DetailRow label="Date of Birth" value={
-                selected.dateOfBirth !== "N/A"
+                selected.dateOfBirth !== "N/A" && selected.dateOfBirth
                   ? new Date(selected.dateOfBirth).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
                   : "N/A"
               } />

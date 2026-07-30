@@ -10,6 +10,10 @@ export interface UIAppointment {
   date: string;     // formatted date string
   status: string;
   observation: string;
+  appointmentType?: "INDIVIDUAL" | "FAMILY";
+  familyMemberId?: string;
+  familyMemberName?: string;
+  headPatientName?: string; // Add this to store the head patient name
 }
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -22,12 +26,32 @@ export const STATUS_COLORS: Record<string, string> = {
 };
 
 export function mapToUIAppointment(appt: any): UIAppointment {
+  // Guard against null/undefined appointment object
+  if (!appt) {
+    return {
+      id: "",
+      rawId: "",
+      patientId: "",
+      patientName: "Unknown",
+      initials: "U",
+      doctorId: null,
+      doctorName: "Unassigned",
+      date: "",
+      status: "BOOKED",
+      observation: "",
+      appointmentType: "INDIVIDUAL",
+    };
+  }
+
+  // ✅ FIX: Use familyMemberName if available for display
+  const displayName = appt.familyMemberName || appt.patientName || "Unknown";
+  
   return {
     id: `APT-${appt.id.slice(0, 6).toUpperCase()}`,
     rawId: appt.id,
     patientId: appt.patientId ?? "",
-    patientName: appt.patientName ?? "Unknown",
-    initials: (appt.patientName ?? "?")
+    patientName: displayName, // ✅ Use familyMemberName here
+    initials: (displayName)
       .split(" ")
       .map((n: string) => n[0])
       .slice(0, 2)
@@ -38,5 +62,9 @@ export function mapToUIAppointment(appt: any): UIAppointment {
     date: appt.appointmentDate ?? "",
     status: appt.status ?? "BOOKED",
     observation: appt.observation ?? "No notes",
+    appointmentType: appt.type ?? appt.appointmentType ?? "INDIVIDUAL",
+    familyMemberId: appt.familyMemberId,
+    familyMemberName: appt.familyMemberName,
+    headPatientName: appt.patientName || "Unknown", // Store head patient name for reference
   };
 }

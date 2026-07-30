@@ -47,6 +47,26 @@ export default function DoctorDashboard() {
     },
   ];
 
+  // Helper function to get display name for appointments
+  const getDisplayName = (appt: any) => {
+    // For family appointments, show the family member name
+    if (appt.appointmentType === "FAMILY" && appt.familyMemberName) {
+      return appt.familyMemberName;
+    }
+    return appt.patientName || "Unknown Patient";
+  };
+
+  // Helper function to get initials
+  const getInitials = (name: string) => {
+    if (!name) return "??";
+    return name
+      .split(" ")
+      .map((n: string) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar
@@ -98,7 +118,7 @@ export default function DoctorDashboard() {
               <table className="w-full min-w-[640px]">
                 <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                   <tr>
-                    {["PATIENT", "DATE", "STATUS"].map((h) => (
+                    {["PATIENT", "DATE", "STATUS", "TYPE"].map((h) => (
                       <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                         {h}
                       </th>
@@ -109,7 +129,7 @@ export default function DoctorDashboard() {
                   {loading ? (
                     [...Array(3)].map((_, i) => (
                       <tr key={i} className="border-t border-[#F8FAFC]">
-                        {[...Array(3)].map((__, j) => (
+                        {[...Array(4)].map((__, j) => (
                           <td key={j} className="px-6 py-4">
                             <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                           </td>
@@ -118,52 +138,70 @@ export default function DoctorDashboard() {
                     ))
                   ) : !dashboard?.todayAppointments?.length ? (
                     <tr>
-                      <td colSpan={3} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                      <td colSpan={4} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                         No appointments assigned to you today.
                       </td>
                     </tr>
                   ) : (
-                    dashboard.todayAppointments.map((appt, i) => (
-                      <tr
-                        key={appt.id}
-                        className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors`}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
-                              {appt.patientName
-                                .split(" ")
-                                .map((n: string) => n[0])
-                                .slice(0, 2)
-                                .join("")
-                                .toUpperCase()}
+                    dashboard.todayAppointments.map((appt, i) => {
+                      const displayName = getDisplayName(appt);
+                      const initials = getInitials(displayName);
+                      const isFamily = appt.appointmentType === "FAMILY";
+                      
+                      return (
+                        <tr
+                          key={appt.id}
+                          className={`${i > 0 ? "border-t border-[#F8FAFC]" : ""} hover:bg-[#F8FAFC] transition-colors`}
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
+                                {initials}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-[#0B1C30]">{displayName}</p>
+                                {isFamily && appt.familyMemberName && (
+                                  <p className="text-xs text-[#94A3B8]">
+                                    Head Patient: {appt.patientName}
+                                  </p>
+                                )}
+                                {!isFamily && (
+                                  <p className="text-xs text-[#94A3B8]">{appt.patientId?.slice(0, 8) || "N/A"}…</p>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-sm font-semibold text-[#0B1C30]">{appt.patientName}</p>
-                              <p className="text-xs text-[#94A3B8]">{appt.patientId.slice(0, 8)}…</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-sm font-medium text-[#0B1C30]">
-                            {new Date(appt.appointmentDate).toLocaleDateString("en-US", {
-                              month: "short", day: "numeric",
-                            })}
-                          </p>
-                          <p className="text-xs text-[#94A3B8]">
-                            {new Date(appt.appointmentDate).toLocaleTimeString([], {
-                              hour: "2-digit", minute: "2-digit",
-                            })}
-                          </p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                            {appt.status}
-                          </span>
-                        </td>
-                        
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-medium text-[#0B1C30]">
+                              {new Date(appt.appointmentDate).toLocaleDateString("en-US", {
+                                month: "short", day: "numeric",
+                              })}
+                            </p>
+                            <p className="text-xs text-[#94A3B8]">
+                              {new Date(appt.appointmentDate).toLocaleTimeString([], {
+                                hour: "2-digit", minute: "2-digit",
+                              })}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                              {appt.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            {isFamily ? (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                                Family
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                                Individual
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

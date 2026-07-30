@@ -1,7 +1,11 @@
+// app/(patient)/patient/layout.tsx
+'use client';
+
 import Sidebar from "@/components/layout/Sidebar";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
-// ... nav items unchanged ...
 const patientNavItems = [
   {
     label: "Dashboard",
@@ -51,6 +55,51 @@ const patientNavItems = [
 ];
 
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem("token");
+      const mustChange = localStorage.getItem("mustChangePassword") === "true";
+      setMustChangePassword(mustChange);
+
+      if (!token) {
+        router.push("/login");
+        setIsLoading(false);
+        return;
+      }
+
+      // If must change password and trying to access dashboard or other pages (except profile)
+      // Show the banner instead of redirecting aggressively
+      // Only redirect if user explicitly tries to go to a page that requires full access
+      if (mustChange && pathname === "/patient/profile") {
+        // Allow profile page - no redirect
+        setIsLoading(false);
+        return;
+      }
+
+      // For other pages, check if user has changed password
+      // If not, still render the page but with a banner overlay
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, [pathname, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FF]">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#00685C] border-t-transparent"></div>
+          <p className="mt-2 text-sm text-[#485F83]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F9FF]">
       <Sidebar
@@ -59,7 +108,10 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
         navItems={patientNavItems}
       />
       <div className="min-h-screen lg:pl-64">
-        <ErrorBoundary>{children}</ErrorBoundary>
+        <ErrorBoundary>
+          {/* Pass mustChangePassword to children via context or prop drilling */}
+          {children}
+        </ErrorBoundary>
       </div>
     </div>
   );

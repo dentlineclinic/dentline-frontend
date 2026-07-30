@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
-import { fetchMyPatientHistories } from "@/services/patientHistoryService";
+import { 
+  fetchMyPatientHistories, 
+  fetchIndividualHistoriesById,
+  fetchFamilyHistoriesById,
+  
+} from "@/services/patientHistoryService";
 import { submitReview as submitReviewApi } from "@/services/reviewService";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +27,10 @@ type PatientHistory = {
   createdAt: string;
   imageUrls: string[];
   videoUrls: string[];
+  // Family appointment fields
+  familyMemberId?: string;
+  familyMemberName?: string;
+  appointmentType?: "INDIVIDUAL" | "FAMILY";
 };
 
 const statusColors: Record<string, string> = {
@@ -36,23 +45,34 @@ const paymentColors: Record<string, string> = {
   UNPAID: "bg-[#FFDAD6] text-[#93000A]",
 };
 
+type TabType = "all" | "individual" | "family";
+
 export default function MedicalHistoryPage() {
-  const [histories, setHistories] = useState<PatientHistory[]>([]);
+  const [allHistories, setAllHistories] = useState<PatientHistory[]>([]);
+  const [individualHistories, setIndividualHistories] = useState<PatientHistory[]>([]);
+  const [familyHistories, setFamilyHistories] = useState<PatientHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("All");
+  const [activeTab, setActiveTab] = useState<TabType>("all");
   const [userName, setUserName] = useState("Patient");
   const [selectedHistory, setSelectedHistory] = useState<PatientHistory | null>(null);
   
   // Review form state
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewAppointmentId, setReviewAppointmentId] = useState<string | null>(null); // ✅ Fixed: renamed to appointmentId
+  const [reviewAppointmentId, setReviewAppointmentId] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
+
+  // Get the patient ID from localStorage or use a default
+  const getPatientId = () => {
+    // Try to get from localStorage, or use a stored patient ID
+    return localStorage.getItem("patientId") || "";
+  };
 
   useEffect(() => {
     const loadHistories = async () => {
@@ -63,18 +83,27 @@ export default function MedicalHistoryPage() {
         const name = localStorage.getItem("userName") || "Patient";
         setUserName(name);
 
-        const result = await fetchMyPatientHistories(0, 10);
+        const patientId = getPatientId();
 
-        if (result.success) {
-          setHistories(
-            (result.data.content || []).map((h: any) => ({
-              ...h,
-              imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
-              videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
-            }))
-          );
+        // Load all histories (using the "my" endpoint which gets all for the logged-in patient)
+        const allResult = await fetchMyPatientHistories(0, 100);
+        
+        if (allResult.success) {
+          const allData = (allResult.data.content || []).map((h: any) => ({
+            ...h,
+            imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
+            videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
+          }));
+          setAllHistories(allData);
+
+          // Separate into individual and family
+          const individual = allData.filter((h: PatientHistory) => h.appointmentType === "INDIVIDUAL");
+          const family = allData.filter((h: PatientHistory) => h.appointmentType === "FAMILY");
+
+          setIndividualHistories(individual);
+          setFamilyHistories(family);
         } else {
-          setError(result.message || "Failed to load medical history");
+          setError(allResult.message || "Failed to load medical history");
         }
       } catch (err) {
         setError("Failed to load medical history");
@@ -87,12 +116,29 @@ export default function MedicalHistoryPage() {
     loadHistories();
   }, []);
 
-  const filteredHistories = histories.filter((h) => {
-    if (statusFilter === "All") return true;
-    return h.status === statusFilter;
-  });
+  // Get the current displayed histories based on active tab and status filter
+  const getCurrentHistories = () => {
+    let histories: PatientHistory[] = [];
+    
+    if (activeTab === "all") {
+      histories = allHistories;
+    } else if (activeTab === "individual") {
+      histories = individualHistories;
+    } else if (activeTab === "family") {
+      histories = familyHistories;
+    }
 
-  // ✅ Fixed: now accepts appointmentId instead of historyId
+    if (statusFilter === "All") return histories;
+    return histories.filter((h) => h.status === statusFilter);
+  };
+
+  const filteredHistories = getCurrentHistories();
+
+  // Get counts for each tab
+  const allCount = allHistories.length;
+  const individualCount = individualHistories.length;
+  const familyCount = familyHistories.length;
+
   const openReviewForm = (appointmentId: string) => {
     setReviewAppointmentId(appointmentId);
     setShowReviewForm(true);
@@ -111,7 +157,6 @@ export default function MedicalHistoryPage() {
     setReviewError(null);
   };
 
-  // ✅ Fixed: using real API call instead of mock
   const submitReview = async () => {
     if (rating === 0) {
       setReviewError("Please select a rating");
@@ -133,7 +178,7 @@ export default function MedicalHistoryPage() {
 
     try {
       const result = await submitReviewApi({
-        appointmentId: reviewAppointmentId, // ✅ correct mapping
+        appointmentId: reviewAppointmentId,
         rating,
         comment: reviewText,
       });
@@ -148,19 +193,22 @@ export default function MedicalHistoryPage() {
         setReviewError(result.message || "Failed to submit review");
       }
     } catch (err: any) {
-      // Handle backend error message if available
-      const message =
-        err.message ||
-        "Failed to submit review. Please try again.";
-
+      const message = err.message || "Failed to submit review. Please try again.";
       setReviewError(message);
     } finally {
       setSubmittingReview(false);
     }
   };
 
-  const totalAmount = histories.reduce((sum, h) => sum + h.amount, 0);
-  const paidAmount = histories
+  // Calculate totals for the current view
+  const totalAmount = filteredHistories.reduce((sum, h) => sum + h.amount, 0);
+  const paidAmount = filteredHistories
+    .filter(h => h.paymentStatus === "PAID")
+    .reduce((sum, h) => sum + h.amount, 0);
+
+  // Calculate totals for all histories (for summary cards)
+  const allTotalAmount = allHistories.reduce((sum, h) => sum + h.amount, 0);
+  const allPaidAmount = allHistories
     .filter(h => h.paymentStatus === "PAID")
     .reduce((sum, h) => sum + h.amount, 0);
 
@@ -172,13 +220,13 @@ export default function MedicalHistoryPage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-4 sm:gap-6">
-        {/* Summary Cards */}
+        {/* Summary Cards - showing totals from all histories */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-[#3D4946]">Total Records</p>
-                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{histories.length}</p>
+                <p className="text-3xl font-bold text-[#0B1C30] mt-1">{allHistories.length}</p>
                 <p className="text-xs text-[#0D9488] mt-1">Treatment history</p>
               </div>
               <div className="w-12 h-12 bg-[#F0FDFA] rounded-xl flex items-center justify-center">
@@ -194,7 +242,7 @@ export default function MedicalHistoryPage() {
               <div>
                 <p className="text-sm text-[#3D4946]">Completed</p>
                 <p className="text-3xl font-bold text-[#0B1C30] mt-1">
-                  {histories.filter((h) => h.status === "COMPLETED").length}
+                  {allHistories.filter((h) => h.status === "COMPLETED").length}
                 </p>
                 <p className="text-xs text-[#0D9488] mt-1">Treatments finished</p>
               </div>
@@ -211,7 +259,7 @@ export default function MedicalHistoryPage() {
               <div>
                 <p className="text-sm text-[#3D4946]">In Progress</p>
                 <p className="text-3xl font-bold text-[#0B1C30] mt-1">
-                  {histories.filter((h) => h.status === "IN_PROGRESS").length}
+                  {allHistories.filter((h) => h.status === "IN_PROGRESS").length}
                 </p>
                 <p className="text-xs text-[#0D9488] mt-1">Ongoing treatments</p>
               </div>
@@ -228,10 +276,10 @@ export default function MedicalHistoryPage() {
               <div>
                 <p className="text-sm text-[#3D4946]">Total Spent</p>
                 <p className="text-3xl font-bold text-[#0B1C30] mt-1">
-                  ₦{totalAmount.toLocaleString()}
+                  ₦{allTotalAmount.toLocaleString()}
                 </p>
                 <p className="text-xs text-[#0D9488] mt-1">
-                  ₦{paidAmount.toLocaleString()} paid
+                  ₦{allPaidAmount.toLocaleString()} paid
                 </p>
               </div>
               <div className="w-12 h-12 bg-[#F0FDFA] rounded-xl flex items-center justify-center">
@@ -241,6 +289,40 @@ export default function MedicalHistoryPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-[#E2E8F0]">
+          <button
+            onClick={() => setActiveTab("all")}
+            className={`px-6 py-3 text-sm font-semibold transition-colors border-b-2 ${
+              activeTab === "all"
+                ? "border-[#00685C] text-[#00685C]"
+                : "border-transparent text-[#94A3B8] hover:text-[#3D4946]"
+            }`}
+          >
+            All ({allCount})
+          </button>
+          <button
+            onClick={() => setActiveTab("individual")}
+            className={`px-6 py-3 text-sm font-semibold transition-colors border-b-2 ${
+              activeTab === "individual"
+                ? "border-[#00685C] text-[#00685C]"
+                : "border-transparent text-[#94A3B8] hover:text-[#3D4946]"
+            }`}
+          >
+            Individual ({individualCount})
+          </button>
+          <button
+            onClick={() => setActiveTab("family")}
+            className={`px-6 py-3 text-sm font-semibold transition-colors border-b-2 ${
+              activeTab === "family"
+                ? "border-[#00685C] text-[#00685C]"
+                : "border-transparent text-[#94A3B8] hover:text-[#3D4946]"
+            }`}
+          >
+            Family ({familyCount})
+          </button>
         </div>
 
         {/* Filter Buttons */}
@@ -259,6 +341,22 @@ export default function MedicalHistoryPage() {
             </button>
           ))}
         </div>
+
+        {/* Active filter indicator */}
+        {statusFilter !== "All" && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#94A3B8]">Filtered by:</span>
+            <span className="text-xs font-semibold bg-[#E5EEFF] text-[#435B7E] px-2 py-1 rounded-full">
+              {statusFilter.replace("_", " ")}
+            </span>
+            <button
+              onClick={() => setStatusFilter("All")}
+              className="text-xs text-[#0D9488] hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
@@ -301,7 +399,11 @@ export default function MedicalHistoryPage() {
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <p className="text-sm text-[#94A3B8]">No medical history records found</p>
+            <p className="text-sm text-[#94A3B8]">
+              {activeTab === "all" && "No medical history records found"}
+              {activeTab === "individual" && "No individual treatment records found"}
+              {activeTab === "family" && "No family member treatment records found"}
+            </p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -313,7 +415,7 @@ export default function MedicalHistoryPage() {
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <div className="w-10 h-10 bg-[#F0FDFA] rounded-lg flex items-center justify-center flex-shrink-0">
                         <svg
                           className="w-5 h-5 text-[#00685C]"
@@ -335,7 +437,25 @@ export default function MedicalHistoryPage() {
                         </p>
                         <p className="text-sm text-[#3D4946]">{history.doctorName}</p>
                       </div>
+                      {/* ✅ Show appointment type badge */}
+                      {history.appointmentType === "FAMILY" && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                          Family
+                        </span>
+                      )}
+                      {history.appointmentType === "INDIVIDUAL" && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          Individual
+                        </span>
+                      )}
                     </div>
+
+                    {/* ✅ Show family member name for family appointments */}
+                    {history.appointmentType === "FAMILY" && history.familyMemberName && (
+                      <p className="text-sm font-semibold text-[#00685C] mb-2">
+                        👤 Family Member: {history.familyMemberName}
+                      </p>
+                    )}
 
                     <p className="text-sm text-[#485F83] leading-relaxed mb-3 line-clamp-2">
                       {history.observation || "No observation notes available"}
@@ -399,10 +519,10 @@ export default function MedicalHistoryPage() {
         )}
 
         {/* Results Count */}
-        {!loading && !error && histories.length > 0 && (
+        {!loading && !error && allHistories.length > 0 && (
           <div className="flex justify-between items-center">
             <p className="text-sm text-[#3D4946]">
-              Showing {filteredHistories.length} of {histories.length} records
+              Showing {filteredHistories.length} of {activeTab === "all" ? allHistories.length : activeTab === "individual" ? individualHistories.length : familyHistories.length} records
             </p>
             {statusFilter !== "All" && filteredHistories.length > 0 && (
               <button
@@ -416,7 +536,7 @@ export default function MedicalHistoryPage() {
         )}
       </main>
 
-      {/* Details Modal */}
+      {/* Details Modal - same as before */}
       {selectedHistory && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -465,6 +585,18 @@ export default function MedicalHistoryPage() {
                     </p>
                   </div>
                   <div>
+                    <p className="text-xs text-[#94A3B8]">Type</p>
+                    <span
+                      className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${
+                        selectedHistory.appointmentType === "FAMILY"
+                          ? "bg-purple-100 text-purple-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {selectedHistory.appointmentType || "INDIVIDUAL"}
+                    </span>
+                  </div>
+                  <div>
                     <p className="text-xs text-[#94A3B8]">Status</p>
                     <span
                       className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${
@@ -474,6 +606,14 @@ export default function MedicalHistoryPage() {
                       {selectedHistory.status.replace("_", " ")}
                     </span>
                   </div>
+                  {selectedHistory.appointmentType === "FAMILY" && selectedHistory.familyMemberName && (
+                    <div>
+                      <p className="text-xs text-[#94A3B8]">Family Member</p>
+                      <p className="text-sm font-semibold text-[#00685C]">
+                        {selectedHistory.familyMemberName}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -584,12 +724,11 @@ export default function MedicalHistoryPage() {
               >
                 Close
               </button>
-              {/* ✅ Only show Drop Review button for COMPLETED appointments */}
               {selectedHistory.status === "COMPLETED" && (
                 <button
                   onClick={() => {
                     setSelectedHistory(null);
-                    openReviewForm(selectedHistory.appointmentId); // ✅ Fixed: passing appointmentId
+                    openReviewForm(selectedHistory.appointmentId);
                   }}
                   className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#008375] transition-colors"
                 >
@@ -604,7 +743,7 @@ export default function MedicalHistoryPage() {
         </div>
       )}
 
-      {/* Review Form Modal */}
+      {/* Review Form Modal - same as before */}
       {showReviewForm && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
