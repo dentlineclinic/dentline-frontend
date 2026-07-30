@@ -3,7 +3,7 @@
 import { CalendarDay } from "@/services/appointmentService";
 
 interface Props {
-  day: CalendarDay | null;        // null = filler day (prev/next month)
+  day: CalendarDay | null;
   dayNumber: number;
   isToday: boolean;
   isSelected: boolean;

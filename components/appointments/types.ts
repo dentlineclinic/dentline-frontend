@@ -13,7 +13,7 @@ export interface UIAppointment {
   appointmentType?: "INDIVIDUAL" | "FAMILY";
   familyMemberId?: string;
   familyMemberName?: string;
-  headPatientName?: string; // Add this to store the head patient name
+  headPatientName?: string;
 }
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -25,10 +25,23 @@ export const STATUS_COLORS: Record<string, string> = {
   MISSED:    "bg-[#FFDAD6] text-[#93000A]",
 };
 
-// ✅ Safe slice helper
+// ✅ Safe string helpers
 const safeSlice = (str: string | undefined | null, length: number = 6): string => {
   if (!str) return '';
   return str.slice(0, length);
+};
+
+const safeUpperCase = (str: string | undefined | null): string => {
+  if (!str) return '';
+  return str.toUpperCase();
+};
+
+const getInitials = (name: string | undefined | null): string => {
+  if (!name) return 'U';
+  const parts = name.split(' ').filter(Boolean);
+  if (parts.length === 0) return 'U';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
 export function mapToUIAppointment(appt: any): UIAppointment {
@@ -49,24 +62,19 @@ export function mapToUIAppointment(appt: any): UIAppointment {
     };
   }
 
-  // ✅ FIX: Use familyMemberName if available for display
+  // Use familyMemberName if available for display
   const displayName = appt.familyMemberName || appt.patientName || "Unknown";
   
-  // ✅ FIX: Safely get the ID for the display ID
+  // Safely get the ID
   const rawId = appt.id || appt.appointmentId || '';
-  const shortId = rawId ? safeSlice(rawId, 6) : '';
+  const shortId = safeSlice(rawId, 6);
   
   return {
-    id: shortId ? `APT-${shortId.toUpperCase()}` : `APT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+    id: shortId ? `APT-${safeUpperCase(shortId)}` : `APT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
     rawId: rawId,
     patientId: appt.patientId ?? "",
     patientName: displayName,
-    initials: (displayName)
-      .split(" ")
-      .map((n: string) => n[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase(),
+    initials: getInitials(displayName),
     doctorId: appt.doctorId ?? null,
     doctorName: appt.doctorName || "Unassigned",
     date: appt.appointmentDate ?? "",

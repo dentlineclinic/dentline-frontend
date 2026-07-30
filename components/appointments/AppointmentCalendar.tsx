@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "react-toastify";
@@ -29,6 +29,12 @@ function Spinner() {
     </svg>
   );
 }
+
+// ✅ Safe slice helper
+const safeSlice = (str: string | undefined | null, length: number = 8): string => {
+  if (!str) return '';
+  return str.slice(0, length);
+};
 
 export default function AppointmentCalendar() {
   const now = new Date();
@@ -153,6 +159,7 @@ export default function AppointmentCalendar() {
       await bookMutation.mutateAsync({ patientId: bookPatientId, appointmentDate: bookDate });
       toast.success("Appointment booked successfully.");
       setShowBookModal(false);
+      refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to book appointment.");
     }
@@ -177,7 +184,6 @@ export default function AppointmentCalendar() {
       });
       toast.success("Appointment rescheduled.");
       setShowRescheduleModal(false);
-      // If day drawer is open for the old date, refresh it
       handleRefresh();
     } catch (err: any) {
       toast.error(err.message || "Failed to reschedule.");
@@ -186,6 +192,24 @@ export default function AppointmentCalendar() {
 
   const anyPanelOpen = !!selectedDate || !!selectedAppt;
   const today = new Date().toISOString().split("T")[0];
+
+  // ✅ ERROR HANDLING
+  if (isError) {
+    console.error("Calendar data fetch error");
+    return (
+      <div className="flex flex-col min-h-screen p-4 sm:p-6 lg:p-10">
+        <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
+          Failed to load calendar. Please try again.
+        </div>
+        <button 
+          onClick={() => refetch()} 
+          className="mt-4 bg-[#00685C] text-white px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -225,14 +249,14 @@ export default function AppointmentCalendar() {
                     className="w-full text-left px-4 py-3 hover:bg-[#F0FDFA] transition-colors flex items-center gap-3 border-b border-[#F9FAFB] last:border-0"
                   >
                     <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
-                      {appt.initials}
+                      {appt.initials || "?"}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#0B1C30] truncate">{appt.patientName}</p>
-                      <p className="text-xs text-[#3D4946]">{appt.date}</p>
+                      <p className="text-sm font-semibold text-[#0B1C30] truncate">{appt.patientName || "Unknown"}</p>
+                      <p className="text-xs text-[#3D4946]">{appt.date || "No date"}</p>
                     </div>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLORS[appt.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                      {appt.status}
+                      {appt.status || "UNKNOWN"}
                     </span>
                   </button>
                 ))}
@@ -358,7 +382,8 @@ export default function AppointmentCalendar() {
                           className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0FDFA] transition-colors border-b border-[#F1F5F9] last:border-0 ${bookPatientId === p.id ? "bg-[#F0FDFA] font-semibold text-[#00685C]" : "text-[#0B1C30]"}`}
                         >
                           {p.name}
-                          <span className="text-xs text-[#94A3B8] ml-2">{p.id.slice(0, 8)}…</span>
+                          {/* ✅ FIXED: Added safeSlice for p.id */}
+                          <span className="text-xs text-[#94A3B8] ml-2">{safeSlice(p.id, 8)}…</span>
                         </button>
                       ))}
                     </div>
@@ -412,7 +437,7 @@ export default function AppointmentCalendar() {
                 <div>
                   <h2 className="text-base font-bold text-[#0B1C30]">Reschedule Appointment</h2>
                   <p className="text-xs text-[#94A3B8] mt-0.5 truncate max-w-[220px]">
-                    {rescheduleAppt.patientName} — {rescheduleAppt.date}
+                    {rescheduleAppt.patientName || "Unknown"} — {rescheduleAppt.date || "No date"}
                   </p>
                 </div>
                 <button onClick={() => setShowRescheduleModal(false)} className="text-[#94A3B8] hover:text-[#475569]">

@@ -14,21 +14,29 @@ const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export default function CalendarGrid({ calendarData, selectedDate, onSelectDate }: Props) {
   const today = new Date().toISOString().split("T")[0];
 
+  // ✅ Guard against missing data
+  if (!calendarData || !calendarData.days || !Array.isArray(calendarData.days)) {
+    return (
+      <div className="bg-white border border-[#F1F5F9] rounded-2xl shadow-sm overflow-hidden p-8 text-center">
+        <p className="text-[#94A3B8]">No calendar data available</p>
+      </div>
+    );
+  }
+
   // Build a lookup from date string → CalendarDay
   const dayMap: Record<string, CalendarDay> = {};
   for (const d of calendarData.days) {
-    dayMap[d.date] = d;
+    if (d && d.date) {
+      dayMap[d.date] = d;
+    }
   }
 
   // Determine the weekday (0=Sun) of the 1st of the month
-  // We derive it from the first day entry if available, otherwise construct it
   const firstDate = `${calendarData.year}-${String(calendarData.month).padStart(2, "0")}-01`;
-  const firstDow = new Date(firstDate + "T00:00:00").getDay(); // 0-6
+  const firstDow = new Date(firstDate + "T00:00:00").getDay();
 
   // Build grid cells: leading empty + current month days
   const totalCells = firstDow + calendarData.numberOfDays;
-  const rows = Math.ceil(totalCells / 7);
-
   const cells: Array<{ date: string | null; dayNum: number | null; isCurrentMonth: boolean }> = [];
 
   // Leading filler
