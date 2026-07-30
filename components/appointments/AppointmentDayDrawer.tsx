@@ -2,6 +2,7 @@
 
 import { useAppointmentsByDate } from "@/hooks/useAppointments";
 import { mapToUIAppointment, STATUS_COLORS, UIAppointment } from "./types";
+import { safeSlice } from "@/lib/safeUtils";
 
 interface Props {
   date: string;
@@ -20,12 +21,6 @@ function Spinner() {
     </svg>
   );
 }
-
-// ✅ Safe slice helper to prevent undefined errors
-const safeSlice = (str: string | undefined | null, length: number = 8): string => {
-  if (!str) return 'N/A';
-  return str.slice(0, length);
-};
 
 export default function AppointmentDayDrawer({ 
   date, 
@@ -141,7 +136,7 @@ export default function AppointmentDayDrawer({
                 {/* ✅ FIXED: Added null check for familyMemberId */}
                 {appt.appointmentType === "FAMILY" && appt.familyMemberId && (
                   <p className="text-xs text-[#94A3B8] mt-0.5">
-                    Family Member ID: {safeSlice(appt.familyMemberId)}...
+                    Family Member ID: {safeSlice(appt.familyMemberId, 8)}...
                   </p>
                 )}
                 

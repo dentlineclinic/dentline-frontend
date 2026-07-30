@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchDoctors } from "@/services/doctorService";
 import { UIAppointment, STATUS_COLORS } from "./types";
 import { useMarkArrival, useAssignDoctor, useCancelAppointment } from "@/hooks/useAppointments";
+import { safeSlice, getSafeInitials } from "@/lib/safeUtils";
 
 interface Doctor {
   id: string;
@@ -18,12 +19,6 @@ interface Props {
   onClose: () => void;
   onRefresh: () => void;
 }
-
-// ✅ Safe slice helper
-const safeSlice = (str: string | undefined | null, length: number = 8): string => {
-  if (!str) return 'N/A';
-  return str.slice(0, length);
-};
 
 export default function AppointmentManagementDrawer({ appointment, onClose, onRefresh }: Props) {
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -64,9 +59,10 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
         setDoctors(
           res.data.content.map((d: any) => ({
             id: d.id,
-            fullName: d.name,
-            initials: d.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase(),
-            specialty: d.specialization,
+            fullName: d.name || "Unknown Doctor",
+            // ✅ FIXED: Added null check for d.name
+            initials: d.name ? getSafeInitials(d.name) : 'DR',
+            specialty: d.specialization || "General",
             patients: 0,
           }))
         );
@@ -200,13 +196,13 @@ export default function AppointmentManagementDrawer({ appointment, onClose, onRe
               {/* ✅ FIXED: Added null check for familyMemberId */}
               {appointment.appointmentType === "FAMILY" && appointment.familyMemberId && (
                 <p className="text-xs text-[#94A3B8] mt-0.5">
-                  Family Member ID: {safeSlice(appointment.familyMemberId)}...
+                  Family Member ID: {safeSlice(appointment.familyMemberId, 8)}...
                 </p>
               )}
               {/* ✅ FIXED: Added null check for patientId */}
               {appointment.patientId && appointment.appointmentType !== "FAMILY" && (
                 <p className="text-xs text-[#94A3B8]">
-                  Patient ID: {safeSlice(appointment.patientId)}...
+                  Patient ID: {safeSlice(appointment.patientId, 8)}...
                 </p>
               )}
             </div>

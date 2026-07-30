@@ -14,6 +14,7 @@ import CalendarHeader from "./CalendarHeader";
 import CalendarGrid from "./CalendarGrid";
 import AppointmentDayDrawer from "./AppointmentDayDrawer";
 import AppointmentManagementDrawer from "./AppointmentManagementDrawer";
+import { safeSlice } from "@/lib/safeUtils";
 
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
@@ -29,12 +30,6 @@ function Spinner() {
     </svg>
   );
 }
-
-// ✅ Safe slice helper
-const safeSlice = (str: string | undefined | null, length: number = 8): string => {
-  if (!str) return '';
-  return str.slice(0, length);
-};
 
 export default function AppointmentCalendar() {
   const now = new Date();
@@ -130,9 +125,16 @@ export default function AppointmentCalendar() {
     setLoadingBookPatients(true);
     try {
       const res = await fetchPatients(0, 20, term);
-      setBookPatients((res.data?.content ?? []).map((p: any) => ({ id: p.id, name: p.name })));
-    } catch { /* silent */ }
-    finally { setLoadingBookPatients(false); }
+      setBookPatients((res.data?.content ?? []).map((p: any) => ({ 
+        id: p.patientId || p.id,
+        name: p.name || p.fullName || 'Unknown'
+      })));
+    } catch (error) {
+      console.error('❌ Error loading patients:', error);
+    }
+    finally { 
+      setLoadingBookPatients(false); 
+    }
   }, []);
 
   useEffect(() => {
@@ -161,6 +163,7 @@ export default function AppointmentCalendar() {
       setShowBookModal(false);
       refetch();
     } catch (err: any) {
+      console.error('❌ Booking error:', err);
       toast.error(err.message || "Failed to book appointment.");
     }
   };
@@ -277,13 +280,6 @@ export default function AppointmentCalendar() {
         </div>
       </div>
 
-      {/* ── Error ── */}
-      {isError && (
-        <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
-          Failed to load calendar. Please try again.
-        </div>
-      )}
-
       {/* ── Calendar ── */}
       {isLoading || !calendarData ? (
         <div className="bg-white border border-[#F1F5F9] rounded-2xl shadow-sm overflow-hidden">
@@ -367,7 +363,11 @@ export default function AppointmentCalendar() {
                     type="search"
                     placeholder="Search by patient name…"
                     value={bookPatientSearch}
-                    onChange={e => { setBookPatientSearch(e.target.value); setBookPatientId(""); setBookPatientName(""); }}
+                    onChange={e => { 
+                      setBookPatientSearch(e.target.value); 
+                      setBookPatientId(""); 
+                      setBookPatientName("");
+                    }}
                     className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
                   />
                   {loadingBookPatients && (
@@ -378,11 +378,15 @@ export default function AppointmentCalendar() {
                       {bookPatients.map((p, index) => (
                         <button
                           key={p.id || `book-patient-${index}`}
-                          onClick={() => { setBookPatientId(p.id); setBookPatientName(p.name); setBookPatientSearch(p.name); setBookPatients([]); }}
+                          onClick={() => { 
+                            setBookPatientId(p.id); 
+                            setBookPatientName(p.name); 
+                            setBookPatientSearch(p.name); 
+                            setBookPatients([]); 
+                          }}
                           className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0FDFA] transition-colors border-b border-[#F1F5F9] last:border-0 ${bookPatientId === p.id ? "bg-[#F0FDFA] font-semibold text-[#00685C]" : "text-[#0B1C30]"}`}
                         >
                           {p.name}
-                          {/* ✅ FIXED: Added safeSlice for p.id */}
                           <span className="text-xs text-[#94A3B8] ml-2">{safeSlice(p.id, 8)}…</span>
                         </button>
                       ))}
@@ -390,6 +394,9 @@ export default function AppointmentCalendar() {
                   )}
                   {bookPatientId && (
                     <p className="text-xs text-[#00685C] font-semibold">✓ {bookPatientName} selected</p>
+                  )}
+                  {!loadingBookPatients && bookPatients.length === 0 && bookPatientSearch.trim() && (
+                    <p className="text-xs text-[#94A3B8]">No patients found</p>
                   )}
                 </div>
 
@@ -416,7 +423,11 @@ export default function AppointmentCalendar() {
                 <button
                   onClick={handleBookSubmit}
                   disabled={bookMutation.isPending || !bookPatientId || !bookDate}
-                  className="flex-1 py-2.5 text-sm font-semibold bg-[#00685C] text-white rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className={`flex-1 py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors ${
+                    bookMutation.isPending || !bookPatientId || !bookDate
+                      ? 'bg-[#94A3B8] text-white cursor-not-allowed opacity-50'
+                      : 'bg-[#00685C] text-white hover:bg-[#008375]'
+                  }`}
                 >
                   {bookMutation.isPending && <Spinner />}
                   {bookMutation.isPending ? "Booking…" : "Book Appointment"}
