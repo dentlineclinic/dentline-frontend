@@ -138,6 +138,8 @@ export interface DashboardAppointment {
   patientName: string;
   appointmentDate: string;
   status: string;
+  appointmentType?: string;
+  familyMemberName?: string;
 }
 
 
