@@ -14,10 +14,9 @@ export default function RequestOtpPage() {
   const router = useRouter();
   const mutation = useRequestOtp();
   const { executeRecaptcha } = useGoogleReCaptcha();
-  
-  // Track if the component is mounted to prevent state updates after unmount
   const isMounted = useRef(true);
-  
+  const tokenTimestamp = useRef<number>(0);
+
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -62,18 +61,18 @@ export default function RequestOtpPage() {
         return;
       }
 
-      // ✅ Generate a FRESH token for this specific request
-      // The action parameter helps Google track the purpose
+      // ✅ Generate a FRESH token right before the request
+      // This ensures the token is not expired
       const captchaToken = await executeRecaptcha("register_otp");
 
       if (!captchaToken) {
-        setError("Failed to generate captcha. Please refresh the page and try again.");
+        setError("Failed to generate captcha. Please try again.");
         setIsSubmitting(false);
         return;
       }
 
-      // ✅ Log token generation for debugging (remove in production)
-      console.log("Captcha token generated, length:", captchaToken.length);
+      // ✅ Store when this token was generated
+      tokenTimestamp.current = Date.now();
 
       mutation.mutate(
         isEmail
@@ -81,23 +80,20 @@ export default function RequestOtpPage() {
           : { phoneNumber: trimmedIdentifier, captchaToken },
         {
           onSuccess: () => {
-            // Store identifier for the next step
             sessionStorage.setItem("reg_identifier", trimmedIdentifier);
-            // Clear any previous error
-            setError("");
             router.push("/register/verify-otp");
           },
           onError: (error: any) => {
             setIsSubmitting(false);
-            // ✅ Check for captcha-specific errors
             const errorMessage = error?.response?.data?.message || error?.message || "";
+            
+            // ✅ If it's a captcha error, suggest refreshing
             if (
               errorMessage.toLowerCase().includes("captcha") ||
               errorMessage.toLowerCase().includes("timeout") ||
               errorMessage.toLowerCase().includes("duplicate")
             ) {
-              setError("Security verification expired. Please try again.");
-              // ✅ Reset the captcha by refreshing the token on next attempt
+              setError("Security verification expired. Please refresh the page and try again.");
             } else {
               setError(errorMessage || "Something went wrong. Please try again.");
             }
@@ -110,15 +106,29 @@ export default function RequestOtpPage() {
     }
   };
 
+  // ✅ Handler to refresh captcha
+  const handleRefresh = () => {
+    setError("");
+    setIdentifier("");
+    tokenTimestamp.current = 0;
+    // Force a hard refresh to reset everything
+    window.location.reload();
+  };
+
   const errorMessage = error || (mutation.isError && mutation.error instanceof Error
     ? mutation.error.message
     : mutation.isError
       ? "Something went wrong. Please try again."
       : null);
 
+  // ✅ Check if the token is too old (> 1 minute)
+  const tokenAge = tokenTimestamp.current > 0 
+    ? (Date.now() - tokenTimestamp.current) / 1000 
+    : 0;
+  const isTokenTooOld = tokenAge > 60;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F9FF] to-white flex flex-col">
-      {/* Background decorations */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#008375]/10 rounded-full blur-[80px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#BBD3FD]/20 rounded-full blur-[80px]" />
@@ -157,7 +167,7 @@ export default function RequestOtpPage() {
             </Link>
             <h2 className="text-3xl font-bold text-[#0B1C30] mt-4">Create Your Account</h2>
             <p className="text-base text-[#485F83] mt-1">
-              Enter your email address or phone number to get started. We&apos;ll send you a verification code.
+              Enter your email address or phone number to get started. We'll send you a verification code.
             </p>
           </div>
 
@@ -170,14 +180,11 @@ export default function RequestOtpPage() {
                   {errorMessage}
                   {(errorMessage.toLowerCase().includes("captcha") || 
                     errorMessage.toLowerCase().includes("security") || 
-                    errorMessage.toLowerCase().includes("expired")) && (
+                    errorMessage.toLowerCase().includes("expired") ||
+                    errorMessage.toLowerCase().includes("timeout")) && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setError("");
-                        setIdentifier("");
-                        window.location.reload();
-                      }}
+                      onClick={handleRefresh}
                       className="block mt-1 text-[#93000A] underline hover:no-underline font-normal"
                     >
                       Refresh page and try again
@@ -224,7 +231,7 @@ export default function RequestOtpPage() {
               disabled={mutation.isPending || isSubmitting}
               className="w-full bg-[#00685C] text-white font-semibold text-base py-4 rounded-lg shadow-sm hover:bg-[#008375] transition-colors flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {(mutation.isPending || isSubmitting) ? (
+              {mutation.isPending || isSubmitting ? (
                 <>
                   <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                     <circle
