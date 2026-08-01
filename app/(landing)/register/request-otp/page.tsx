@@ -1,61 +1,113 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useRequestOtp } from "@/hooks/useRequestOtp";
 import { isValidEmail, isValidPhone } from "@/lib/utils";
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 
-
 export default function RequestOtpPage() {
   const [identifier, setIdentifier] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const mutation = useRequestOtp();
   const { executeRecaptcha } = useGoogleReCaptcha();
+  
+  // Track if the component is mounted to prevent state updates after unmount
+  const isMounted = useRef(true);
+  
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const trimmedIdentifier = identifier.trim();
-    const isEmail = trimmedIdentifier.includes("@");
+    // Prevent multiple submissions
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    if (!trimmedIdentifier) {
-      setError("Please enter your email or phone number.");
-      return;
-    }
+    try {
+      const trimmedIdentifier = identifier.trim();
+      const isEmail = trimmedIdentifier.includes("@");
 
-    if (isEmail && !isValidEmail(trimmedIdentifier)) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-
-    if (!isEmail && !isValidPhone(trimmedIdentifier)) {
-      setError("Please enter a valid phone number.");
-      return;
-    }
-
-    setError("");
-
-    if (!executeRecaptcha) {
-      setError("Captcha not ready");
-      return;
-    }
-
-    const captchaToken = await executeRecaptcha("register_otp");
-
-    mutation.mutate(
-      isEmail
-        ? { email: trimmedIdentifier, captchaToken }
-        : { phoneNumber: trimmedIdentifier, captchaToken },
-      {
-        onSuccess: () => {
-          sessionStorage.setItem("reg_identifier", trimmedIdentifier);
-          router.push("/register/verify-otp");
-        },
+      if (!trimmedIdentifier) {
+        setError("Please enter your email or phone number.");
+        setIsSubmitting(false);
+        return;
       }
-    );
+
+      if (isEmail && !isValidEmail(trimmedIdentifier)) {
+        setError("Please enter a valid email address.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!isEmail && !isValidPhone(trimmedIdentifier)) {
+        setError("Please enter a valid phone number.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      setError("");
+
+      if (!executeRecaptcha) {
+        setError("Captcha not ready. Please refresh the page.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // ✅ Generate a FRESH token for this specific request
+      // The action parameter helps Google track the purpose
+      const captchaToken = await executeRecaptcha("register_otp");
+
+      if (!captchaToken) {
+        setError("Failed to generate captcha. Please refresh the page and try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // ✅ Log token generation for debugging (remove in production)
+      console.log("Captcha token generated, length:", captchaToken.length);
+
+      mutation.mutate(
+        isEmail
+          ? { email: trimmedIdentifier, captchaToken }
+          : { phoneNumber: trimmedIdentifier, captchaToken },
+        {
+          onSuccess: () => {
+            // Store identifier for the next step
+            sessionStorage.setItem("reg_identifier", trimmedIdentifier);
+            // Clear any previous error
+            setError("");
+            router.push("/register/verify-otp");
+          },
+          onError: (error: any) => {
+            setIsSubmitting(false);
+            // ✅ Check for captcha-specific errors
+            const errorMessage = error?.response?.data?.message || error?.message || "";
+            if (
+              errorMessage.toLowerCase().includes("captcha") ||
+              errorMessage.toLowerCase().includes("timeout") ||
+              errorMessage.toLowerCase().includes("duplicate")
+            ) {
+              setError("Security verification expired. Please try again.");
+              // ✅ Reset the captcha by refreshing the token on next attempt
+            } else {
+              setError(errorMessage || "Something went wrong. Please try again.");
+            }
+          },
+        }
+      );
+    } catch (err) {
+      setIsSubmitting(false);
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   const errorMessage = error || (mutation.isError && mutation.error instanceof Error
@@ -112,8 +164,26 @@ export default function RequestOtpPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             {/* Error */}
             {errorMessage && (
-              <div className="bg-[#FFDAD6] border border-[#FCA5A5] text-[#93000A] px-4 py-3 rounded-lg text-sm font-semibold">
-                {errorMessage}
+              <div className="bg-[#FFDAD6] border border-[#FCA5A5] text-[#93000A] px-4 py-3 rounded-lg text-sm font-semibold flex items-start gap-2">
+                <span className="mt-0.5">⚠️</span>
+                <div>
+                  {errorMessage}
+                  {(errorMessage.toLowerCase().includes("captcha") || 
+                    errorMessage.toLowerCase().includes("security") || 
+                    errorMessage.toLowerCase().includes("expired")) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError("");
+                        setIdentifier("");
+                        window.location.reload();
+                      }}
+                      className="block mt-1 text-[#93000A] underline hover:no-underline font-normal"
+                    >
+                      Refresh page and try again
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -151,10 +221,10 @@ export default function RequestOtpPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || isSubmitting}
               className="w-full bg-[#00685C] text-white font-semibold text-base py-4 rounded-lg shadow-sm hover:bg-[#008375] transition-colors flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {mutation.isPending ? (
+              {(mutation.isPending || isSubmitting) ? (
                 <>
                   <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                     <circle
