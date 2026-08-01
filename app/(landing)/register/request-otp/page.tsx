@@ -16,6 +16,7 @@ export default function RequestOtpPage() {
   const { executeRecaptcha } = useGoogleReCaptcha();
   const isMounted = useRef(true);
   const tokenTimestamp = useRef<number>(0);
+  const lastToken = useRef<string>("");
 
   useEffect(() => {
     isMounted.current = true;
@@ -27,7 +28,6 @@ export default function RequestOtpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent multiple submissions
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -61,9 +61,9 @@ export default function RequestOtpPage() {
         return;
       }
 
-      // ✅ Generate a FRESH token right before the request
-      // This ensures the token is not expired
-      const captchaToken = await executeRecaptcha("register_otp");
+      // ✅ Generate FRESH token IMMEDIATELY before the API call
+      // Use a different action name to ensure fresh token
+      const captchaToken = await executeRecaptcha("register_otp_submit");
 
       if (!captchaToken) {
         setError("Failed to generate captcha. Please try again.");
@@ -71,8 +71,12 @@ export default function RequestOtpPage() {
         return;
       }
 
-      // ✅ Store when this token was generated
+      // ✅ Store token and timestamp
+      lastToken.current = captchaToken;
       tokenTimestamp.current = Date.now();
+
+      // ✅ Log for debugging
+      console.log(`🔐 Captcha token generated at ${new Date().toISOString()}, length: ${captchaToken.length}`);
 
       mutation.mutate(
         isEmail
@@ -81,19 +85,23 @@ export default function RequestOtpPage() {
         {
           onSuccess: () => {
             sessionStorage.setItem("reg_identifier", trimmedIdentifier);
+            // Clear the token after successful use
+            lastToken.current = "";
             router.push("/register/verify-otp");
           },
           onError: (error: any) => {
             setIsSubmitting(false);
             const errorMessage = error?.response?.data?.message || error?.message || "";
             
-            // ✅ If it's a captcha error, suggest refreshing
             if (
               errorMessage.toLowerCase().includes("captcha") ||
               errorMessage.toLowerCase().includes("timeout") ||
               errorMessage.toLowerCase().includes("duplicate")
             ) {
-              setError("Security verification expired. Please refresh the page and try again.");
+              // ✅ Clear the old token so a new one will be generated
+              lastToken.current = "";
+              tokenTimestamp.current = 0;
+              setError("Security verification expired. Please try again.");
             } else {
               setError(errorMessage || "Something went wrong. Please try again.");
             }
@@ -106,12 +114,11 @@ export default function RequestOtpPage() {
     }
   };
 
-  // ✅ Handler to refresh captcha
   const handleRefresh = () => {
     setError("");
     setIdentifier("");
     tokenTimestamp.current = 0;
-    // Force a hard refresh to reset everything
+    lastToken.current = "";
     window.location.reload();
   };
 
@@ -120,12 +127,6 @@ export default function RequestOtpPage() {
     : mutation.isError
       ? "Something went wrong. Please try again."
       : null);
-
-  // ✅ Check if the token is too old (> 1 minute)
-  const tokenAge = tokenTimestamp.current > 0 
-    ? (Date.now() - tokenTimestamp.current) / 1000 
-    : 0;
-  const isTokenTooOld = tokenAge > 60;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F9FF] to-white flex flex-col">
