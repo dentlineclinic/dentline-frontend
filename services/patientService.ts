@@ -41,14 +41,17 @@ export interface CreatePatientResponse {
 }
 
 export interface PatientDto {
-  id: string;
+  patientId: string;      // Patient ID (from your backend)
+  userId: string | null;  // User ID (from your backend)
+  hasAccount: boolean;
   name: string;
   email: string;
+  phoneNumber: string;
+  lastVerificationType?: "EMAIL" | "PHONE";
   role: string;
   status: string;
   mustChangePassword: boolean;
   profilePhotoUrl?: string;
-  phoneNumber?: string;
   dateOfBirth?: string;
   gender?: string;
   emergencyContactName?: string;
@@ -58,7 +61,6 @@ export interface PatientDto {
   referencePoints?: number;
   hmo: string;
   hmoId: string;
-  lastVerificationType?: "EMAIL" | "PHONE";
 }
 
 export interface UpdatePatientProfileRequest {
@@ -246,7 +248,7 @@ export interface UploadPhotoResponse {
   data: PatientDto;
 }
 
-// CHANGED: Now uses userId instead of patientId
+// IMPORTANT: This endpoint expects userId (User ID), not patientId
 export const uploadProfilePhoto = async (
   userId: string,
   file: File
@@ -300,7 +302,7 @@ export const fetchPatientDashboard = async (): Promise<PatientDashboardResponse>
   return res.data;
 };
 
-// CHANGED: Now uses userId instead of patientId
+// IMPORTANT: This endpoint expects userId (User ID), not patientId
 export const updatePatientProfile = async (
   userId: string,
   payload: UpdatePatientProfileRequest

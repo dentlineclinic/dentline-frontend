@@ -34,6 +34,8 @@ const HMO_OPTIONS = [
 ];
 
 export default function PatientProfilePage() {
+  // IMPORTANT: Use userId for API calls, patientId for display only
+  const [userId, setUserId] = useState<string | null>(null);
   const [patientId, setPatientId] = useState<string | null>(null);
   const [passwordChangeReason, setPasswordChangeReason] = useState<string | null>(null);
 
@@ -80,23 +82,19 @@ export default function PatientProfilePage() {
         setCountdown(countdown - 1);
       }, 1000);
     } else if (showLogoutCountdown && countdown === 0) {
-      // Perform logout
       performLogout();
     }
     return () => clearTimeout(timer);
   }, [showLogoutCountdown, countdown]);
 
   const performLogout = () => {
-    // Clear all auth data
     localStorage.clear();
     sessionStorage.clear();
     
-    // Clear cookies
     document.cookie = "token=; path=/; max-age=0; samesite=strict";
     document.cookie = "role=; path=/; max-age=0; samesite=strict";
     document.cookie = "refreshToken=; path=/; max-age=0; samesite=strict";
     
-    // Redirect to login
     window.location.href = "/login?reason=password_changed";
   };
 
@@ -113,7 +111,10 @@ export default function PatientProfilePage() {
 
         const patient = result.data;
         
-        setPatientId(patient.id);
+        // CRITICAL: Store userId for API calls, patientId for display
+        setUserId(patient.userId);      // This is the User ID
+        setPatientId(patient.patientId); // This is the Patient ID (for display)
+        
         setName(patient.name);
         setEmail(patient.email);
         setPhoneNumber(patient.phoneNumber ?? "");
@@ -125,11 +126,9 @@ export default function PatientProfilePage() {
         setProfilePhotoUrl(patient.profilePhotoUrl ?? "");
         setLastVerificationType(patient.lastVerificationType!);
 
-        // Check if user must change password
         const mustChange = localStorage.getItem("mustChangePassword") === "true";
         setMustChangePassword(mustChange);
 
-        // Check if redirected from login with reason
         const reason = searchParams.get("reason");
         if (reason === "must_change_password") {
           setPasswordChangeReason("You were redirected here because you need to change your temporary password.");
@@ -147,7 +146,6 @@ export default function PatientProfilePage() {
           });
         }
 
-        // Check if redirected after password change
         if (reason === "password_changed") {
           toast.success("✅ Password changed successfully! Please login with your new password.", {
             position: "top-center",
@@ -167,7 +165,8 @@ export default function PatientProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!patientId) {
+    // CRITICAL: Check userId (not patientId)
+    if (!userId) {
       toast.error("User not found");
       return;
     }
@@ -180,7 +179,8 @@ export default function PatientProfilePage() {
           ? { phoneNumber }
           : { email };
 
-      const result = await updatePatientProfile(patientId, {
+      // CRITICAL: Use userId for the API call
+      const result = await updatePatientProfile(userId, {
         ...updatePayload,
         emergencyContactName,
         emergencyContactPhone,
@@ -241,22 +241,18 @@ export default function PatientProfilePage() {
     try {
       const result = await changePassword({ currentPassword, newPassword });
       if (result.success) {
-        // Clear the must change password flag
         localStorage.removeItem("mustChangePassword");
         setMustChangePassword(false);
         setPasswordChangeReason(null);
         
-        // Show success message
         toast.success("✅ Password changed successfully! You will be logged out for security.", {
           position: "top-center",
           autoClose: 3000,
         });
         
-        // Start logout countdown
         setShowLogoutCountdown(true);
         setCountdown(5);
         
-        // Clear form
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -278,10 +274,13 @@ export default function PatientProfilePage() {
       toast.error("Please select a file to upload");
       return;
     }
-    if (!patientId) {
+    
+    // CRITICAL: Check userId (not patientId)
+    if (!userId) {
       toast.error("User not found");
       return;
     }
+    
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
     if (!allowedTypes.includes(selectedFile.type)) {
       toast.error("Please upload a valid image file (JPEG, PNG, WEBP)");
@@ -295,7 +294,8 @@ export default function PatientProfilePage() {
     setPhotoLoading(true);
 
     try {
-      const result = await uploadProfilePhoto(patientId, selectedFile);
+      // CRITICAL: Use userId for the API call
+      const result = await uploadProfilePhoto(userId, selectedFile);
       if (result.success) {
         toast.success(result.message || "Profile photo uploaded successfully");
         const newPhotoUrl = result.data?.profilePhotoUrl ?? "";
