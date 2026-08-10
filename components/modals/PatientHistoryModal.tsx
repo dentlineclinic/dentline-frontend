@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
-import { PatientHistory } from "@/services/patientHistoryService";
+import { PatientHistory, ToothObservation, addToothObservation, deleteToothObservation } from "@/services/patientHistoryService";
 import {
   updateObservation,
   markHistoryAsCompleted,
@@ -12,6 +12,7 @@ import {
   deleteHistoryVideo,
 } from "@/services/doctorService";
 import { imageThumbnail } from "@/lib/cloudinary";
+import ToothChart from "@/components/ToothChart";
 
 interface PatientHistoryModalProps {
   isOpen: boolean;
@@ -55,6 +56,16 @@ export default function PatientHistoryModal({
   const [deletingImage, setDeletingImage] = useState<string | null>(null);
   const [deletingVideo, setDeletingVideo] = useState<string | null>(null);
 
+  // FDI Tooth Observations state
+  const [toothObservations, setToothObservations] = useState<ToothObservation[]>([]);
+  const [selectedTooth, setSelectedTooth] = useState<string | null>(null);
+  const [selectedToothType, setSelectedToothType] = useState<"PERMANENT" | "PRIMARY">("PERMANENT");
+  const [diagnosis, setDiagnosis] = useState("");
+  const [treatment, setTreatment] = useState("");
+  const [showToothForm, setShowToothForm] = useState(false);
+  const [savingTooth, setSavingTooth] = useState(false);
+  const [deletingTooth, setDeletingTooth] = useState<string | null>(null);
+
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +74,7 @@ export default function PatientHistoryModal({
       setObservation(history.observation || "");
       setImageUrls(Array.isArray(history.imageUrls) ? history.imageUrls : []);
       setVideoUrls(Array.isArray(history.videoUrls) ? history.videoUrls : []);
+      setToothObservations(history.toothObservations || []);
     }
   }, [history]);
 
@@ -127,7 +139,6 @@ export default function PatientHistoryModal({
     try {
       const result = await uploadHistoryImage(history.id, file);
       if (result.success) {
-        // Optimistically add a local object URL so the image shows immediately
         const localUrl = URL.createObjectURL(file);
         setImageUrls(prev => [...prev, localUrl]);
         showToast("Image uploaded successfully!", "success");
@@ -164,20 +175,12 @@ export default function PatientHistoryModal({
     }
   };
 
-  /**
-   * Extracts the media ID from a Cloudinary URL.
-   * The backend expects the public_id which is everything after the version
-   * segment, e.g. "dentline/histories/abc123" from a full Cloudinary URL.
-   * We send the last path segment (filename without extension) as the ID.
-   */
   const extractMediaId = (url: string): string => {
     try {
       const pathname = new URL(url).pathname;
-      // Remove extension and take the last segment
       const withoutExt = pathname.replace(/\.[^/.]+$/, "");
       return withoutExt.split("/").pop() ?? url;
     } catch {
-      // Fallback for blob/local URLs (optimistic uploads not yet persisted)
       return url;
     }
   };
@@ -220,6 +223,79 @@ export default function PatientHistoryModal({
     } finally {
       setDeletingVideo(null);
     }
+  };
+
+  // FDI Tooth Observation Handlers
+  const handleToothSelect = (fdiCode: string, toothType: "PERMANENT" | "PRIMARY") => {
+    setSelectedTooth(fdiCode);
+    setSelectedToothType(toothType);
+    setShowToothForm(true);
+    setDiagnosis("");
+    setTreatment("");
+  };
+
+  const handleSaveToothObservation = async () => {
+    if (!history || !selectedTooth) return;
+    if (!diagnosis.trim() && !treatment.trim()) {
+      toast.error("Please enter diagnosis or treatment details");
+      return;
+    }
+
+    setSavingTooth(true);
+    try {
+      const result = await addToothObservation(history.id, {
+        fdiCode: selectedTooth,
+        toothType: selectedToothType,
+        diagnosis: diagnosis.trim(),
+        treatment: treatment.trim(),
+      });
+
+      if (result.success) {
+        // Update local state with the new observation
+        const newObservation = result.data.toothObservations?.find(
+          (obs: any) => obs.fdiCode === selectedTooth
+        );
+        if (newObservation) {
+          setToothObservations(prev => [...prev, newObservation]);
+        }
+        toast.success("Tooth observation added successfully!");
+        setShowToothForm(false);
+        setSelectedTooth(null);
+        onObservationSaved?.();
+      } else {
+        toast.error(result.message || "Failed to add tooth observation");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add tooth observation");
+    } finally {
+      setSavingTooth(false);
+    }
+  };
+
+  const handleDeleteToothObservation = async (observationId: string) => {
+    if (!history) return;
+    setDeletingTooth(observationId);
+    try {
+      const result = await deleteToothObservation(history.id, observationId);
+      if (result.success) {
+        setToothObservations(prev => prev.filter(obs => obs.id !== observationId));
+        toast.success("Tooth observation deleted");
+        onObservationSaved?.();
+      } else {
+        toast.error(result.message || "Failed to delete tooth observation");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete tooth observation");
+    } finally {
+      setDeletingTooth(null);
+    }
+  };
+
+  const cancelToothForm = () => {
+    setShowToothForm(false);
+    setSelectedTooth(null);
+    setDiagnosis("");
+    setTreatment("");
   };
 
   const formatDate = (dateString: string) => {
@@ -269,6 +345,11 @@ export default function PatientHistoryModal({
               <div className="flex-1">
                 <p className="text-base font-bold text-[#0B1C30]">{history.patientName}</p>
                 <p className="text-sm text-[#94A3B8]">Patient ID: {history.patientId.slice(0, 8)}…</p>
+                {history.appointmentType === "FAMILY" && history.familyMemberName && (
+                  <p className="text-sm font-semibold text-[#00685C] mt-0.5">
+                    👤 Family Member: {history.familyMemberName}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -301,6 +382,212 @@ export default function PatientHistoryModal({
                 </div>
               </div>
             </div>
+
+            {/* FDI Tooth Observations - Doctor Mode */}
+            {doctorMode && (
+              <div className="bg-white border border-[#F1F5F9] rounded-xl p-5 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-[#0B1C30]">Tooth Observations (FDI)</h3>
+                  {!isCompleted && (
+                    <button
+                      onClick={() => setShowToothForm(!showToothForm)}
+                      className="text-xs font-semibold text-[#00685C] hover:underline flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Tooth
+                    </button>
+                  )}
+                </div>
+
+                {/* Tooth Chart */}
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        onClick={() => setSelectedToothType("PERMANENT")}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                          selectedToothType === "PERMANENT"
+                            ? "bg-[#00685C] text-white"
+                            : "bg-[#F1F5F9] text-[#3D4946] hover:bg-[#E2E8F0]"
+                        }`}
+                      >
+                        Permanent
+                      </button>
+                      <button
+                        onClick={() => setSelectedToothType("PRIMARY")}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                          selectedToothType === "PRIMARY"
+                            ? "bg-[#00685C] text-white"
+                            : "bg-[#F1F5F9] text-[#3D4946] hover:bg-[#E2E8F0]"
+                        }`}
+                      >
+                        Primary
+                      </button>
+                    </div>
+                    <ToothChart
+                      selectedTooth={selectedTooth}
+                      onToothSelect={handleToothSelect}
+                      toothType={selectedToothType}
+                      existingObservations={toothObservations.map(obs => obs.fdiCode)}
+                      isReadOnly={isCompleted}
+                    />
+                  </div>
+                </div>
+
+                {/* Tooth Observation Form */}
+                {showToothForm && selectedTooth && !isCompleted && (
+                  <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-4 mt-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-bold text-[#0B1C30]">
+                        Tooth {selectedTooth} - {selectedToothType}
+                      </h4>
+                      <button
+                        onClick={cancelToothForm}
+                        className="text-[#94A3B8] hover:text-[#3D4946]"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#3D4946] mb-1">
+                          Diagnosis
+                        </label>
+                        <input
+                          type="text"
+                          value={diagnosis}
+                          onChange={(e) => setDiagnosis(e.target.value)}
+                          placeholder="e.g., Caries, Fracture, etc."
+                          className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00685C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#3D4946] mb-1">
+                          Treatment
+                        </label>
+                        <input
+                          type="text"
+                          value={treatment}
+                          onChange={(e) => setTreatment(e.target.value)}
+                          placeholder="e.g., Filling, Extraction, etc."
+                          className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00685C]"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveToothObservation}
+                          disabled={savingTooth}
+                          className="flex-1 bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50"
+                        >
+                          {savingTooth ? "Saving..." : "Save Observation"}
+                        </button>
+                        <button
+                          onClick={cancelToothForm}
+                          className="flex-1 border border-[#E2E8F0] text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Existing Tooth Observations List */}
+                {toothObservations.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <h4 className="text-sm font-semibold text-[#0B1C30]">Recorded Teeth</h4>
+                    {toothObservations.map((obs) => (
+                      <div
+                        key={obs.id}
+                        className="flex items-center justify-between bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-3"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-[#00685C]">{obs.fdiCode}</span>
+                            <span className="text-xs bg-[#E5EEFF] text-[#435B7E] px-2 py-0.5 rounded-full">
+                              {obs.toothType}
+                            </span>
+                            <span className="text-xs text-[#94A3B8]">{obs.toothLabel}</span>
+                          </div>
+                          <div className="flex gap-4 mt-1 text-xs">
+                            {obs.diagnosis && (
+                              <span><span className="font-semibold">Dx:</span> {obs.diagnosis}</span>
+                            )}
+                            {obs.treatment && (
+                              <span><span className="font-semibold">Tx:</span> {obs.treatment}</span>
+                            )}
+                          </div>
+                        </div>
+                        {!isCompleted && (
+                          <button
+                            onClick={() => handleDeleteToothObservation(obs.id)}
+                            disabled={deletingTooth === obs.id}
+                            className="text-[#93000A] hover:text-[#7A0000] transition-colors disabled:opacity-50"
+                          >
+                            {deletingTooth === obs.id ? (
+                              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* FDI Tooth Observations - Patient View (Read-only) */}
+            {!doctorMode && toothObservations.length > 0 && (
+              <div className="bg-white border border-[#F1F5F9] rounded-xl p-5 flex flex-col gap-4">
+                <h3 className="text-base font-bold text-[#0B1C30]">
+                  Tooth Observations (FDI)
+                  <span className="text-sm font-normal text-[#94A3B8] ml-2">
+                    ({toothObservations.length} teeth)
+                  </span>
+                </h3>
+                <div className="space-y-2">
+                  {toothObservations.map((obs) => (
+                    <div
+                      key={obs.id}
+                      className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-[#00685C]">{obs.fdiCode}</span>
+                        <span className="text-xs bg-[#E5EEFF] text-[#435B7E] px-2 py-0.5 rounded-full">
+                          {obs.toothType}
+                        </span>
+                        <span className="text-xs text-[#94A3B8]">{obs.toothLabel}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {obs.diagnosis && (
+                          <div className="text-xs">
+                            <span className="font-semibold text-[#3D4946]">Diagnosis:</span>
+                            <span className="text-[#485F83] ml-1">{obs.diagnosis}</span>
+                          </div>
+                        )}
+                        {obs.treatment && (
+                          <div className="text-xs">
+                            <span className="font-semibold text-[#3D4946]">Treatment:</span>
+                            <span className="text-[#485F83] ml-1">{obs.treatment}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Observation */}
             <div className="bg-white border border-[#F1F5F9] rounded-xl p-5 flex flex-col gap-4">
@@ -343,7 +630,6 @@ export default function PatientHistoryModal({
               <div className="bg-white border border-[#F1F5F9] rounded-xl p-5 flex flex-col gap-4">
                 <h3 className="text-base font-bold text-[#0B1C30]">Upload Media</h3>
                 <div className="flex gap-3">
-                  {/* Image upload */}
                   <button
                     onClick={() => imageInputRef.current?.click()}
                     disabled={uploadingImage}
@@ -357,7 +643,6 @@ export default function PatientHistoryModal({
                   </button>
                   <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageUpload} />
 
-                  {/* Video upload */}
                   <button
                     onClick={() => videoInputRef.current?.click()}
                     disabled={uploadingVideo}
@@ -384,11 +669,9 @@ export default function PatientHistoryModal({
                   {imageUrls.map((url, i) => (
                     <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-[#E2E8F0] bg-[#F8FAFC]">
                       <a href={url} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imageThumbnail(url)} alt={`Clinical image ${i + 1}`} className="w-full h-full object-cover" />
                       </a>
 
-                      {/* Delete button — visible on hover in doctor mode */}
                       {doctorMode && !isCompleted && (
                         <button
                           onClick={() => handleDeleteImage(url)}
@@ -423,7 +706,6 @@ export default function PatientHistoryModal({
                 <div className="flex flex-col gap-2">
                   {videoUrls.map((url, i) => (
                     <div key={i} className="flex items-center gap-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-3">
-                      {/* Clickable video link */}
                       <a
                         href={url}
                         target="_blank"
@@ -442,7 +724,6 @@ export default function PatientHistoryModal({
                         </svg>
                       </a>
 
-                      {/* Delete button — doctor mode only, not completed */}
                       {doctorMode && !isCompleted && (
                         <button
                           onClick={() => handleDeleteVideo(url)}

@@ -27,10 +27,18 @@ type PatientHistory = {
   createdAt: string;
   imageUrls: string[];
   videoUrls: string[];
-  // Family appointment fields
   familyMemberId?: string;
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
+  toothObservations?: {
+    id: string;
+    fdiCode: string;
+    toothType: "PERMANENT" | "PRIMARY";
+    toothLabel: string;
+    diagnosis: string;
+    treatment: string;
+    createdAt: string;
+  }[];
 };
 
 const statusColors: Record<string, string> = {
@@ -58,7 +66,6 @@ export default function MedicalHistoryPage() {
   const [userName, setUserName] = useState("Patient");
   const [selectedHistory, setSelectedHistory] = useState<PatientHistory | null>(null);
   
-  // Review form state
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewAppointmentId, setReviewAppointmentId] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
@@ -68,9 +75,7 @@ export default function MedicalHistoryPage() {
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
-  // Get the patient ID from localStorage or use a default
   const getPatientId = () => {
-    // Try to get from localStorage, or use a stored patient ID
     return localStorage.getItem("patientId") || "";
   };
 
@@ -85,7 +90,6 @@ export default function MedicalHistoryPage() {
 
         const patientId = getPatientId();
 
-        // Load all histories (using the "my" endpoint which gets all for the logged-in patient)
         const allResult = await fetchMyPatientHistories(0, 100);
         
         if (allResult.success) {
@@ -93,10 +97,10 @@ export default function MedicalHistoryPage() {
             ...h,
             imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
             videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
+            toothObservations: h.toothObservations || [],
           }));
           setAllHistories(allData);
 
-          // Separate into individual and family
           const individual = allData.filter((h: PatientHistory) => h.appointmentType === "INDIVIDUAL");
           const family = allData.filter((h: PatientHistory) => h.appointmentType === "FAMILY");
 
@@ -116,7 +120,6 @@ export default function MedicalHistoryPage() {
     loadHistories();
   }, []);
 
-  // Get the current displayed histories based on active tab and status filter
   const getCurrentHistories = () => {
     let histories: PatientHistory[] = [];
     
@@ -134,7 +137,6 @@ export default function MedicalHistoryPage() {
 
   const filteredHistories = getCurrentHistories();
 
-  // Get counts for each tab
   const allCount = allHistories.length;
   const individualCount = individualHistories.length;
   const familyCount = familyHistories.length;
@@ -200,13 +202,6 @@ export default function MedicalHistoryPage() {
     }
   };
 
-  // Calculate totals for the current view
-  const totalAmount = filteredHistories.reduce((sum, h) => sum + h.amount, 0);
-  const paidAmount = filteredHistories
-    .filter(h => h.paymentStatus === "PAID")
-    .reduce((sum, h) => sum + h.amount, 0);
-
-  // Calculate totals for all histories (for summary cards)
   const allTotalAmount = allHistories.reduce((sum, h) => sum + h.amount, 0);
   const allPaidAmount = allHistories
     .filter(h => h.paymentStatus === "PAID")
@@ -220,7 +215,7 @@ export default function MedicalHistoryPage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-4 sm:gap-6">
-        {/* Summary Cards - showing totals from all histories */}
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between">
@@ -342,7 +337,6 @@ export default function MedicalHistoryPage() {
           ))}
         </div>
 
-        {/* Active filter indicator */}
         {statusFilter !== "All" && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#94A3B8]">Filtered by:</span>
@@ -358,14 +352,12 @@ export default function MedicalHistoryPage() {
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
 
-        {/* Loading State */}
         {loading ? (
           <div className="flex flex-col gap-3">
             {[...Array(5)].map((_, i) => (
@@ -437,7 +429,6 @@ export default function MedicalHistoryPage() {
                         </p>
                         <p className="text-sm text-[#3D4946]">{history.doctorName}</p>
                       </div>
-                      {/* ✅ Show appointment type badge */}
                       {history.appointmentType === "FAMILY" && (
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
                           Family
@@ -450,7 +441,6 @@ export default function MedicalHistoryPage() {
                       )}
                     </div>
 
-                    {/* ✅ Show family member name for family appointments */}
                     {history.appointmentType === "FAMILY" && history.familyMemberName && (
                       <p className="text-sm font-semibold text-[#00685C] mb-2">
                         👤 Family Member: {history.familyMemberName}
@@ -460,6 +450,24 @@ export default function MedicalHistoryPage() {
                     <p className="text-sm text-[#485F83] leading-relaxed mb-3 line-clamp-2">
                       {history.observation || "No observation notes available"}
                     </p>
+
+                    {/* FDI Tooth Observations Summary */}
+                    {history.toothObservations && history.toothObservations.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {history.toothObservations.map((obs) => (
+                          <span
+                            key={obs.id}
+                            className="text-xs bg-[#F0FDFA] border border-[#00685C]/20 text-[#00685C] px-2 py-0.5 rounded-full"
+                            title={`${obs.fdiCode}: ${obs.toothLabel}`}
+                          >
+                            {obs.fdiCode}
+                          </span>
+                        ))}
+                        <span className="text-xs text-[#94A3B8] ml-1">
+                          ({history.toothObservations.length} teeth)
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center gap-4 text-xs text-[#3D4946] flex-wrap">
                       <span className="flex items-center gap-1">
@@ -518,7 +526,6 @@ export default function MedicalHistoryPage() {
           </div>
         )}
 
-        {/* Results Count */}
         {!loading && !error && allHistories.length > 0 && (
           <div className="flex justify-between items-center">
             <p className="text-sm text-[#3D4946]">
@@ -536,7 +543,7 @@ export default function MedicalHistoryPage() {
         )}
       </main>
 
-      {/* Details Modal - same as before */}
+      {/* Details Modal */}
       {selectedHistory && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -659,6 +666,45 @@ export default function MedicalHistoryPage() {
                 </div>
               </div>
 
+              {/* FDI Tooth Observations - Patient View */}
+              {selectedHistory.toothObservations && selectedHistory.toothObservations.length > 0 && (
+                <div className="bg-[#F8FAFC] rounded-lg p-4">
+                  <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
+                    Tooth Observations ({selectedHistory.toothObservations.length})
+                  </p>
+                  <div className="space-y-2">
+                    {selectedHistory.toothObservations.map((obs) => (
+                      <div
+                        key={obs.id}
+                        className="bg-white border border-[#E2E8F0] rounded-lg p-3"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-[#00685C]">{obs.fdiCode}</span>
+                          <span className="text-xs bg-[#E5EEFF] text-[#435B7E] px-2 py-0.5 rounded-full">
+                            {obs.toothType}
+                          </span>
+                          <span className="text-xs text-[#94A3B8]">{obs.toothLabel}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          {obs.diagnosis && (
+                            <div className="text-xs">
+                              <span className="font-semibold text-[#3D4946]">Diagnosis:</span>
+                              <span className="text-[#485F83] ml-1">{obs.diagnosis}</span>
+                            </div>
+                          )}
+                          {obs.treatment && (
+                            <div className="text-xs">
+                              <span className="font-semibold text-[#3D4946]">Treatment:</span>
+                              <span className="text-[#485F83] ml-1">{obs.treatment}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Clinical Observation */}
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-2">
@@ -681,7 +727,6 @@ export default function MedicalHistoryPage() {
                     {selectedHistory.imageUrls.map((url, i) => (
                       <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                         className="block aspect-square rounded-xl overflow-hidden border border-[#E2E8F0] hover:opacity-90 transition-opacity bg-[#E2E8F0]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt={`Clinical image ${i + 1}`} className="w-full h-full object-cover" />
                       </a>
                     ))}
@@ -743,11 +788,10 @@ export default function MedicalHistoryPage() {
         </div>
       )}
 
-      {/* Review Form Modal - same as before */}
+      {/* Review Form Modal */}
       {showReviewForm && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-[#F1F5F9]">
               <h2 className="text-xl font-bold text-[#0B1C30]">Drop Your Review</h2>
               <button
@@ -766,9 +810,7 @@ export default function MedicalHistoryPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 space-y-4">
-              {/* Success Message */}
               {reviewSuccess && (
                 <div className="bg-[#DCFCE7] text-[#166534] text-sm font-semibold px-4 py-3 rounded-lg flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -778,14 +820,12 @@ export default function MedicalHistoryPage() {
                 </div>
               )}
 
-              {/* Error Message */}
               {reviewError && (
                 <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
                   {reviewError}
                 </div>
               )}
 
-              {/* Rating Stars */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Rating <span className="text-[#93000A]">*</span>
@@ -832,7 +872,6 @@ export default function MedicalHistoryPage() {
                 )}
               </div>
 
-              {/* Review Text */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Your Review <span className="text-[#93000A]">*</span>
@@ -852,7 +891,6 @@ export default function MedicalHistoryPage() {
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="flex justify-end gap-3 p-6 border-t border-[#F1F5F9]">
               <button
                 onClick={closeReviewForm}

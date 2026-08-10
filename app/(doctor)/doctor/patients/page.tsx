@@ -10,7 +10,6 @@ import {
   PatientHistory 
 } from "@/services/patientHistoryService";
 
-// Dynamically import the modal
 const PatientHistoryModal = dynamicImport(
   () => import("@/components/modals/PatientHistoryModal"),
   { ssr: false }
@@ -66,9 +65,7 @@ const PAYMENT_COLORS: Record<string, string> = {
 
 type TabType = "all" | "individual" | "family";
 
-// ✅ Helper function to get patient name from history
 const getPatientDisplayName = (history: PatientHistory): string => {
-  // For family appointments, show the family member name
   if (history.appointmentType === "FAMILY" && history.familyMemberName) {
     return history.familyMemberName;
   }
@@ -87,7 +84,6 @@ export default function DoctorPatientsPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   
-  // Modal state
   const [selectedHistory, setSelectedHistory] = useState<PatientHistory | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -107,7 +103,6 @@ export default function DoctorPatientsPage() {
     if (familyResult) searchFamily(familyResult.currentPage);
   };
 
-  // ✅ Search all histories
   const searchAll = async (page = 0) => {
     const patientId = query.trim();
     if (!patientId) return;
@@ -133,7 +128,6 @@ export default function DoctorPatientsPage() {
         return;
       }
 
-      // ✅ Get the correct patient name from the first history
       const displayName = getPatientDisplayName(histories[0]);
 
       setAllResult({
@@ -164,7 +158,6 @@ export default function DoctorPatientsPage() {
     }
   };
 
-  // ✅ Search individual histories only
   const searchIndividual = async (page = 0) => {
     const patientId = query.trim();
     if (!patientId) return;
@@ -188,7 +181,6 @@ export default function DoctorPatientsPage() {
         return;
       }
 
-      // ✅ For individual tab, use the patient name from the history
       const displayName = histories[0]?.patientName || "Unknown Patient";
 
       setIndividualResult({
@@ -218,7 +210,6 @@ export default function DoctorPatientsPage() {
     }
   };
 
-  // ✅ Search family histories only
   const searchFamily = async (page = 0) => {
     const patientId = query.trim();
     if (!patientId) return;
@@ -242,8 +233,6 @@ export default function DoctorPatientsPage() {
         return;
       }
 
-      // ✅ For family tab, show the head patient name
-      // The head patient name is the patientName field
       const displayName = histories[0]?.patientName || "Unknown Patient";
 
       setFamilyResult({
@@ -273,7 +262,6 @@ export default function DoctorPatientsPage() {
     }
   };
 
-  // Main search function
   const search = async (page = 0) => {
     const patientId = query.trim();
     if (!patientId) return;
@@ -283,7 +271,6 @@ export default function DoctorPatientsPage() {
     setHasSearched(true);
 
     try {
-      // Search all histories
       const allRes = await fetchPatientHistoriesById(patientId, page, 10);
       
       if (allRes.success && allRes.data.content.length > 0) {
@@ -311,7 +298,6 @@ export default function DoctorPatientsPage() {
         setAllResult(null);
       }
 
-      // Search individual histories
       const individualRes = await fetchIndividualHistoriesById(patientId, 0, 100);
       if (individualRes.success && individualRes.data.content.length > 0) {
         const displayName = individualRes.data.content[0]?.patientName || "Unknown Patient";
@@ -338,10 +324,8 @@ export default function DoctorPatientsPage() {
         setIndividualResult(null);
       }
 
-      // Search family histories
       const familyRes = await fetchFamilyHistoriesById(patientId, 0, 100);
       if (familyRes.success && familyRes.data.content.length > 0) {
-        // ✅ For family tab, show the head patient name
         const displayName = familyRes.data.content[0]?.patientName || "Unknown Patient";
         setFamilyResult({
           patient: {
@@ -413,7 +397,6 @@ export default function DoctorPatientsPage() {
 
   const renderHistories = (histories: PatientHistory[]) => {
     return histories.map(h => {
-      // ✅ Determine the display name for this history
       const displayName = h.appointmentType === "FAMILY" && h.familyMemberName 
         ? h.familyMemberName 
         : h.patientName;
@@ -423,11 +406,9 @@ export default function DoctorPatientsPage() {
           key={h.id}
           className="bg-white border border-[#F1F5F9] rounded-xl p-5 shadow-sm flex flex-col gap-3 hover:border-[#00685C]/30 transition-colors"
         >
-          {/* Row 1: doctor + date + badges */}
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                {/* ✅ Make patient name bold and prominent */}
                 <p className="text-base font-bold text-[#0B1C30]">
                   {displayName}
                 </p>
@@ -445,13 +426,11 @@ export default function DoctorPatientsPage() {
               <p className="text-xs text-[#94A3B8] mt-0.5">
                 Doctor: {h.doctorName} • {formatDate(h.appointmentDate)}
               </p>
-              {/* ✅ Show family member name more prominently */}
               {h.appointmentType === "FAMILY" && h.familyMemberName && (
                 <p className="text-sm font-semibold text-[#00685C] mt-0.5">
                   👤 Family Member: {h.familyMemberName}
                 </p>
               )}
-              {/* ✅ Show head patient for family appointments */}
               {h.appointmentType === "FAMILY" && h.patientName && h.patientName !== h.familyMemberName && (
                 <p className="text-xs text-[#94A3B8]">
                   Head Patient: {h.patientName}
@@ -468,12 +447,28 @@ export default function DoctorPatientsPage() {
             </div>
           </div>
 
-          {/* Row 2: observation */}
           <p className="text-sm text-[#485F83] leading-relaxed bg-[#F8FAFC] rounded-lg px-4 py-3">
             {h.observation || "No observation recorded."}
           </p>
 
-          {/* Row 3: amount + link */}
+          {/* FDI Tooth Observations Summary */}
+          {h.toothObservations && h.toothObservations.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {h.toothObservations.map((obs) => (
+                <span
+                  key={obs.id}
+                  className="text-xs bg-[#F0FDFA] border border-[#00685C]/20 text-[#00685C] px-2 py-0.5 rounded-full"
+                  title={`${obs.fdiCode}: ${obs.toothLabel}`}
+                >
+                  {obs.fdiCode}
+                </span>
+              ))}
+              <span className="text-xs text-[#94A3B8] ml-1">
+                ({h.toothObservations.length} teeth)
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[#3D4946]">
@@ -508,7 +503,6 @@ export default function DoctorPatientsPage() {
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10 flex flex-col gap-6">
 
-        {/* Search bar */}
         <div className="flex flex-col gap-2">
           <h2 className="text-xl font-bold text-[#0B1C30]">Patient History Search</h2>
           <p className="text-sm text-[#94A3B8]">
@@ -553,10 +547,8 @@ export default function DoctorPatientsPage() {
           </div>
         </div>
 
-        {/* Separator line between search and results */}
         <hr className="border-[#E2E8F0]" />
 
-        {/* Error */}
         {error && (
           <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-xl flex items-center gap-3">
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -566,7 +558,6 @@ export default function DoctorPatientsPage() {
           </div>
         )}
 
-        {/* Empty state */}
         {!hasSearched && !error && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-16 h-16 bg-[#F0FDFA] rounded-full flex items-center justify-center">
@@ -581,10 +572,8 @@ export default function DoctorPatientsPage() {
           </div>
         )}
 
-        {/* Results - Tabs */}
         {currentResult && (
           <div className="flex flex-col gap-5">
-            {/* Patient summary card */}
             <div className="bg-white border border-[#F1F5F9] rounded-xl p-5 shadow-sm flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-[#CCFBF1] flex items-center justify-center text-base font-bold text-[#0F766E] flex-shrink-0">
                 {currentResult.patient.initials}
@@ -601,7 +590,6 @@ export default function DoctorPatientsPage() {
               </div>
             </div>
 
-            {/* Tabs */}
             <div className="flex border-b border-[#E2E8F0]">
               <button
                 onClick={() => setActiveTab("all")}
@@ -635,7 +623,6 @@ export default function DoctorPatientsPage() {
               </button>
             </div>
 
-            {/* History records */}
             {currentResult.histories.length === 0 ? (
               <div className="bg-white border border-[#F1F5F9] rounded-xl p-10 text-center shadow-sm">
                 <p className="text-sm text-[#94A3B8]">No {activeTab} history records found for this patient.</p>
@@ -646,7 +633,6 @@ export default function DoctorPatientsPage() {
               </div>
             )}
 
-            {/* Pagination */}
             {currentResult.totalPages > 1 && (
               <div className="flex items-center justify-between">
                 <p className="text-sm text-[#3D4946]">
@@ -687,7 +673,6 @@ export default function DoctorPatientsPage() {
         )}
       </main>
 
-      {/* Patient History Modal */}
       <PatientHistoryModal
         isOpen={isModalOpen}
         onClose={closeHistoryModal}

@@ -1,17 +1,30 @@
 // services/patientHistoryService.ts
 import api from "@/lib/axios";
 
-export interface PatientHistoryResponse {
-  success: boolean;
-  message: string;
-  data: {
-    content: PatientHistory[];
-    totalElements: number;
-    totalPages: number;
-    size: number;
-    number: number;
-  };
+// ============================================
+// TOOTH OBSERVATION TYPES (FDI)
+// ============================================
+
+export interface ToothObservation {
+  id: string;
+  fdiCode: string;
+  toothType: "PERMANENT" | "PRIMARY";
+  toothLabel: string;
+  diagnosis: string;
+  treatment: string;
+  createdAt: string;
 }
+
+export interface AddToothObservationRequest {
+  fdiCode: string;
+  toothType: "PERMANENT" | "PRIMARY";
+  diagnosis: string;
+  treatment: string;
+}
+
+// ============================================
+// PATIENT HISTORY TYPES
+// ============================================
 
 export interface PatientHistory {
   id: string;
@@ -33,48 +46,27 @@ export interface PatientHistory {
   familyMemberId?: string;
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
+  // Tooth observations (FDI)
+  toothObservations?: ToothObservation[];
 }
 
-export const fetchPatientHistories = async (
-  page = 0,
-  size = 10,
-  search?: string,
-  paymentStatus?: string
-): Promise<PatientHistoryResponse> => {
-
-  const params: any = {
-    page,
-    size,
+export interface PatientHistoryResponse {
+  success: boolean;
+  message: string;
+  data: {
+    content: PatientHistory[];
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;
   };
+}
 
-  if (search) {
-    params.search = search;
-  }
-
-  if (paymentStatus && paymentStatus !== "All") {
-    params.paymentStatus = paymentStatus;
-  }
-
-  const response = await api.get("/patient-history/all", {
-    params,
-  });
-
-  return response.data;
-};
-
-
-
-export const fetchPatientHistoriesById = async (
-  patientId: string,
-  page = 0,
-  size = 10
-): Promise<PatientHistoryResponse> => {
-  const res = await api.get<PatientHistoryResponse>(
-    `/patient-history/patient/${patientId}`,
-    { params: { page, size } }
-  );
-  return res.data;
-};
+export interface SinglePatientHistoryResponse {
+  success: boolean;
+  message: string;
+  data: PatientHistory;
+}
 
 export interface RecordPaymentResponse {
   success: boolean;
@@ -97,32 +89,6 @@ export interface RecordPaymentResponse {
   };
 }
 
-export const recordPayment = async (
-  historyId: string,
-  amount: number
-): Promise<RecordPaymentResponse> => {
-  const res = await api.post(
-    `/patient-history/${historyId}/payment`,
-    { amount }
-  );
-  return res.data;
-};
-
-export const markPaymentUnpaid = async (historyId: string): Promise<RecordPaymentResponse> => {
-  const res = await api.patch(
-    `/patient-history/${historyId}/mark-unpaid`
-  );
-  return res.data;
-};
-
-// fetchPayments is an alias for fetchPatientHistories — uses the correct endpoint
-export const fetchPayments = async (page = 0, size = 10): Promise<PatientHistoryResponse> => {
-  const response = await api.get("/patient-history/all", {
-    params: { page, size },
-  });
-  return response.data;
-};
-
 export interface PaymentStatsResponse {
   success: boolean;
   message: string;
@@ -139,13 +105,56 @@ export interface PaymentStatsResponse {
   };
 }
 
-export const fetchPaymentStats = async (): Promise<PaymentStatsResponse> => {
-  const res = await api.get("/admin/payments/stats");
-  return res.data;
+export interface CreatePatientHistoryRequest {
+  appointmentId: string;
+  amount: number;
+}
+
+export interface UpdateObservationRequest {
+  observation: string;
+}
+
+// ============================================
+// API FUNCTIONS
+// ============================================
+
+export const fetchPatientHistories = async (
+  page = 0,
+  size = 10,
+  search?: string,
+  paymentStatus?: string
+): Promise<PatientHistoryResponse> => {
+  const params: any = {
+    page,
+    size,
+  };
+
+  if (search) {
+    params.search = search;
+  }
+
+  if (paymentStatus && paymentStatus !== "All") {
+    params.paymentStatus = paymentStatus;
+  }
+
+  const response = await api.get("/patient-history/all", {
+    params,
+  });
+
+  return response.data;
 };
 
-
-// In patientHistoryService.ts - add these functions
+export const fetchPatientHistoriesById = async (
+  patientId: string,
+  page = 0,
+  size = 10
+): Promise<PatientHistoryResponse> => {
+  const res = await api.get<PatientHistoryResponse>(
+    `/patient-history/patient/${patientId}`,
+    { params: { page, size } }
+  );
+  return res.data;
+};
 
 export const fetchIndividualHistoriesById = async (
   patientId: string,
@@ -171,7 +180,6 @@ export const fetchFamilyHistoriesById = async (
   return res.data;
 };
 
-
 export const fetchMyPatientHistories = async (
   page = 0,
   size = 10
@@ -182,15 +190,8 @@ export const fetchMyPatientHistories = async (
       params: { page, size },
     }
   );
-
   return res.data;
 };
-
-export interface SinglePatientHistoryResponse {
-  success: boolean;
-  message: string;
-  data: PatientHistory;
-}
 
 export const fetchPatientHistoryById = async (
   id: string
@@ -199,112 +200,17 @@ export const fetchPatientHistoryById = async (
   return res.data;
 };
 
-
-export interface CreatePatientHistoryRequest {
-  appointmentId: string;
-  amount: number;
-}
-
-export const createPatientHistory = async (
-  payload: CreatePatientHistoryRequest
-): Promise<SinglePatientHistoryResponse> => {
-  const res = await api.post("/patient-history", payload);
-
-  return res.data;
+export const fetchPayments = async (page = 0, size = 10): Promise<PatientHistoryResponse> => {
+  const response = await api.get("/patient-history/all", {
+    params: { page, size },
+  });
+  return response.data;
 };
 
-export interface UpdateObservationRequest {
-  observation: string;
-}
-
-export const updateObservation = async (
-  historyId: string,
-  payload: UpdateObservationRequest
-): Promise<SinglePatientHistoryResponse> => {
-  const res = await api.patch(
-    `/patient-history/${historyId}/observation`,
-    payload
-  );
-
+export const fetchPaymentStats = async (): Promise<PaymentStatsResponse> => {
+  const res = await api.get("/admin/payments/stats");
   return res.data;
 };
-
-export const completePatientHistory = async (
-  historyId: string
-): Promise<SinglePatientHistoryResponse> => {
-  const res = await api.patch(
-    `/patient-history/${historyId}/complete`
-  );
-
-  return res.data;
-};
-
-export const uploadHistoryImage = async (
-  historyId: string,
-  file: File
-): Promise<SinglePatientHistoryResponse> => {
-  const formData = new FormData();
-
-  formData.append("file", file);
-
-  const res = await api.post(
-    `/patient-history/${historyId}/upload/image`,
-    formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }
-  );
-
-  return res.data;
-};
-
-export const uploadHistoryVideo = async (
-  historyId: string,
-  file: File
-): Promise<SinglePatientHistoryResponse> => {
-  const formData = new FormData();
-
-  formData.append("file", file);
-
-  const res = await api.post(
-    `/patient-history/${historyId}/upload/video`,
-    formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }
-  );
-
-  return res.data;
-};
-
-
-export const deleteHistoryImage = async (
-  historyId: string,
-  imageId: string
-): Promise<SinglePatientHistoryResponse> => {
-  const res = await api.delete(
-    `/patient-history/${historyId}/image/${imageId}`
-  );
-
-  return res.data;
-};
-
-
-export const deleteHistoryVideo = async (
-  historyId: string,
-  videoId: string
-): Promise<SinglePatientHistoryResponse> => {
-  const res = await api.delete(
-    `/patient-history/${historyId}/video/${videoId}`
-  );
-
-  return res.data;
-};
-
 
 export const searchPayments = async (
   name: string,
@@ -318,6 +224,125 @@ export const searchPayments = async (
       size,
     },
   });
-
   return response.data;
+};
+
+export const createPatientHistory = async (
+  payload: CreatePatientHistoryRequest
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.post("/patient-history", payload);
+  return res.data;
+};
+
+export const updateObservation = async (
+  historyId: string,
+  payload: UpdateObservationRequest
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.patch(
+    `/patient-history/${historyId}/observation`,
+    payload
+  );
+  return res.data;
+};
+
+export const completePatientHistory = async (
+  historyId: string
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.patch(`/patient-history/${historyId}/complete`);
+  return res.data;
+};
+
+export const recordPayment = async (
+  historyId: string,
+  amount: number
+): Promise<RecordPaymentResponse> => {
+  const res = await api.post(
+    `/patient-history/${historyId}/payment`,
+    { amount }
+  );
+  return res.data;
+};
+
+export const markPaymentUnpaid = async (historyId: string): Promise<RecordPaymentResponse> => {
+  const res = await api.patch(`/patient-history/${historyId}/mark-unpaid`);
+  return res.data;
+};
+
+export const uploadHistoryImage = async (
+  historyId: string,
+  file: File
+): Promise<SinglePatientHistoryResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await api.post(
+    `/patient-history/${historyId}/upload/image`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+  return res.data;
+};
+
+export const uploadHistoryVideo = async (
+  historyId: string,
+  file: File
+): Promise<SinglePatientHistoryResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await api.post(
+    `/patient-history/${historyId}/upload/video`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+  return res.data;
+};
+
+export const deleteHistoryImage = async (
+  historyId: string,
+  imageId: string
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.delete(`/patient-history/${historyId}/image/${imageId}`);
+  return res.data;
+};
+
+export const deleteHistoryVideo = async (
+  historyId: string,
+  videoId: string
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.delete(`/patient-history/${historyId}/video/${videoId}`);
+  return res.data;
+};
+
+// ============================================
+// FDI TOOTH OBSERVATION API FUNCTIONS
+// ============================================
+
+export const addToothObservation = async (
+  historyId: string,
+  request: AddToothObservationRequest
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.post(
+    `/patient-history/${historyId}/tooth-observation`,
+    request
+  );
+  return res.data;
+};
+
+export const deleteToothObservation = async (
+  historyId: string,
+  toothObservationId: string
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.delete(
+    `/patient-history/${historyId}/tooth-observation/${toothObservationId}`
+  );
+  return res.data;
 };
