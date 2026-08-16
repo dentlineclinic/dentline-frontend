@@ -8,13 +8,15 @@ import {
   getBroadcastRecipients,
   sendBroadcast,
   getBroadcastHistory,
+  importRecipientsFromCsv,
   type BroadcastRecipient,
   type BroadcastHistoryDto,
+  type ImportRecipientsResponse,
 } from "@/services/broadcastService";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "send" | "recipients" | "history";
+type Tab = "send" | "recipients" | "history" | "import";
 
 function Spinner({ small }: { small?: boolean }) {
   return (
@@ -118,6 +120,11 @@ export default function BroadcastPage() {
   const [histTotal, setHistTotal] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // ── CSV Import ────────────────────────────────────────────────────────────
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportRecipientsResponse | null>(null);
+
   const loadHistory = useCallback(async (p: number) => {
     setHistLoading(true);
     setHistError(null);
@@ -142,6 +149,25 @@ export default function BroadcastPage() {
     if (tab === "history") loadHistory(histPage);
   }, [tab, histPage, loadHistory]);
 
+  // ── CSV import handler ────────────────────────────────────────────────────
+  const handleImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) { toast.error("Please select a CSV file."); return; }
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await importRecipientsFromCsv(importFile);
+      setImportResult(res.data);
+      toast.success(`Imported ${res.data.successCount} recipient${res.data.successCount !== 1 ? "s" : ""} from ${res.data.fileName}`);
+      // Refresh recipient count if on recipients tab
+      if (tab === "recipients") loadRecipients(0);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to import CSV.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar title="Broadcasts" subtitle="Send email broadcasts to subscribers" />
@@ -150,7 +176,7 @@ export default function BroadcastPage() {
 
         {/* Tab bar */}
         <div className="flex gap-0 border-b border-[#F1F5F9]">
-          {(["send", "recipients", "history"] as Tab[]).map(t => (
+          {(["send", "recipients", "history", "import"] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -162,6 +188,7 @@ export default function BroadcastPage() {
             >
               {t === "send"       ? "Send Broadcast"
                : t === "recipients" ? `Recipients${recTotal > 0 ? ` (${recTotal})` : ""}`
+               : t === "import"     ? "Import CSV"
                : "History"}
             </button>
           ))}
@@ -477,6 +504,181 @@ export default function BroadcastPage() {
                 <button disabled={histPage === 0} onClick={() => setHistPage(p => p - 1)} className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#3D4946] hover:bg-[#F8FAFC] disabled:opacity-50 transition-colors">Previous</button>
                 <span className="text-sm text-[#3D4946]">Page {histPage + 1} of {histTotalPages}</span>
                 <button disabled={histPage >= histTotalPages - 1} onClick={() => setHistPage(p => p + 1)} className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#3D4946] hover:bg-[#F8FAFC] disabled:opacity-50 transition-colors">Next</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ──────────────────────────────────────────────────────────────────
+            IMPORT CSV TAB
+        ────────────────────────────────────────────────────────────────── */}
+        {tab === "import" && (
+          <div className="flex flex-col gap-6 max-w-2xl">
+
+            {/* Instructions card */}
+            <div className="bg-[#F0FDFA] border border-[#00685C]/20 rounded-xl p-5 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-[#00685C] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm font-bold text-[#00685C]">Google Forms CSV Format</p>
+              </div>
+              <p className="text-xs text-[#3D4946] leading-relaxed">
+                Upload a CSV exported from the clinic's Google Forms registration form.
+                The file must follow the standard column structure:
+                <strong> First Name</strong> (column 3) and <strong>Email address</strong> (column 13).
+                Duplicate emails and invalid addresses are automatically skipped.
+              </p>
+              <a
+                href={`${process.env.NEXT_PUBLIC_API_URL}/admin/broadcasts/sample-csv`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-[#00685C] hover:underline w-fit flex items-center gap-1 mt-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Download sample CSV template
+              </a>
+            </div>
+
+            {/* Upload form */}
+            <form onSubmit={handleImport} className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm flex flex-col gap-5">
+              <div>
+                <h2 className="text-base font-bold text-[#0B1C30]">Upload CSV File</h2>
+                <p className="text-sm text-[#94A3B8] mt-0.5">
+                  Works with all clinic Google Forms exports (Gbagada, Ikeja, Surulere, etc.)
+                </p>
+              </div>
+
+              {/* Drop zone */}
+              <div
+                className={`relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors ${
+                  importFile
+                    ? "border-[#00685C] bg-[#F0FDFA]"
+                    : "border-[#BDC9C5] bg-[#F8FAFC] hover:border-[#00685C] hover:bg-[#F0FDFA]/50"
+                }`}
+                onClick={() => document.getElementById("csv-file-input")?.click()}
+              >
+                <input
+                  id="csv-file-input"
+                  type="file"
+                  accept=".csv,text/csv,application/vnd.ms-excel,text/plain"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0] ?? null;
+                    setImportFile(f);
+                    setImportResult(null);
+                  }}
+                />
+                {importFile ? (
+                  <>
+                    <svg className="w-10 h-10 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm font-semibold text-[#00685C]">{importFile.name}</p>
+                    <p className="text-xs text-[#3D4946]">
+                      {(importFile.size / 1024).toFixed(1)} KB · Click to change
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-10 h-10 text-[#94A3B8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-sm font-semibold text-[#3D4946]">Click to upload CSV</p>
+                    <p className="text-xs text-[#94A3B8]">CSV files only · Any size</p>
+                  </>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={importing || !importFile}
+                  className="flex items-center justify-center gap-2 bg-[#00685C] text-white font-semibold text-sm px-6 py-3 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {importing ? (
+                    <><Spinner small /> Importing…</>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Import Recipients
+                    </>
+                  )}
+                </button>
+                {importFile && !importing && (
+                  <button
+                    type="button"
+                    onClick={() => { setImportFile(null); setImportResult(null); }}
+                    className="text-sm font-semibold text-[#3D4946] border border-[#E2E8F0] px-5 py-3 rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {/* Import result */}
+            {importResult && (
+              <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm flex flex-col gap-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="text-sm font-bold text-[#0B1C30]">Import Results</h3>
+                  <span className="text-xs text-[#94A3B8] truncate max-w-[260px]">{importResult.fileName}</span>
+                </div>
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: "Processed",   value: importResult.totalProcessed, color: "text-[#0B1C30]",  bg: "bg-[#F8FAFC]" },
+                    { label: "Imported",    value: importResult.successCount,   color: "text-[#166534]",  bg: "bg-[#DCFCE7]" },
+                    { label: "Duplicates",  value: importResult.duplicateEmails?.length ?? 0, color: "text-[#92400E]", bg: "bg-[#FEF3C7]" },
+                    { label: "Invalid",     value: importResult.failedCount,    color: "text-[#93000A]",  bg: "bg-[#FFDAD6]" },
+                  ].map(({ label, value, color, bg }) => (
+                    <div key={label} className={`${bg} rounded-lg p-3 text-center`}>
+                      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                      <p className="text-xs text-[#3D4946] mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-sm text-[#3D4946]">{importResult.message}</p>
+
+                {/* Duplicate emails */}
+                {importResult.duplicateEmails?.length > 0 && (
+                  <details className="group">
+                    <summary className="text-xs font-semibold text-[#92400E] cursor-pointer hover:underline list-none flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      {importResult.duplicateEmails.length} duplicate email{importResult.duplicateEmails.length !== 1 ? "s" : ""} skipped
+                    </summary>
+                    <div className="mt-2 bg-[#FEF3C7] rounded-lg p-3 max-h-32 overflow-y-auto">
+                      {importResult.duplicateEmails.map((email, i) => (
+                        <p key={`dup-${i}`} className="text-xs text-[#92400E] font-mono">{email}</p>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
+                {/* Failed emails */}
+                {importResult.failedEmails?.length > 0 && (
+                  <details className="group">
+                    <summary className="text-xs font-semibold text-[#93000A] cursor-pointer hover:underline list-none flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      {importResult.failedEmails.length} invalid email{importResult.failedEmails.length !== 1 ? "s" : ""} skipped
+                    </summary>
+                    <div className="mt-2 bg-[#FFDAD6] rounded-lg p-3 max-h-32 overflow-y-auto">
+                      {importResult.failedEmails.map((email, i) => (
+                        <p key={`fail-${i}`} className="text-xs text-[#93000A] font-mono">{email}</p>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
             )}
           </div>

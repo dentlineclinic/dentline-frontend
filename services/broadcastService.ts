@@ -55,7 +55,26 @@ export const sendBroadcast = async (payload: {
   return res.data;
 };
 
-// ── History ───────────────────────────────────────────────────────────────────
+// ── CSV Import ────────────────────────────────────────────────────────────────
+
+export interface ImportRecipientsResponse {
+  fileName: string;
+  totalProcessed: number;
+  successCount: number;
+  failedCount: number;
+  failedEmails: string[];
+  duplicateEmails: string[];
+  message: string;
+}
+
+export const importRecipientsFromCsv = async (
+  file: File
+): Promise<{ success: boolean; message: string; data: ImportRecipientsResponse }> => {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await api.post("/admin/broadcasts/import", form);
+  return res.data;
+};
 
 export const getBroadcastHistory = async (
   page = 0,
