@@ -1,6 +1,64 @@
 import api from "@/lib/axios";
 
 
+// Add this to your doctorService.ts file
+
+export interface AssignedAppointmentsResponse {
+  success: boolean;
+  message: string;
+  data: {
+    content: DoctorAppointment[];
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;
+  };
+}
+
+export const fetchAssignedDoctorAppointments = async (
+  page = 0,
+  size = 10
+): Promise<AssignedAppointmentsResponse> => {
+  const res = await api.get("/appointments/doctor/assigned", {
+    params: { page, size },
+  });
+  return res.data;
+};
+
+// Add to doctorService.ts
+
+export const searchDoctorAppointments = async (
+  name: string,
+  page = 0,
+  size = 10
+): Promise<DoctorAppointmentsResponse> => {
+  const res = await api.get("/appointments/doctor/search", {
+    params: { name, page, size },
+  });
+  return res.data;
+};
+
+export const searchDoctorHistories = async (
+  name: string,
+  page = 0,
+  size = 10
+): Promise<{
+  success: boolean;
+  message: string;
+  data: {
+    content: any[];
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;
+  };
+}> => {
+  const res = await api.get("/patient-history/doctor/search", {
+    params: { name, page, size },
+  });
+  return res.data;
+};
+
 export interface Doctor {
   id: string;
   name: string;

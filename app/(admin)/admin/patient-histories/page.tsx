@@ -210,8 +210,8 @@ export default function PatientHistoriesPage() {
     loadStats();
   }, [loadStats]);
 
-  // Client-side filtering for search
-  const visible = histories;
+  // REMOVE THIS LINE - No client-side filtering needed
+  // const visible = histories;
 
   // Current page completion rate (for UI feedback only, not for totals)
   const currentPageCompletedCount = histories.filter(h => h.status === "COMPLETED").length;
@@ -421,14 +421,14 @@ export default function PatientHistoriesPage() {
                       ))}
                     </tr>
                   ))
-                ) : visible.length === 0 ? (
+                ) : histories.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No patient history records found.
                     </td>
                   </tr>
                 ) : (
-                  visible.map((h) => {
+                  histories.map((h) => {
                     const isFamily = h.appointmentType === "FAMILY";
                     
                     return (
@@ -520,10 +520,10 @@ export default function PatientHistoriesPage() {
           </div>
         )}
 
-        {/* Record count */}
+        {/* Record count - UPDATED to use histories.length directly */}
         {!loading && (
           <p className="text-sm text-[#3D4946]">
-            Showing {visible.length} of {totalElements} records
+            Showing {histories.length} of {totalElements} records
           </p>
         )}
       </main>

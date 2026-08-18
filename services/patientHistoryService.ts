@@ -129,15 +129,20 @@ export const fetchPatientHistories = async (
     size,
   };
 
-  if (search) {
-    params.search = search;
-  }
-
+  // Add payment status filter if provided and not "All"
   if (paymentStatus && paymentStatus !== "All") {
     params.paymentStatus = paymentStatus;
   }
 
-  const response = await api.get("/patient-history/all", {
+  let endpoint = "/patient-history/all";
+  
+  // If search term is provided, use the search endpoint
+  if (search && search.trim()) {
+    endpoint = "/patient-history/search";
+    params.name = search.trim();
+  }
+
+  const response = await api.get(endpoint, {
     params,
   });
 
