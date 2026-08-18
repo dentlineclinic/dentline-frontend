@@ -56,16 +56,11 @@ export const completeRegistration = async (payload: {
   const response = await api.post("/auth/register", payload);
   return response;
 };
-export const requestAdminOtp = async (payload: { email: string }) => {
-  const response = await api.post("/auth/otp/request", payload);
-  return response;
-};
-
-export const verifyAdminOtp = async (payload: {
+export const adminLogin = async (payload: {
   email: string;
-  otp: string;
+  password: string;
 }) => {
-  const response = await api.post("/auth/otp/verify", payload);
+  const response = await api.post("/auth/admin/login", payload);
   return response;
 };
 

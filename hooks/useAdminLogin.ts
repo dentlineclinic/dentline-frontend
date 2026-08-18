@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
-import { verifyAdminOtp } from "@/services/authService";
+import { adminLogin } from "@/services/authService";
 import { applyAuthSuccess } from "@/lib/auth";
 
-export const useVerifyAdminOtp = () => {
+export const useAdminLogin = () => {
   return useMutation({
-    mutationFn: verifyAdminOtp,
+    mutationFn: adminLogin,
     onSuccess: (response) => {
       applyAuthSuccess(response.data.data);
     },

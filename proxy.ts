@@ -47,7 +47,7 @@ export function proxy(request: NextRequest) {
     if (!validRole) {
       const loginUrl =
         pathname === "/admin" || pathname.startsWith("/admin/")
-          ? "/admin-login/request-otp"
+          ? "/admin-login/login"
           : "/login";
       return NextResponse.redirect(new URL(loginUrl, request.url), 307);
     }
