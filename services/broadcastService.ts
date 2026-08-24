@@ -17,6 +17,9 @@ export interface BroadcastHistoryDto {
   recipientCount: number;
   createdBy: string;
   createdAt: string;
+  flyerImageUrl?: string | null;
+  imagePosition?: string | null;
+  imageWidth?: number | null;
 }
 
 export interface PageResponse<T> {
@@ -47,11 +50,25 @@ export const getBroadcastRecipients = async (
 
 // ── Send broadcast ────────────────────────────────────────────────────────────
 
-export const sendBroadcast = async (payload: {
-  subject: string;
-  body: string;
-}): Promise<{ success: boolean; message: string; data: BroadcastHistoryDto }> => {
-  const res = await api.post("/admin/broadcasts", payload);
+/**
+ * Send a broadcast email with optional flyer image
+ * 
+ * @param formData - FormData containing:
+ *   - subject: string (required)
+ *   - body: string (required)
+ *   - flyerImage: File (optional) - image file upload
+ *   - flyerImageUrl: string (optional) - image URL
+ *   - imagePosition: string (optional) - 'top' | 'middle' | 'bottom' (default: 'middle')
+ *   - imageWidth: number (optional) - 1-100 (default: 80)
+ */
+export const sendBroadcast = async (
+  formData: FormData
+): Promise<{ success: boolean; message: string; data: BroadcastHistoryDto }> => {
+  const res = await api.post("/admin/broadcasts", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return res.data;
 };
 
@@ -72,7 +89,11 @@ export const importRecipientsFromCsv = async (
 ): Promise<{ success: boolean; message: string; data: ImportRecipientsResponse }> => {
   const form = new FormData();
   form.append("file", file);
-  const res = await api.post("/admin/broadcasts/import", form);
+  const res = await api.post("/admin/broadcasts/import", form, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return res.data;
 };
 

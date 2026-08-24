@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "react-toastify";
 import TopBar from "@/components/layout/TopBar";
 import {
@@ -47,6 +47,14 @@ export default function BroadcastPage() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  
+  // Flyer image states
+  const [flyerImage, setFlyerImage] = useState<File | null>(null);
+  const [flyerImageUrl, setFlyerImageUrl] = useState<string>("");
+  const [imagePosition, setImagePosition] = useState<string>("middle");
+  const [imageWidth, setImageWidth] = useState<number>(80);
+  const [flyerPreview, setFlyerPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,16 +62,74 @@ export default function BroadcastPage() {
     if (!body.trim())    { toast.error("Message body is required."); return; }
     setSending(true);
     try {
-      const res = await sendBroadcast({ subject: subject.trim(), body: body.trim() });
+      const formData = new FormData();
+      formData.append("subject", subject.trim());
+      formData.append("body", body.trim());
+      formData.append("imagePosition", imagePosition);
+      formData.append("imageWidth", String(imageWidth));
+      
+      if (flyerImage) {
+        formData.append("flyerImage", flyerImage);
+      } else if (flyerImageUrl.trim()) {
+        formData.append("flyerImageUrl", flyerImageUrl.trim());
+      }
+      
+      const res = await sendBroadcast(formData);
       toast.success(
         `Broadcast sent to ${res.data.recipientCount} recipient${res.data.recipientCount !== 1 ? "s" : ""}.`
       );
       setSubject("");
       setBody("");
+      setFlyerImage(null);
+      setFlyerImageUrl("");
+      setFlyerPreview(null);
+      setImagePosition("middle");
+      setImageWidth(80);
     } catch (err: any) {
       toast.error(err.message || "Failed to send broadcast.");
     } finally {
       setSending(false);
+    }
+  };
+
+  // Handle flyer image file selection
+  const handleFlyerImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image file.");
+        e.target.value = "";
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size must be less than 5MB.");
+        e.target.value = "";
+        return;
+      }
+      
+      setFlyerImage(file);
+      setFlyerImageUrl("");
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFlyerPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFlyerImage(null);
+      setFlyerPreview(null);
+    }
+  };
+
+  const clearFlyerImage = () => {
+    setFlyerImage(null);
+    setFlyerImageUrl("");
+    setFlyerPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -159,7 +225,6 @@ export default function BroadcastPage() {
       const res = await importRecipientsFromCsv(importFile);
       setImportResult(res.data);
       toast.success(`Imported ${res.data.successCount} recipient${res.data.successCount !== 1 ? "s" : ""} from ${res.data.fileName}`);
-      // Refresh recipient count if on recipients tab
       if (tab === "recipients") loadRecipients(0);
     } catch (err: any) {
       toast.error(err.message || "Failed to import CSV.");
@@ -237,8 +302,151 @@ export default function BroadcastPage() {
                   <p className="text-xs text-[#94A3B8] text-right">{body.length} characters</p>
                 </div>
 
+                {/* ── Flyer Image Section ── */}
+                <div className="flex flex-col gap-3 border-t border-[#F1F5F9] pt-4">
+                  <div>
+                    <p className="text-sm font-semibold text-[#3D4946]">Flyer / Image (Optional)</p>
+                    <p className="text-xs text-[#94A3B8] mt-0.5">
+                      Upload an image or provide a URL to include in the email.
+                    </p>
+                  </div>
+
+                  {/* Upload Options */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* File Upload */}
+                    <div>
+                      <label className="text-xs font-semibold text-[#3D4946] block mb-1">
+                        Upload Image
+                      </label>
+                      <div 
+                        className={`relative border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                          flyerImage 
+                            ? "border-[#00685C] bg-[#F0FDFA]" 
+                            : "border-[#BDC9C5] hover:border-[#00685C] hover:bg-[#F0FDFA]/50"
+                        }`}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleFlyerImageChange}
+                        />
+                        {flyerImage ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <svg className="w-5 h-5 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-xs font-semibold text-[#00685C]">{flyerImage.name}</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1">
+                            <svg className="w-6 h-6 text-[#94A3B8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-xs text-[#94A3B8]">Click to upload</span>
+                            <span className="text-[10px] text-[#94A3B8]">PNG, JPG, WEBP (max 5MB)</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* URL Input */}
+                    <div>
+                      <label className="text-xs font-semibold text-[#3D4946] block mb-1">
+                        Or Image URL
+                      </label>
+                      <input
+                        type="url"
+                        value={flyerImageUrl}
+                        onChange={e => {
+                          setFlyerImageUrl(e.target.value);
+                          if (e.target.value && !flyerImage) {
+                            setFlyerPreview(e.target.value);
+                          }
+                        }}
+                        placeholder="https://example.com/image.jpg"
+                        className={`${INPUT} py-2 text-sm`}
+                        disabled={!!flyerImage}
+                      />
+                      {flyerImage && (
+                        <p className="text-[10px] text-[#94A3B8] mt-1">
+                          URL disabled while file is selected
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Image Preview */}
+                  {flyerPreview && (
+                    <div className="mt-2 p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-[#3D4946]">Preview</span>
+                        <button
+                          type="button"
+                          onClick={clearFlyerImage}
+                          className="text-xs text-[#93000A] hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="flex justify-center">
+                        <img 
+                          src={flyerPreview} 
+                          alt="Flyer preview" 
+                          className="max-h-48 rounded-lg border border-[#E2E8F0] object-contain"
+                          onError={() => {
+                            if (flyerImageUrl && !flyerImage) {
+                              toast.error("Invalid image URL. Please check the URL.");
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Image Settings */}
+                  {(flyerImage || flyerImageUrl) && (
+                    <div className="grid grid-cols-2 gap-4 mt-1">
+                      <div>
+                        <label className="text-xs font-semibold text-[#3D4946] block mb-1">
+                          Position
+                        </label>
+                        <select
+                          value={imagePosition}
+                          onChange={e => setImagePosition(e.target.value)}
+                          className={`${INPUT} py-2 text-sm`}
+                        >
+                          <option value="top">Top</option>
+                          <option value="middle">Middle</option>
+                          <option value="bottom">Bottom</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-[#3D4946] block mb-1">
+                          Width <span className="text-[10px] font-normal text-[#94A3B8]">(1-100%)</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={imageWidth}
+                          onChange={e => {
+                            const val = parseInt(e.target.value);
+                            if (val >= 1 && val <= 100) {
+                              setImageWidth(val);
+                            }
+                          }}
+                          className={`${INPUT} py-2 text-sm`}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Preview */}
-                {(subject.trim() || body.trim()) && (
+                {(subject.trim() || body.trim() || flyerPreview) && (
                   <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-5">
                     <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest mb-3">Email Preview</p>
                     <div className="flex items-center gap-2 mb-3">
@@ -253,28 +461,53 @@ export default function BroadcastPage() {
                       </div>
                     </div>
                     <p className="text-sm font-bold text-[#0B1C30] mb-2">{subject || "(No subject)"}</p>
+                    
+                    {/* Flyer preview in email */}
+                    {flyerPreview && (
+                      <div className="mb-3 p-2 bg-white rounded border border-[#E2E8F0]">
+                        <img 
+                          src={flyerPreview} 
+                          alt="Flyer" 
+                          className="max-h-32 rounded object-contain mx-auto"
+                          onError={() => {}}
+                        />
+                        <p className="text-[10px] text-[#94A3B8] text-center mt-1">Flyer Image</p>
+                      </div>
+                    )}
+                    
                     <p className="text-sm text-[#485F83] whitespace-pre-wrap leading-relaxed">
                       {body || "(No message)"}
                     </p>
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={sending}
-                  className="flex items-center justify-center gap-2 bg-[#00685C] text-white font-semibold text-sm px-6 py-3 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit"
-                >
-                  {sending ? (
-                    <><Spinner small /> Sending…</>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                      Send Broadcast
-                    </>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={sending}
+                    className="flex items-center justify-center gap-2 bg-[#00685C] text-white font-semibold text-sm px-6 py-3 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sending ? (
+                      <><Spinner small /> Sending…</>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Send Broadcast
+                      </>
+                    )}
+                  </button>
+                  {(flyerImage || flyerImageUrl) && (
+                    <button
+                      type="button"
+                      onClick={clearFlyerImage}
+                      className="text-sm font-semibold text-[#3D4946] border border-[#E2E8F0] px-5 py-3 rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                    >
+                      Remove Image
+                    </button>
                   )}
-                </button>
+                </div>
               </form>
             </div>
           </div>
@@ -469,6 +702,11 @@ export default function BroadcastPage() {
                           <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#E5EEFF] text-[#1E40AF] flex-shrink-0">
                             {broadcast.recipientCount} recipient{broadcast.recipientCount !== 1 ? "s" : ""}
                           </span>
+                          {broadcast.flyerImageUrl && (
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#F0FDFA] text-[#00685C] flex-shrink-0">
+                              📎 Flyer
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-[#94A3B8] flex-wrap">
                           <span>{formatDate(broadcast.createdAt)}</span>
@@ -491,6 +729,25 @@ export default function BroadcastPage() {
                         <p className="text-sm text-[#485F83] whitespace-pre-wrap leading-relaxed bg-[#F8FAFC] rounded-lg p-4">
                           {broadcast.body}
                         </p>
+                        {broadcast.flyerImageUrl && (
+                          <>
+                            <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest mt-4 mb-2">Flyer Image</p>
+                            <div className="bg-[#F8FAFC] rounded-lg p-4">
+                              <img 
+                                src={broadcast.flyerImageUrl} 
+                                alt="Flyer" 
+                                className="max-h-64 rounded-lg border border-[#E2E8F0] object-contain"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                              <p className="text-xs text-[#94A3B8] mt-2">
+                                Position: {broadcast.imagePosition || 'middle'} · 
+                                Width: {broadcast.imageWidth || 80}%
+                              </p>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
