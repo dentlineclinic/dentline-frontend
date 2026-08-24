@@ -26,7 +26,6 @@ export interface AddToothObservationRequest {
 // PATIENT HISTORY TYPES
 // ============================================
 
-// In patientHistoryService.ts
 export interface PatientHistory {
   id: string;
   patientId: string;
@@ -37,17 +36,17 @@ export interface PatientHistory {
   appointmentDate: string;
   observation: string;
   amount: number;
-  discount: number;
-  amountPaid: number;  
   balance: number;
   paymentStatus: string;
   status: string;
   createdAt: string;
   imageUrls: string[];
   videoUrls: string[];
+  // Family appointment fields
   familyMemberId?: string;
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
+  // Tooth observations (FDI)
   toothObservations?: ToothObservation[];
 }
 
@@ -109,7 +108,6 @@ export interface PaymentStatsResponse {
 export interface CreatePatientHistoryRequest {
   appointmentId: string;
   amount: number;
-   discount?: number;
 }
 
 export interface UpdateObservationRequest {

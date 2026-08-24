@@ -23,7 +23,6 @@ type PatientHistory = {
   date: string;
   time: string;
   amount: number;
-  discount: number;
   balance: number;
   paymentStatus: string;
   status: string;
@@ -78,7 +77,7 @@ export default function PatientHistoriesPage() {
   const [paymentFilter, setPaymentFilter] = useState("All");
   const [selectedHistory, setSelectedHistory] = useState<SelectedHistory | null>(null);
 
-  // Stats state
+  // ✅ Stats state
   const [stats, setStats] = useState<PaymentStats | null>(null);
 
   // Pagination state
@@ -91,7 +90,6 @@ export default function PatientHistoriesPage() {
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [createApptId, setCreateApptId] = useState("");
   const [createAmount, setCreateAmount] = useState("");
-  const [createDiscount, setCreateDiscount] = useState(""); // ✅ NEW
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -130,10 +128,14 @@ export default function PatientHistoriesPage() {
     return history.patientName || "Unknown Patient";
   };
 
-  // Load stats from backend
+  // ✅ Load stats from backend - using imported service (NO duplicate /api)
   const loadStats = useCallback(async () => {
     try {
       const res = await fetchPaymentStats();
+
+      // Debug log to check response structure
+      console.log("STATS RESPONSE:", res);
+
       if (res.success) {
         setStats(res.data);
       }
@@ -171,7 +173,6 @@ export default function PatientHistoriesPage() {
             date,
             time,
             amount: h.amount ?? 0,
-            discount: h.discount ?? 0, // ✅ NEW
             balance: h.balance ?? calculateBalance(
               h.amount ?? 0,
               h.paymentStatus || "PENDING"
@@ -204,10 +205,13 @@ export default function PatientHistoriesPage() {
     }
   }, []);
 
-  // Call loadStats on mount only
+  // ✅ Call loadStats on mount only
   useEffect(() => {
     loadStats();
   }, [loadStats]);
+
+  // REMOVE THIS LINE - No client-side filtering needed
+  // const visible = histories;
 
   // Current page completion rate (for UI feedback only, not for totals)
   const currentPageCompletedCount = histories.filter(h => h.status === "COMPLETED").length;
@@ -247,7 +251,6 @@ export default function PatientHistoriesPage() {
   const openCreatePanel = () => {
     setCreateApptId("");
     setCreateAmount("");
-    setCreateDiscount(""); // ✅ NEW
     setCreateError(null);
     setCreateSuccess(null);
     setShowCreatePanel(true);
@@ -270,18 +273,10 @@ export default function PatientHistoriesPage() {
     setCreateSuccess(null);
 
     try {
-      const payload: any = {
+      const res = await createPatientHistory({
         appointmentId: createApptId,
         amount,
-      };
-
-      // ✅ Add discount if provided
-      const discount = parseFloat(createDiscount);
-      if (createDiscount && !isNaN(discount) && discount > 0) {
-        payload.discount = discount;
-      }
-
-      const res = await createPatientHistory(payload);
+      });
 
       if (res.success) {
         setCreateSuccess(res.message || "Patient history created successfully!");
@@ -289,12 +284,11 @@ export default function PatientHistoriesPage() {
         setTimeout(async () => {
           await Promise.all([
             loadHistories(page, size, search, paymentFilter),
-            loadStats(), // Refresh stats after creating
+            loadStats(), // ✅ Refresh stats after creating
           ]);
           setShowCreatePanel(false);
           setCreateApptId("");
           setCreateAmount("");
-          setCreateDiscount("");
         }, 1500);
       } else {
         setCreateError(res.message || "Failed to create patient history.");
@@ -322,7 +316,7 @@ export default function PatientHistoriesPage() {
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10 flex flex-col gap-6">
 
-        {/* Summary Cards - Using backend stats */}
+        {/* ✅ Summary Cards - Using backend stats */}
         {stats ? (
           <div className="grid grid-cols-3 gap-6">
             <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
@@ -366,7 +360,7 @@ export default function PatientHistoriesPage() {
           </div>
         )}
 
-        {/* Current Page Info */}
+        {/* Current Page Info (optional - shows only current page data) */}
         {!loading && histories.length > 0 && (
           <div className="text-xs text-[#94A3B8] bg-[#F8FAFC] rounded-lg px-4 py-2">
             Current page: {histories.length} records ·
@@ -406,10 +400,10 @@ export default function PatientHistoriesPage() {
         {/* Table */}
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px]">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "DISCOUNT", "BALANCE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
+                  {["ID", "PATIENT", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -420,7 +414,7 @@ export default function PatientHistoriesPage() {
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(11)].map((__, j) => (
+                      {[...Array(9)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -429,7 +423,7 @@ export default function PatientHistoriesPage() {
                   ))
                 ) : histories.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={9} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No patient history records found.
                     </td>
                   </tr>
@@ -473,16 +467,6 @@ export default function PatientHistoriesPage() {
                         </td>
                         <td className="px-6 py-4 text-sm font-semibold text-[#0B1C30]">
                           {formatCurrency(h.amount)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`text-sm font-semibold ${h.discount > 0 ? "text-[#0D9488]" : "text-[#94A3B8]"}`}>
-                            {h.discount > 0 ? formatCurrency(h.discount) : "—"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`text-sm font-bold ${h.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
-                            {formatCurrency(h.balance)}
-                          </span>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
@@ -536,7 +520,7 @@ export default function PatientHistoriesPage() {
           </div>
         )}
 
-        {/* Record count */}
+        {/* Record count - UPDATED to use histories.length directly */}
         {!loading && (
           <p className="text-sm text-[#3D4946]">
             Showing {histories.length} of {totalElements} records
@@ -635,19 +619,13 @@ export default function PatientHistoriesPage() {
                 </div>
               </div>
 
-              {/* Financial Information - Updated with Discount */}
+              {/* Financial Information */}
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">Financial Details</p>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <p className="text-xs text-[#94A3B8]">Amount</p>
                     <p className="text-sm font-bold text-[#0B1C30]">{formatCurrency(selectedHistory.amount)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[#94A3B8]">Discount</p>
-                    <p className={`text-sm font-bold ${selectedHistory.discount > 0 ? "text-[#0D9488]" : "text-[#94A3B8]"}`}>
-                      {selectedHistory.discount > 0 ? formatCurrency(selectedHistory.discount) : "—"}
-                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Balance</p>
@@ -812,26 +790,6 @@ export default function PatientHistoriesPage() {
                   disabled={creating}
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
-              </div>
-
-              {/* ✅ NEW: Discount Input */}
-              <div>
-                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Discount <span className="text-xs text-[#94A3B8]">(optional)</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={createDiscount}
-                  onChange={(e) => setCreateDiscount(e.target.value)}
-                  disabled={creating}
-                  className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <p className="text-xs text-[#94A3B8] mt-1">
-                  Discount amount will be subtracted from the total. Balance = Amount - Discount
-                </p>
               </div>
             </div>
 
