@@ -23,6 +23,7 @@ type HistoryRow = {
   time: string;
   amount: number;
   discount: number;
+  amountPaid: number;  // ✅ NEW
   balance: number;
   paymentStatus: string;
 };
@@ -113,6 +114,7 @@ export default function PaymentsPage() {
           time,
           amount: h.amount ?? 0,
           discount: h.discount ?? 0,
+          amountPaid: h.amountPaid ?? 0,  // ✅ NEW
           balance: h.balance ?? 0,
           paymentStatus,
         };
@@ -241,10 +243,10 @@ export default function PaymentsPage() {
 
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px]">
+            <table className="w-full min-w-[1100px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "DOCTOR", "DATE", "AMOUNT", "DISCOUNT", "BALANCE", "PAYMENT STATUS", ""].map((h) => (
+                  {["ID", "PATIENT", "DOCTOR", "DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT STATUS", ""].map((h) => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -255,7 +257,7 @@ export default function PaymentsPage() {
                 {loading && rows.length === 0 ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(9)].map((__, j) => (
+                      {[...Array(10)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -264,7 +266,7 @@ export default function PaymentsPage() {
                   ))
                 ) : visible.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={10} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No payment records found.
                     </td>
                   </tr>
@@ -294,6 +296,7 @@ export default function PaymentsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-[#0B1C30]">{fmt(r.amount)}</td>
                       <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{fmt(r.discount || 0)}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-[#2563EB]">{fmt(r.amountPaid || 0)}</td>
                       <td className="px-6 py-4">
                         <span className={`text-sm font-bold ${r.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
                           {fmt(r.balance)}
@@ -382,6 +385,7 @@ export default function PaymentsPage() {
                 { label: "Date", value: `${selected.date} ${selected.time}` },
                 { label: "Amount", value: fmt(selected.amount) },
                 { label: "Discount", value: fmt(selected.discount || 0) },
+                { label: "Amount Paid", value: fmt(selected.amountPaid || 0) },
                 { label: "Balance", value: fmt(selected.balance) },
               ].map(({ label, value }) => (
                 <div key={label}>

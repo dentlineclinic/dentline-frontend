@@ -37,6 +37,7 @@ export interface PatientHistory {
   observation: string;
   amount: number;
   discount: number;
+  amountPaid: number;  // ✅ NEW
   balance: number;
   paymentStatus: string;
   status: string;
@@ -81,6 +82,7 @@ export interface RecordPaymentResponse {
     observation: string;
     amount: number;
     discount: number;
+    amountPaid: number;  // ✅ NEW
     balance: number;
     paymentStatus: string;
     status: string;

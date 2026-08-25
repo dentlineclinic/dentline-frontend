@@ -24,6 +24,7 @@ type PatientHistory = {
   time: string;
   amount: number;
   discount: number;
+  amountPaid: number;  // ✅ NEW
   balance: number;
   paymentStatus: string;
   status: string;
@@ -163,6 +164,7 @@ export default function PatientHistoriesPage() {
             time,
             amount: h.amount ?? 0,
             discount: h.discount ?? 0,
+            amountPaid: h.amountPaid ?? 0,  // ✅ NEW
             balance: h.balance ?? calculateBalance(
               h.amount ?? 0,
               h.paymentStatus || "PENDING"
@@ -381,10 +383,10 @@ export default function PatientHistoriesPage() {
 
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px]">
+            <table className="w-full min-w-[1200px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "DISCOUNT", "BALANCE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
+                  {["ID", "PATIENT", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -395,7 +397,7 @@ export default function PatientHistoriesPage() {
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(11)].map((__, j) => (
+                      {[...Array(12)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -404,7 +406,7 @@ export default function PatientHistoriesPage() {
                   ))
                 ) : histories.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={12} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No patient history records found.
                     </td>
                   </tr>
@@ -451,6 +453,9 @@ export default function PatientHistoriesPage() {
                         </td>
                         <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">
                           {formatCurrency(h.discount || 0)}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-[#2563EB]">
+                          {formatCurrency(h.amountPaid || 0)}
                         </td>
                         <td className="px-6 py-4 text-sm font-bold">
                           <span className={h.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}>
@@ -602,7 +607,7 @@ export default function PatientHistoriesPage() {
 
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">Financial Details</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   <div>
                     <p className="text-xs text-[#94A3B8]">Amount</p>
                     <p className="text-sm font-bold text-[#0B1C30]">{formatCurrency(selectedHistory.amount)}</p>
@@ -610,6 +615,10 @@ export default function PatientHistoriesPage() {
                   <div>
                     <p className="text-xs text-[#94A3B8]">Discount</p>
                     <p className="text-sm font-bold text-[#0D9488]">{formatCurrency(selectedHistory.discount || 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#94A3B8]">Amount Paid</p>
+                    <p className="text-sm font-bold text-[#2563EB]">{formatCurrency(selectedHistory.amountPaid || 0)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Balance</p>
@@ -752,7 +761,8 @@ export default function PatientHistoriesPage() {
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Amount <span className="text-[#93000A]">*</span>
                 </label>
-                <input                  type="number"
+                <input
+                  type="number"
                   step="0.01"
                   min="0.01"
                   placeholder="0.00"
