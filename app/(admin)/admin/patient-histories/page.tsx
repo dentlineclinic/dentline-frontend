@@ -23,6 +23,7 @@ type PatientHistory = {
   date: string;
   time: string;
   amount: number;
+  discount: number;
   balance: number;
   paymentStatus: string;
   status: string;
@@ -30,7 +31,6 @@ type PatientHistory = {
   createdAt: string;
   imageUrls: string[];
   videoUrls: string[];
-  // Family appointment fields
   familyMemberId?: string;
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
@@ -76,20 +76,17 @@ export default function PatientHistoriesPage() {
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("All");
   const [selectedHistory, setSelectedHistory] = useState<SelectedHistory | null>(null);
-
-  // ✅ Stats state
   const [stats, setStats] = useState<PaymentStats | null>(null);
 
-  // Pagination state
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const size = 10;
 
-  // Create panel state
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [createApptId, setCreateApptId] = useState("");
   const [createAmount, setCreateAmount] = useState("");
+  const [createDiscount, setCreateDiscount] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -98,7 +95,6 @@ export default function PatientHistoriesPage() {
     return paymentStatus === "PAID" ? 0 : amount;
   };
 
-  // Safe date parsing
   const formatDateSafe = (dateString: string | null | undefined) => {
     if (!dateString) return { date: "—", time: "—" };
     const dt = new Date(dateString);
@@ -119,23 +115,16 @@ export default function PatientHistoriesPage() {
       .toUpperCase();
   };
 
-  // Helper to get display name for history
   const getDisplayName = (history: any) => {
-    // For family appointments, show the family member name
     if (history.appointmentType === "FAMILY" && history.familyMemberName) {
       return history.familyMemberName;
     }
     return history.patientName || "Unknown Patient";
   };
 
-  // ✅ Load stats from backend - using imported service (NO duplicate /api)
   const loadStats = useCallback(async () => {
     try {
       const res = await fetchPaymentStats();
-
-      // Debug log to check response structure
-      console.log("STATS RESPONSE:", res);
-
       if (res.success) {
         setStats(res.data);
       }
@@ -173,6 +162,7 @@ export default function PatientHistoriesPage() {
             date,
             time,
             amount: h.amount ?? 0,
+            discount: h.discount ?? 0,
             balance: h.balance ?? calculateBalance(
               h.amount ?? 0,
               h.paymentStatus || "PENDING"
@@ -183,7 +173,6 @@ export default function PatientHistoriesPage() {
             createdAt: h.createdAt ? new Date(h.createdAt).toLocaleString() : "—",
             imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
             videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
-            // Family fields
             familyMemberId: h.familyMemberId,
             familyMemberName: h.familyMemberName,
             appointmentType: h.appointmentType || "INDIVIDUAL",
@@ -205,31 +194,15 @@ export default function PatientHistoriesPage() {
     }
   }, []);
 
-  // ✅ Call loadStats on mount only
   useEffect(() => {
     loadStats();
   }, [loadStats]);
 
-  // REMOVE THIS LINE - No client-side filtering needed
-  // const visible = histories;
-
-  // Current page completion rate (for UI feedback only, not for totals)
   const currentPageCompletedCount = histories.filter(h => h.status === "COMPLETED").length;
   const currentPageCompletionRate = histories.length
     ? Math.round((currentPageCompletedCount / histories.length) * 100)
     : 0;
 
-  const handlePaymentFilterChange = (value: string) => {
-    setPaymentFilter(value);
-    setPage(0);
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
-    setPage(0);
-  };
-
-  // Debounced API calls
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -251,6 +224,7 @@ export default function PatientHistoriesPage() {
   const openCreatePanel = () => {
     setCreateApptId("");
     setCreateAmount("");
+    setCreateDiscount("");
     setCreateError(null);
     setCreateSuccess(null);
     setShowCreatePanel(true);
@@ -268,6 +242,17 @@ export default function PatientHistoriesPage() {
       return;
     }
 
+    const discount = parseFloat(createDiscount) || 0;
+    if (discount < 0) {
+      setCreateError("Discount cannot be negative.");
+      return;
+    }
+
+    if (discount > amount) {
+      setCreateError("Discount cannot exceed the total amount.");
+      return;
+    }
+
     setCreating(true);
     setCreateError(null);
     setCreateSuccess(null);
@@ -276,6 +261,7 @@ export default function PatientHistoriesPage() {
       const res = await createPatientHistory({
         appointmentId: createApptId,
         amount,
+        discount,
       });
 
       if (res.success) {
@@ -284,11 +270,12 @@ export default function PatientHistoriesPage() {
         setTimeout(async () => {
           await Promise.all([
             loadHistories(page, size, search, paymentFilter),
-            loadStats(), // ✅ Refresh stats after creating
+            loadStats(),
           ]);
           setShowCreatePanel(false);
           setCreateApptId("");
           setCreateAmount("");
+          setCreateDiscount("");
         }, 1500);
       } else {
         setCreateError(res.message || "Failed to create patient history.");
@@ -316,7 +303,6 @@ export default function PatientHistoriesPage() {
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10 flex flex-col gap-6">
 
-        {/* ✅ Summary Cards - Using backend stats */}
         {stats ? (
           <div className="grid grid-cols-3 gap-6">
             <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
@@ -348,7 +334,6 @@ export default function PatientHistoriesPage() {
             </div>
           </div>
         ) : (
-          // Loading skeleton for stats
           <div className="grid grid-cols-3 gap-6">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
@@ -360,7 +345,6 @@ export default function PatientHistoriesPage() {
           </div>
         )}
 
-        {/* Current Page Info (optional - shows only current page data) */}
         {!loading && histories.length > 0 && (
           <div className="text-xs text-[#94A3B8] bg-[#F8FAFC] rounded-lg px-4 py-2">
             Current page: {histories.length} records ·
@@ -368,14 +352,13 @@ export default function PatientHistoriesPage() {
           </div>
         )}
 
-        {/* Filters */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <input
               type="search"
               placeholder="Search by patient, doctor or ID…"
               value={search}
-              onChange={handleSearchChange}
+              onChange={(e) => setSearch(e.target.value)}
               className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-72"
             />
             <button
@@ -390,20 +373,18 @@ export default function PatientHistoriesPage() {
           </div>
         </div>
 
-        {/* Error */}
         {error && (
           <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
 
-        {/* Table */}
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+            <table className="w-full min-w-[1100px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
+                  {["ID", "PATIENT", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "DISCOUNT", "BALANCE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -414,7 +395,7 @@ export default function PatientHistoriesPage() {
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(9)].map((__, j) => (
+                      {[...Array(11)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -423,7 +404,7 @@ export default function PatientHistoriesPage() {
                   ))
                 ) : histories.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={11} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No patient history records found.
                     </td>
                   </tr>
@@ -468,6 +449,14 @@ export default function PatientHistoriesPage() {
                         <td className="px-6 py-4 text-sm font-semibold text-[#0B1C30]">
                           {formatCurrency(h.amount)}
                         </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">
+                          {formatCurrency(h.discount || 0)}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold">
+                          <span className={h.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}>
+                            {formatCurrency(h.balance)}
+                          </span>
+                        </td>
                         <td className="px-6 py-4">
                           <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
                             {h.paymentStatus}
@@ -495,7 +484,6 @@ export default function PatientHistoriesPage() {
           </div>
         </div>
 
-        {/* Pagination Controls */}
         {!loading && totalPages > 0 && (
           <div className="flex items-center justify-between mt-6">
             <button
@@ -520,7 +508,6 @@ export default function PatientHistoriesPage() {
           </div>
         )}
 
-        {/* Record count - UPDATED to use histories.length directly */}
         {!loading && (
           <p className="text-sm text-[#3D4946]">
             Showing {histories.length} of {totalElements} records
@@ -528,11 +515,9 @@ export default function PatientHistoriesPage() {
         )}
       </main>
 
-      {/* Modal/Popup for Detailed Information */}
       {selectedHistory && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-[#F1F5F9]">
               <h2 className="text-xl font-bold text-[#0B1C30]">Patient History Details</h2>
               <button
@@ -545,9 +530,7 @@ export default function PatientHistoriesPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 space-y-6">
-              {/* Basic Information Section */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest">Record ID</p>
@@ -561,7 +544,6 @@ export default function PatientHistoriesPage() {
                 </div>
               </div>
 
-              {/* Patient & Doctor Information */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-[#F8FAFC] rounded-lg p-4">
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-2">Patient Information</p>
@@ -588,7 +570,6 @@ export default function PatientHistoriesPage() {
                 </div>
               </div>
 
-              {/* Appointment Details */}
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">Appointment Details</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -619,7 +600,6 @@ export default function PatientHistoriesPage() {
                 </div>
               </div>
 
-              {/* Financial Information */}
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">Financial Details</p>
                 <div className="grid grid-cols-3 gap-3">
@@ -628,17 +608,21 @@ export default function PatientHistoriesPage() {
                     <p className="text-sm font-bold text-[#0B1C30]">{formatCurrency(selectedHistory.amount)}</p>
                   </div>
                   <div>
+                    <p className="text-xs text-[#94A3B8]">Discount</p>
+                    <p className="text-sm font-bold text-[#0D9488]">{formatCurrency(selectedHistory.discount || 0)}</p>
+                  </div>
+                  <div>
                     <p className="text-xs text-[#94A3B8]">Balance</p>
                     <p className={`text-sm font-bold ${selectedHistory.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
                       {formatCurrency(selectedHistory.balance)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs text-[#94A3B8]">Payment Status</p>
-                    <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[selectedHistory.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                      {selectedHistory.paymentStatus}
-                    </span>
-                  </div>
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs text-[#94A3B8]">Payment Status</p>
+                  <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[selectedHistory.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                    {selectedHistory.paymentStatus}
+                  </span>
                 </div>
                 {selectedHistory.paymentStatus !== "PAID" && (
                   <p className="text-xs text-[#94A3B8] mt-3 flex items-center gap-1.5">
@@ -650,7 +634,6 @@ export default function PatientHistoriesPage() {
                 )}
               </div>
 
-              {/* Clinical Observation */}
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-2">Clinical Observation</p>
                 <p className="text-sm text-[#485F83] leading-relaxed">
@@ -658,7 +641,6 @@ export default function PatientHistoriesPage() {
                 </p>
               </div>
 
-              {/* Media — Images */}
               {selectedHistory.imageUrls.length > 0 && (
                 <div className="bg-[#F8FAFC] rounded-lg p-4">
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
@@ -668,7 +650,6 @@ export default function PatientHistoriesPage() {
                     {selectedHistory.imageUrls.map((url, i) => (
                       <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                         className="block aspect-square rounded-lg overflow-hidden border border-[#E2E8F0] hover:opacity-90 transition-opacity bg-[#E2E8F0]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
                       </a>
                     ))}
@@ -676,7 +657,6 @@ export default function PatientHistoriesPage() {
                 </div>
               )}
 
-              {/* Media — Videos */}
               {selectedHistory.videoUrls.length > 0 && (
                 <div className="bg-[#F8FAFC] rounded-lg p-4">
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
@@ -703,7 +683,6 @@ export default function PatientHistoriesPage() {
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="flex justify-end p-6 border-t border-[#F1F5F9]">
               <button
                 onClick={closeDetails}
@@ -716,7 +695,6 @@ export default function PatientHistoriesPage() {
         </div>
       )}
 
-      {/* Create Patient History Modal */}
       {showCreatePanel && (
         <div
           className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4"
@@ -727,7 +705,6 @@ export default function PatientHistoriesPage() {
           }}
         >
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            {/* Header */}
             <div className="flex justify-between items-center p-6 border-b border-[#F1F5F9]">
               <h2 className="text-xl font-bold text-[#0B1C30]">Create Patient History</h2>
               <button
@@ -741,23 +718,19 @@ export default function PatientHistoriesPage() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="p-6 space-y-4">
-              {/* Success Message */}
               {createSuccess && (
                 <div className="bg-[#DCFCE7] text-[#166534] text-sm font-semibold px-4 py-3 rounded-lg">
                   {createSuccess}
                 </div>
               )}
 
-              {/* Error Message */}
               {createError && (
                 <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
                   {createError}
                 </div>
               )}
 
-              {/* Appointment ID Input */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Appointment ID <span className="text-[#93000A]">*</span>
@@ -775,13 +748,11 @@ export default function PatientHistoriesPage() {
                 </p>
               </div>
 
-              {/* Amount Input */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Amount <span className="text-[#93000A]">*</span>
                 </label>
-                <input
-                  type="number"
+                <input                  type="number"
                   step="0.01"
                   min="0.01"
                   placeholder="0.00"
@@ -791,9 +762,40 @@ export default function PatientHistoriesPage() {
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
+                  Discount
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={createDiscount}
+                  onChange={(e) => setCreateDiscount(e.target.value)}
+                  disabled={creating}
+                  className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <p className="text-xs text-[#94A3B8] mt-1">
+                  Discount applied to the total amount (optional)
+                </p>
+              </div>
+
+              {createAmount && parseFloat(createAmount) > 0 && (
+                <div className="bg-[#F8FAFC] rounded-lg p-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#3D4946]">Balance after discount:</span>
+                    <span className="font-bold text-[#0B1C30]">
+                      {formatCurrency(
+                        parseFloat(createAmount) - (parseFloat(createDiscount) || 0)
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Footer */}
             <div className="flex justify-end gap-3 p-6 border-t border-[#F1F5F9]">
               <button
                 onClick={() => setShowCreatePanel(false)}

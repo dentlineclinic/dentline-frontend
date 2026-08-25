@@ -22,6 +22,7 @@ type HistoryRow = {
   date: string;
   time: string;
   amount: number;
+  discount: number;
   balance: number;
   paymentStatus: string;
 };
@@ -36,10 +37,9 @@ const PAYMENT_COLORS: Record<string, string> = {
   PAID: "bg-[#DCFCE7] text-[#166534]",
   PENDING: "bg-[#FEF3C7] text-[#92400E]",
   PARTIAL: "bg-[#FEF3C7] text-[#92400E]",
-  UNPAID: "bg-[#FEE2E2] text-[#991B1B]", // 👈 add this
+  UNPAID: "bg-[#FEE2E2] text-[#991B1B]",
 };
 
-// ✅ Move formatter outside component to avoid recreation
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
@@ -76,25 +76,18 @@ export default function PaymentsPage() {
     totalPatientHistories: 0,
   });
 
-  // Pagination
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const size = 10;
 
-  // Search - will move to backend in next phase
   const [search, setSearch] = useState("");
-
-  // Selected row for side panel
   const [selected, setSelected] = useState<HistoryRow | null>(null);
-
-  // Record payment panel
   const [payAmount, setPayAmount] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // ✅ Load ONLY payments (not summary)
   const loadPayments = useCallback(async (p: number, searchTerm?: string) => {
     setLoading(true);
     setError(null);
@@ -107,8 +100,6 @@ export default function PaymentsPage() {
 
       const mapped: HistoryRow[] = res.data.content.map((h: any) => {
         const { date, time } = formatDateSafe(h.createdAt);
-
-        // ✅ Safely map payment status - handle PARTIAL, remove UNPAID assumption
         const paymentStatus = h.paymentStatus || "PENDING";
 
         return {
@@ -121,6 +112,7 @@ export default function PaymentsPage() {
           date,
           time,
           amount: h.amount ?? 0,
+          discount: h.discount ?? 0,
           balance: h.balance ?? 0,
           paymentStatus,
         };
@@ -137,36 +129,25 @@ export default function PaymentsPage() {
     }
   }, [size]);
 
-  // Load summary stats from the dedicated endpoint on mount
   useEffect(() => {
     fetchAdminPaymentSummary()
       .then((res) => {
         if (res.success) setSummary(res.data);
       })
-      .catch(() => {
-        // Non-critical — table still works without summary
-      });
+      .catch(() => {});
   }, []);
 
-  // Reset pagination whenever search changes
   useEffect(() => {
     setPage(0);
   }, [search]);
 
-
-  // Load payments when page or search changes (with debounce)
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => loadPayments(page, search), 300);
     return () => clearTimeout(debounceRef.current);
   }, [page, search, loadPayments]);
 
-
-
-  // Client-side search temporarily (until backend search is implemented)
   const visible = rows;
-
-  // ── Actions ────────────────────────────────────────────────────────────────
 
   const refreshAllData = async () => {
     await loadPayments(page, search);
@@ -212,7 +193,6 @@ export default function PaymentsPage() {
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6">
 
-        {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
           {loading && rows.length === 0 ? (
             [...Array(3)].map((_, i) => (
@@ -243,7 +223,6 @@ export default function PaymentsPage() {
           )}
         </div>
 
-        {/* Toolbar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
           <input
             type="search"
@@ -260,13 +239,12 @@ export default function PaymentsPage() {
           </div>
         )}
 
-        {/* Table */}
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
+            <table className="w-full min-w-[1000px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "DOCTOR", "DATE", "AMOUNT", "BALANCE", "PAYMENT STATUS", ""].map((h) => (
+                  {["ID", "PATIENT", "DOCTOR", "DATE", "AMOUNT", "DISCOUNT", "BALANCE", "PAYMENT STATUS", ""].map((h) => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -277,7 +255,7 @@ export default function PaymentsPage() {
                 {loading && rows.length === 0 ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(8)].map((__, j) => (
+                      {[...Array(9)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -286,7 +264,7 @@ export default function PaymentsPage() {
                   ))
                 ) : visible.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={9} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No payment records found.
                     </td>
                   </tr>
@@ -315,6 +293,7 @@ export default function PaymentsPage() {
                         <p className="text-xs text-[#94A3B8]">{r.time}</p>
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-[#0B1C30]">{fmt(r.amount)}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{fmt(r.discount || 0)}</td>
                       <td className="px-6 py-4">
                         <span className={`text-sm font-bold ${r.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
                           {fmt(r.balance)}
@@ -338,7 +317,6 @@ export default function PaymentsPage() {
           </div>
         </div>
 
-        {/* Pagination */}
         {!loading && totalPages > 1 && (
           <div className="flex items-center justify-between">
             <button
@@ -366,7 +344,6 @@ export default function PaymentsPage() {
         )}
       </main>
 
-      {/* Overlay and Side Panel */}
       {selected && (
         <div
           className="fixed inset-0 backdrop-blur-sm bg-white/30 z-40"
@@ -374,10 +351,8 @@ export default function PaymentsPage() {
         />
       )}
 
-      {/* Detail / action panel */}
       {selected && (
         <div className="fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white shadow-2xl z-50 flex flex-col">
-          {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
             <h2 className="text-base font-bold text-[#0B1C30]">Payment Details</h2>
             <button onClick={() => setSelected(null)} className="text-[#94A3B8] hover:text-[#475569]">
@@ -387,9 +362,7 @@ export default function PaymentsPage() {
             </button>
           </div>
 
-          {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-5">
-            {/* Patient */}
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-[#CCFBF1] flex items-center justify-center text-base font-bold text-[#0F766E] flex-shrink-0">
                 {selected.initials}
@@ -403,12 +376,12 @@ export default function PaymentsPage() {
               </div>
             </div>
 
-            {/* Info grid */}
             <div className="bg-[#F8FAFC] rounded-xl p-4 grid grid-cols-2 gap-4">
               {[
                 { label: "Doctor", value: selected.doctorName },
                 { label: "Date", value: `${selected.date} ${selected.time}` },
                 { label: "Amount", value: fmt(selected.amount) },
+                { label: "Discount", value: fmt(selected.discount || 0) },
                 { label: "Balance", value: fmt(selected.balance) },
               ].map(({ label, value }) => (
                 <div key={label}>
@@ -418,7 +391,6 @@ export default function PaymentsPage() {
               ))}
             </div>
 
-            {/* Observation */}
             <div>
               <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest mb-1">Observation</p>
               <p className="text-sm text-[#485F83] bg-[#F8FAFC] rounded-lg p-3 leading-relaxed">
@@ -426,15 +398,6 @@ export default function PaymentsPage() {
               </p>
             </div>
 
-            {/*
-              Action logic:
-              - PAID    → only "Mark as Unpaid" (revert)
-              - PENDING → only "Mark as Unpaid" first; once marked UNPAID the record
-                          payment form will appear on next open
-              - UNPAID  → only "Record Payment" form
-            */}
-
-            {/* PAID: revert only */}
             {selected.paymentStatus === "PAID" && (
               <div className="flex flex-col gap-2 border border-[#E2E8F0] rounded-xl p-4">
                 <p className="text-sm font-bold text-[#0B1C30]">Revert Payment</p>
@@ -456,7 +419,6 @@ export default function PaymentsPage() {
               </div>
             )}
 
-            {/* PENDING: must mark unpaid before payment can be recorded */}
             {selected.paymentStatus === "PENDING" && (
               <div className="flex flex-col gap-2 border border-[#FEF3C7] bg-[#FFFBEB] rounded-xl p-4">
                 <div className="flex items-center gap-2">
@@ -483,7 +445,6 @@ export default function PaymentsPage() {
               </div>
             )}
 
-            {/* UNPAID: record payment directly */}
             {selected.paymentStatus === "UNPAID" && (
               <div className="flex flex-col gap-3 border border-[#E2E8F0] rounded-xl p-4">
                 <div>
@@ -521,7 +482,6 @@ export default function PaymentsPage() {
             )}
           </div>
 
-          {/* Footer */}
           <div className="px-6 py-4 border-t border-[#F1F5F9]">
             <button
               onClick={() => setSelected(null)}

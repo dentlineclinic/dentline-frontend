@@ -36,17 +36,16 @@ export interface PatientHistory {
   appointmentDate: string;
   observation: string;
   amount: number;
+  discount: number;
   balance: number;
   paymentStatus: string;
   status: string;
   createdAt: string;
   imageUrls: string[];
   videoUrls: string[];
-  // Family appointment fields
   familyMemberId?: string;
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
-  // Tooth observations (FDI)
   toothObservations?: ToothObservation[];
 }
 
@@ -81,6 +80,7 @@ export interface RecordPaymentResponse {
     appointmentDate: string;
     observation: string;
     amount: number;
+    discount: number;
     balance: number;
     paymentStatus: string;
     status: string;
@@ -108,6 +108,7 @@ export interface PaymentStatsResponse {
 export interface CreatePatientHistoryRequest {
   appointmentId: string;
   amount: number;
+  discount: number;
 }
 
 export interface UpdateObservationRequest {
@@ -129,23 +130,18 @@ export const fetchPatientHistories = async (
     size,
   };
 
-  // Add payment status filter if provided and not "All"
   if (paymentStatus && paymentStatus !== "All") {
     params.paymentStatus = paymentStatus;
   }
 
   let endpoint = "/patient-history/all";
   
-  // If search term is provided, use the search endpoint
   if (search && search.trim()) {
     endpoint = "/patient-history/search";
     params.name = search.trim();
   }
 
-  const response = await api.get(endpoint, {
-    params,
-  });
-
+  const response = await api.get(endpoint, { params });
   return response.data;
 };
 
@@ -191,9 +187,7 @@ export const fetchMyPatientHistories = async (
 ): Promise<PatientHistoryResponse> => {
   const res = await api.get<PatientHistoryResponse>(
     "/patient-history/my",
-    {
-      params: { page, size },
-    }
+    { params: { page, size } }
   );
   return res.data;
 };
@@ -223,11 +217,7 @@ export const searchPayments = async (
   size = 10
 ): Promise<any> => {
   const response = await api.get("/admin/payments/search", {
-    params: {
-      name,
-      page,
-      size,
-    },
+    params: { name, page, size },
   });
   return response.data;
 };
