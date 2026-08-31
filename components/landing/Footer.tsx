@@ -1,6 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { trackPhoneClick, trackWhatsAppClick } from "@/lib/analytics/events";
 
 export default function Footer() {
+  const handlePhoneClick = (phoneNumber: string, source: string) => {
+    trackPhoneClick(phoneNumber, source);
+  };
+
+  const handleWhatsAppClick = (phoneNumber: string, source: string) => {
+    trackWhatsAppClick(phoneNumber, source);
+  };
+
   return (
     <footer className="bg-[#0F172A] text-white">
       <div className="max-w-[1280px] mx-auto px-10 py-12">
@@ -13,9 +24,8 @@ export default function Footer() {
               patient-first protocols. Leading the standard in modern dental care.
             </p>
             <div className="flex gap-3">
-              {/* Facebook */}
               <a
-                href="https://web.facebook.com/p/Dentline-Dental-Clinic-61556357006199/?_rdc=1&_rdr#"
+                href="https://web.facebook.com/p/Dentline-Dental-Clinic-61556357006199/"
                 className="w-8 h-8 rounded-full bg-[#1E293B] flex items-center justify-center hover:bg-[#0D9488] transition-colors"
                 aria-label="Facebook"
               >
@@ -23,8 +33,6 @@ export default function Footer() {
                   <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879v-6.99h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.99C18.343 21.128 22 16.991 22 12z" />
                 </svg>
               </a>
-              
-              {/* Twitter/X */}
               <a
                 href="https://x.com/dentlineng"
                 className="w-8 h-8 rounded-full bg-[#1E293B] flex items-center justify-center hover:bg-[#0D9488] transition-colors"
@@ -34,8 +42,6 @@ export default function Footer() {
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>
               </a>
-              
-              {/* Instagram */}
               <a
                 href="https://www.instagram.com/dentlineng/"
                 className="w-8 h-8 rounded-full bg-[#1E293B] flex items-center justify-center hover:bg-[#0D9488] transition-colors"
@@ -95,12 +101,19 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Bottom bar */}
+      {/* Bottom bar with tracked phone number */}
       <div className="border-t border-[#1E293B]/50 px-10 py-6 flex flex-col md:flex-row items-center justify-between gap-4 max-w-[1280px] mx-auto">
         <p className="text-xs text-[#64748B]">
           © 2024 Dentline Clinic. Clinical Excellence Guaranteed.
         </p>
-        <a href="tel:5550123456" className="text-xs text-[#2DD4BF] underline">
+        <a
+          href="tel:09155588070"
+          onClick={() => handlePhoneClick("09155588070", "footer_emergency")}
+          className="text-xs text-[#2DD4BF] underline flex items-center gap-1"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
           Emergency Line: 09155588070
         </a>
       </div>

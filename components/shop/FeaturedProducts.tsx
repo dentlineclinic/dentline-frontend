@@ -5,6 +5,8 @@ import Link from "next/link";
 import { fetchPublicProducts, type Product } from "@/services/productService";
 import { useCart } from "@/context/CartContext";
 import { toast } from "react-toastify";
+import { trackProductView, trackProductAddedToCart } from "@/lib/analytics/events";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const fmtCurrency = (n: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(n);
@@ -13,13 +15,38 @@ export default function FeaturedProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { add } = useCart();
+  const { track } = useAnalytics();
 
   useEffect(() => {
     fetchPublicProducts(0, 6)
-      .then(res => setProducts(res.data?.content ?? []))
+      .then(res => {
+        const data = res.data?.content ?? [];
+        setProducts(data);
+        
+        // Track product views
+        data.forEach(product => {
+          trackProductView(product.id, product.name, product.price);
+        });
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const handleAddToCart = (product: Product) => {
+    add(product);
+    toast.success(`${product.name} added to cart`);
+    
+    // Track add to cart
+    trackProductAddedToCart(product.id, product.name, product.price);
+    
+    // You can also track as a Google Ads event
+    track("add_to_cart", {
+      product_id: product.id,
+      product_name: product.name,
+      price: product.price,
+      currency: "NGN",
+    });
+  };
 
   if (!loading && products.length === 0) return null;
 
@@ -49,11 +76,12 @@ export default function FeaturedProducts() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {products.map(product => (
-              <div key={product.id} className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
-                {/* Image */}
+              <div 
+                key={product.id} 
+                className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col"
+              >
                 <div className="h-48 bg-[#F0FDFA] flex items-center justify-center overflow-hidden">
                   {product.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                   ) : (
                     <svg className="w-12 h-12 text-[#00685C]/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,13 +90,12 @@ export default function FeaturedProducts() {
                   )}
                 </div>
 
-                {/* Content */}
                 <div className="p-5 flex flex-col gap-3 flex-1">
                   <h3 className="text-base font-bold text-[#0B1C30] leading-tight">{product.name}</h3>
                   <p className="text-sm text-[#485F83] line-clamp-2 flex-1">{product.description}</p>
                   <p className="text-lg font-bold text-[#00685C]">{fmtCurrency(product.price)}</p>
                   <button
-                    onClick={() => { add(product); toast.success(`${product.name} added to cart`); }}
+                    onClick={() => handleAddToCart(product)}
                     className="w-full bg-[#00685C] text-white font-semibold text-sm py-2.5 rounded-lg hover:bg-[#008375] transition-colors flex items-center justify-center gap-2"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

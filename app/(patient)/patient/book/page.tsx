@@ -4,6 +4,8 @@ import { useState } from "react";
 import axios from "axios";
 import TopBar from "@/components/layout/TopBar";
 import { bookAppointment } from "@/services/patientService";
+import { useAnalytics } from "@/hooks/useAnalytics";
+import { trackAppointmentBooked } from "@/lib/analytics/events";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +13,12 @@ export default function BookAppointmentPage() {
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const { trackAdConversion } = useAnalytics();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
 
-    // Validation
     if (!date) {
       setMessage({ type: "error", text: "Please select a date" });
       return;
@@ -29,7 +31,24 @@ export default function BookAppointmentPage() {
 
       if (res.success) {
         setMessage({ type: "success", text: "Appointment booked successfully!" });
-        // Reset form
+        
+        // 🎯 TRACK CONVERSION - Appointment Booked!
+        // 1. Track as an event
+        trackAppointmentBooked(
+          "Patient", // You can get this from user context
+          date,
+          false,
+          1
+        );
+
+        // 2. Track as a Google Ads conversion
+        const conversionId = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_ID || "";
+        const conversionLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL || "";
+        
+        if (conversionId && conversionLabel) {
+          trackAdConversion(conversionId, conversionLabel, 12000); // ₦12,000 appointment value
+        }
+
         setDate("");
       } else {
         setMessage({ type: "error", text: res.message || "Booking failed" });
@@ -39,50 +58,32 @@ export default function BookAppointmentPage() {
       
       let errorMessage = "Something went wrong. Please try again.";
       
-      // Handle axios errors
       if (axios.isAxiosError(err)) {
         const responseData = err.response?.data;
         
-        // Check if the response has data
         if (responseData) {
-          // If response is the ApiResponse format from your backend
           if (responseData.message) {
             errorMessage = responseData.message;
-          } 
-          // If response has an error field
-          else if (responseData.error) {
+          } else if (responseData.error) {
             errorMessage = responseData.error;
-          }
-          // If response is a string
-          else if (typeof responseData === 'string') {
+          } else if (typeof responseData === 'string') {
             errorMessage = responseData;
-          }
-          // If response has a detail field (Spring validation errors)
-          else if (responseData.detail) {
+          } else if (responseData.detail) {
             errorMessage = responseData.detail;
-          }
-          // If response has errors object (validation errors)
-          else if (responseData.errors) {
-            // Get first validation error
+          } else if (responseData.errors) {
             const firstError = Object.values(responseData.errors)[0];
             if (Array.isArray(firstError) && firstError.length > 0) {
               errorMessage = firstError[0];
             } else if (typeof firstError === 'string') {
               errorMessage = firstError;
             }
-          }
-          // Fallback: stringify the response data
-          else {
+          } else {
             errorMessage = JSON.stringify(responseData);
           }
-        } 
-        // Network error or no response
-        else if (err.message) {
+        } else if (err.message) {
           errorMessage = err.message;
         }
-      } 
-      // Handle other errors
-      else if (err instanceof Error) {
+      } else if (err instanceof Error) {
         errorMessage = err.message;
       }
       
@@ -104,7 +105,6 @@ export default function BookAppointmentPage() {
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 shadow-sm">
             <h3 className="text-xl font-semibold text-[#0B1C30] mb-6">Appointment Details</h3>
             
-            {/* Information Banner */}
             <div className="mb-6 rounded-xl border border-[#CCFBF1] bg-[#F0FDFA] p-4">
               <h4 className="text-sm font-bold text-[#00685C] mb-2">
                 Important Information
@@ -120,7 +120,6 @@ export default function BookAppointmentPage() {
               </p>
             </div>
 
-            {/* Message Display */}
             {message && (
               <div
                 className={`mb-6 p-4 rounded-lg ${
@@ -129,7 +128,6 @@ export default function BookAppointmentPage() {
                     : "bg-red-50 border border-red-200 text-red-700"
                 }`}
               >
-                {/* Show full error message with better styling for error cases */}
                 {message.type === "error" && (
                   <div className="flex items-start gap-2">
                     <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -149,7 +147,7 @@ export default function BookAppointmentPage() {
               </div>
             )}
 
-              <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">
                   Appointment Date *
@@ -182,7 +180,6 @@ export default function BookAppointmentPage() {
                 )}
               </button>
             </form>
-
           </div>
         </div>
       </main>

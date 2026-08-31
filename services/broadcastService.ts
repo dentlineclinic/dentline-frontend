@@ -17,6 +17,9 @@ export interface BroadcastHistoryDto {
   recipientCount: number;
   createdBy: string;
   createdAt: string;
+  flyerImageUrl?: string;
+  imagePosition?: string;
+  imageWidth?: number;
 }
 
 export interface PageResponse<T> {
@@ -47,11 +50,15 @@ export const getBroadcastRecipients = async (
 
 // ── Send broadcast ────────────────────────────────────────────────────────────
 
-export const sendBroadcast = async (payload: {
-  subject: string;
-  body: string;
-}): Promise<{ success: boolean; message: string; data: BroadcastHistoryDto }> => {
-  const res = await api.post("/admin/broadcasts", payload);
+// Updated to accept FormData
+export const sendBroadcast = async (
+  formData: FormData
+): Promise<{ success: boolean; message: string; data: BroadcastHistoryDto }> => {
+  const res = await api.post("/admin/broadcasts", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return res.data;
 };
 

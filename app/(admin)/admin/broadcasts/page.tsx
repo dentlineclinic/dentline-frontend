@@ -45,21 +45,77 @@ export default function BroadcastPage() {
 
   // ── Send broadcast ────────────────────────────────────────────────────────
   const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [messageBeforeFlyer, setMessageBeforeFlyer] = useState("");
+  const [messageAfterFlyer, setMessageAfterFlyer] = useState("");
+  const [flyerImage, setFlyerImage] = useState<File | null>(null);
+  const [flyerImagePreview, setFlyerImagePreview] = useState<string | null>(null);
+  const [imageWidth, setImageWidth] = useState(80);
+  const [imagePosition, setImagePosition] = useState<"top" | "between" | "bottom">("between");
   const [sending, setSending] = useState(false);
+
+  // Handle flyer image selection
+  const handleFlyerImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setFlyerImage(file);
+    
+    // Create preview
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFlyerImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFlyerImagePreview(null);
+    }
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subject.trim()) { toast.error("Subject is required."); return; }
-    if (!body.trim())    { toast.error("Message body is required."); return; }
+    
+    // Validate
+    if (!subject.trim()) { 
+      toast.error("Subject is required."); 
+      return; 
+    }
+    
+    if (!messageBeforeFlyer.trim() && !messageAfterFlyer.trim()) {
+      toast.error("At least one message section is required.");
+      return;
+    }
+    
     setSending(true);
     try {
-      const res = await sendBroadcast({ subject: subject.trim(), body: body.trim() });
+      const formData = new FormData();
+      formData.append("subject", subject.trim());
+      
+      // Always send both message parts (they can be empty)
+      formData.append("messageBeforeFlyer", messageBeforeFlyer.trim());
+      formData.append("messageAfterFlyer", messageAfterFlyer.trim());
+      
+      // Image settings
+      formData.append("imageWidth", imageWidth.toString());
+      formData.append("imagePosition", imagePosition);
+      
+      // Upload flyer image if selected
+      if (flyerImage) {
+        formData.append("flyerImage", flyerImage);
+      }
+      
+      const res = await sendBroadcast(formData);
       toast.success(
         `Broadcast sent to ${res.data.recipientCount} recipient${res.data.recipientCount !== 1 ? "s" : ""}.`
       );
+      
+      // Reset form
       setSubject("");
-      setBody("");
+      setMessageBeforeFlyer("");
+      setMessageAfterFlyer("");
+      setFlyerImage(null);
+      setFlyerImagePreview(null);
+      setImageWidth(80);
+      setImagePosition("between");
+      
     } catch (err: any) {
       toast.error(err.message || "Failed to send broadcast.");
     } finally {
@@ -159,7 +215,6 @@ export default function BroadcastPage() {
       const res = await importRecipientsFromCsv(importFile);
       setImportResult(res.data);
       toast.success(`Imported ${res.data.successCount} recipient${res.data.successCount !== 1 ? "s" : ""} from ${res.data.fileName}`);
-      // Refresh recipient count if on recipients tab
       if (tab === "recipients") loadRecipients(0);
     } catch (err: any) {
       toast.error(err.message || "Failed to import CSV.");
@@ -168,6 +223,9 @@ export default function BroadcastPage() {
     }
   };
 
+  // Helper to check if we have any message content
+  const hasMessageContent = messageBeforeFlyer.trim() || messageAfterFlyer.trim();
+
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar title="Broadcasts" subtitle="Send email broadcasts to subscribers" />
@@ -175,12 +233,12 @@ export default function BroadcastPage() {
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6">
 
         {/* Tab bar */}
-        <div className="flex gap-0 border-b border-[#F1F5F9]">
+        <div className="flex gap-0 border-b border-[#F1F5F9] overflow-x-auto">
           {(["send", "recipients", "history", "import"] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-3 text-sm font-semibold capitalize transition-colors border-b-2 -mb-px ${
+              className={`px-5 py-3 text-sm font-semibold capitalize transition-colors border-b-2 -mb-px whitespace-nowrap ${
                 tab === t
                   ? "border-[#00685C] text-[#00685C]"
                   : "border-transparent text-[#3D4946] hover:text-[#0B1C30]"
@@ -222,23 +280,135 @@ export default function BroadcastPage() {
                   />
                 </div>
 
-                {/* Body */}
+                {/* Message Before Flyer */}
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-semibold text-[#3D4946]">
-                    Message <span className="text-[#93000A]">*</span>
+                    Message Before Flyer
                   </label>
                   <textarea
-                    rows={9}
-                    value={body}
-                    onChange={e => setBody(e.target.value)}
-                    placeholder="Write your message here. It will be sent as a formatted email to all active subscribers."
+                    rows={4}
+                    value={messageBeforeFlyer}
+                    onChange={e => setMessageBeforeFlyer(e.target.value)}
+                    placeholder="Message content that appears BEFORE the flyer image (leave empty to show flyer at top)"
                     className={`${INPUT} resize-none`}
                   />
-                  <p className="text-xs text-[#94A3B8] text-right">{body.length} characters</p>
+                  <p className="text-xs text-[#94A3B8] text-right">{messageBeforeFlyer.length} characters</p>
                 </div>
 
-                {/* Preview */}
-                {(subject.trim() || body.trim()) && (
+                {/* Flyer Image Upload */}
+                <div className="flex flex-col gap-2 border border-[#E2E8F0] rounded-xl p-4 bg-[#F8FAFC]">
+                  <label className="text-sm font-semibold text-[#3D4946]">
+                    Flyer Image <span className="text-xs font-normal text-[#94A3B8]">(optional)</span>
+                  </label>
+                  
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-[#008375] transition-colors cursor-pointer">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Choose Image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFlyerImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                    {flyerImage && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFlyerImage(null);
+                          setFlyerImagePreview(null);
+                        }}
+                        className="text-sm text-[#93000A] hover:underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  {flyerImage && (
+                    <p className="text-xs text-[#3D4946]">
+                      {flyerImage.name} ({(flyerImage.size / 1024).toFixed(1)} KB)
+                    </p>
+                  )}
+
+                  {/* Image preview */}
+                  {flyerImagePreview && (
+                    <div className="mt-2">
+                      <img 
+                        src={flyerImagePreview} 
+                        alt="Flyer preview" 
+                        className="max-h-48 w-auto rounded-lg border border-[#E2E8F0]"
+                        style={{ maxWidth: `${imageWidth}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Image Settings */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Image Width */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-semibold text-[#3D4946]">
+                      Image Width: {imageWidth}%
+                    </label>
+                    <input
+                      type="range"
+                      min="20"
+                      max="100"
+                      value={imageWidth}
+                      onChange={e => setImageWidth(parseInt(e.target.value))}
+                      className="w-full accent-[#00685C]"
+                      disabled={!flyerImage && !flyerImagePreview}
+                    />
+                    <div className="flex justify-between text-xs text-[#94A3B8]">
+                      <span>20%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+
+                  {/* Image Position */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-semibold text-[#3D4946]">
+                      Image Position
+                    </label>
+                    <select
+                      value={imagePosition}
+                      onChange={e => setImagePosition(e.target.value as "top" | "between" | "bottom")}
+                      className={INPUT}
+                      disabled={!flyerImage && !flyerImagePreview}
+                    >
+                      <option value="top">Top of message</option>
+                      <option value="between">Between message parts</option>
+                      <option value="bottom">Bottom of message</option>
+                    </select>
+                    <p className="text-xs text-[#94A3B8]">
+                      {imagePosition === "top" && "Flyer appears before all message content"}
+                      {imagePosition === "between" && "Flyer appears between the two message sections"}
+                      {imagePosition === "bottom" && "Flyer appears after all message content"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Message After Flyer */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-semibold text-[#3D4946]">
+                    Message After Flyer
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={messageAfterFlyer}
+                    onChange={e => setMessageAfterFlyer(e.target.value)}
+                    placeholder="Message content that appears AFTER the flyer image (leave empty to show flyer at bottom)"
+                    className={`${INPUT} resize-none`}
+                  />
+                  <p className="text-xs text-[#94A3B8] text-right">{messageAfterFlyer.length} characters</p>
+                </div>
+
+                {/* Preview Section */}
+                {(subject.trim() || hasMessageContent || flyerImagePreview) && (
                   <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-5">
                     <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest mb-3">Email Preview</p>
                     <div className="flex items-center gap-2 mb-3">
@@ -253,9 +423,39 @@ export default function BroadcastPage() {
                       </div>
                     </div>
                     <p className="text-sm font-bold text-[#0B1C30] mb-2">{subject || "(No subject)"}</p>
-                    <p className="text-sm text-[#485F83] whitespace-pre-wrap leading-relaxed">
-                      {body || "(No message)"}
-                    </p>
+                    
+                    {/* Preview: Message Before */}
+                    {messageBeforeFlyer && (
+                      <div className="mb-3">
+                        <p className="text-xs text-[#94A3B8] mb-1">Before Flyer:</p>
+                        <p className="text-sm text-[#485F83] whitespace-pre-wrap leading-relaxed">
+                          {messageBeforeFlyer}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Preview: Flyer */}
+                    {flyerImagePreview && (
+                      <div className="my-3 border-t border-[#E2E8F0] pt-3">
+                        <p className="text-xs text-[#94A3B8] mb-2">Flyer Image ({imagePosition}):</p>
+                        <img 
+                          src={flyerImagePreview} 
+                          alt="Flyer preview" 
+                          className="rounded-lg border border-[#E2E8F0]"
+                          style={{ maxWidth: `${imageWidth}%` }}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Preview: Message After */}
+                    {messageAfterFlyer && (
+                      <div className="mt-3 border-t border-[#E2E8F0] pt-3">
+                        <p className="text-xs text-[#94A3B8] mb-1">After Flyer:</p>
+                        <p className="text-sm text-[#485F83] whitespace-pre-wrap leading-relaxed">
+                          {messageAfterFlyer}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

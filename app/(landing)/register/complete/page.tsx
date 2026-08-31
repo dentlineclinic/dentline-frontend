@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useRegister } from "@/hooks/useRegister";
+import { trackPatientSignUp } from "@/lib/analytics/events";
 
 const GENDER_OPTIONS = [
   { value: "MALE", label: "Male" },
@@ -78,7 +79,7 @@ export default function CompleteRegistrationPage() {
     else if (password.length < 8) errors.password = "Password must be at least 8 characters.";
     if (password !== confirmPassword) errors.confirmPassword = "Passwords do not match.";
 
-    // ✅ Fixed: if identifier is email, user must provide a separate phone number
+    // Fixed: if identifier is email, user must provide a separate phone number
     if (isIdentifierEmail && !phoneNumber.trim()) {
       errors.phoneNumber = "Phone number is required.";
     }
@@ -157,6 +158,9 @@ export default function CompleteRegistrationPage() {
 
     mutation.mutate(payload, {
       onSuccess: () => {
+        // 🎯 Track patient sign-up as a Google Ads conversion
+        trackPatientSignUp("website_registration", 0);
+        
         sessionStorage.removeItem("reg_identifier");
         sessionStorage.removeItem("reg_otp_verified");
         router.push("/login");

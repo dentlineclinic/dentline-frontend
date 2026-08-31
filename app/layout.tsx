@@ -6,6 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import Providers from "./providers";
 import OfflineBanner from "@/components/ui/OfflineBanner";
+import { GoogleTag } from "@/components/analytics/GoogleTag";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -79,11 +80,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const googleTagId = process.env.NEXT_PUBLIC_GOOGLE_TAG_ID || "";
+  const adsConversionId = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_ID || "";
+
   return (
     <html lang="en" className={`${manrope.variable} h-full`}>
+      <head>
+        {/* Google Tag (Analytics + Ads) */}
+        {googleTagId && <GoogleTag tagId={googleTagId} adsConversionId={adsConversionId} />}
+      </head>
       <body className="min-h-full font-sans antialiased">
         <OfflineBanner />
-
         <Providers>{children}</Providers>
       </body>
     </html>

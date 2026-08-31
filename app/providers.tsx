@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
 import { ToastContainer } from "react-toastify";
 import { CartProvider } from "@/context/CartContext";
+import { CookieConsent } from "@/components/analytics/CookieConsent";
 
 export default function Providers({
   children,
@@ -31,8 +32,19 @@ export default function Providers({
       <GoogleReCaptchaProvider reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}>
         <CartProvider>
           {children}
+          {/* Cookie Consent Banner - appears at bottom of page */}
+          <CookieConsent />
         </CartProvider>
-        <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick pauseOnHover draggable theme="light" />
+        <ToastContainer 
+          position="top-right" 
+          autoClose={3000} 
+          hideProgressBar={false} 
+          newestOnTop 
+          closeOnClick 
+          pauseOnHover 
+          draggable 
+          theme="light" 
+        />
       </GoogleReCaptchaProvider>
     </QueryClientProvider>
   );
