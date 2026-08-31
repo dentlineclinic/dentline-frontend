@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getConsentSettings, acceptAllConsent, declineNonFunctionalConsent } from "@/lib/analytics/consent";
+import { getConsentSettings, acceptAllConsent, declineNonFunctionalConsent, setConsent } from "@/lib/analytics/consent";
 
 export function CookieConsent() {
   const [showBanner, setShowBanner] = useState(false);
@@ -10,7 +10,6 @@ export function CookieConsent() {
   useEffect(() => {
     const settings = getConsentSettings();
     if (!settings) {
-      // Show banner if no consent settings exist
       setShowBanner(true);
     }
   }, []);
@@ -35,7 +34,6 @@ export function CookieConsent() {
     <div className="fixed bottom-0 left-0 right-0 z-[9999] p-4 md:p-6">
       <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl border border-[#E2E8F0] p-6 md:p-8">
         <div className="flex flex-col gap-4">
-          {/* Header */}
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-base font-bold text-[#0B1C30]">🍪 We Value Your Privacy</h3>
@@ -54,7 +52,6 @@ export function CookieConsent() {
             </button>
           </div>
 
-          {/* Details */}
           {showDetails && (
             <div className="bg-[#F8FAFC] rounded-lg p-4 space-y-3 text-sm">
               <div className="flex items-center justify-between">
@@ -102,7 +99,6 @@ export function CookieConsent() {
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
               onClick={handleAcceptAll}
@@ -128,6 +124,3 @@ export function CookieConsent() {
     </div>
   );
 }
-
-// Import for the toggle
-import { setConsent } from "@/lib/analytics/consent";

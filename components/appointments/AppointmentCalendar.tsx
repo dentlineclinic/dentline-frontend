@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { toast } from "react-toastify";
 import {
   useAppointmentCalendar,
@@ -31,7 +31,8 @@ function Spinner() {
   );
 }
 
-export default function AppointmentCalendar() {
+// ── Move all the logic into this component ──
+function CalendarContent() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1); // 1-based
@@ -493,5 +494,14 @@ export default function AppointmentCalendar() {
         </>
       )}
     </div>
+  );
+}
+
+// ── Main export with Suspense ──
+export default function AppointmentCalendar() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-[#485F83]">Loading calendar...</div>}>
+      <CalendarContent />
+    </Suspense>
   );
 }
