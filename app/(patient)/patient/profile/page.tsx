@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import TopBar from "@/components/layout/TopBar";
 import {
@@ -34,6 +34,14 @@ const HMO_OPTIONS = [
 ];
 
 export default function PatientProfilePage() {
+  return (
+    <Suspense fallback={null}>
+      <PatientProfilePageInner />
+    </Suspense>
+  );
+}
+
+function PatientProfilePageInner() {
   // IMPORTANT: Use userId for API calls, patientId for display only
   const [userId, setUserId] = useState<string | null>(null);
   const [patientId, setPatientId] = useState<string | null>(null);
