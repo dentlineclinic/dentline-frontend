@@ -52,6 +52,10 @@ export default function BroadcastPage() {
   const [imageWidth, setImageWidth] = useState(80);
   const [imagePosition, setImagePosition] = useState<"top" | "between" | "bottom">("between");
   const [sending, setSending] = useState(false);
+  
+  // ── Single Recipient Mode ────────────────────────────────────────────────
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [sendMode, setSendMode] = useState<"all" | "single">("all");
 
   // Handle flyer image selection
   const handleFlyerImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,6 +74,11 @@ export default function BroadcastPage() {
     }
   };
 
+  // Helper to validate email
+  const isValidEmail = (email: string) => {
+    return /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(email);
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -82,6 +91,18 @@ export default function BroadcastPage() {
     if (!messageBeforeFlyer.trim() && !messageAfterFlyer.trim()) {
       toast.error("At least one message section is required.");
       return;
+    }
+    
+    // Validate recipient email if in single mode
+    if (sendMode === "single") {
+      if (!recipientEmail.trim()) {
+        toast.error("Recipient email is required.");
+        return;
+      }
+      if (!isValidEmail(recipientEmail.trim())) {
+        toast.error("Please enter a valid email address.");
+        return;
+      }
     }
     
     setSending(true);
@@ -102,6 +123,11 @@ export default function BroadcastPage() {
         formData.append("flyerImage", flyerImage);
       }
       
+      // Add recipient email if in single mode
+      if (sendMode === "single") {
+        formData.append("recipientEmail", recipientEmail.trim());
+      }
+      
       const res = await sendBroadcast(formData);
       toast.success(
         `Broadcast sent to ${res.data.recipientCount} recipient${res.data.recipientCount !== 1 ? "s" : ""}.`
@@ -115,6 +141,7 @@ export default function BroadcastPage() {
       setFlyerImagePreview(null);
       setImageWidth(80);
       setImagePosition("between");
+      setRecipientEmail("");
       
     } catch (err: any) {
       toast.error(err.message || "Failed to send broadcast.");
@@ -261,7 +288,7 @@ export default function BroadcastPage() {
               <div>
                 <h2 className="text-base font-bold text-[#0B1C30]">Compose Broadcast</h2>
                 <p className="text-sm text-[#94A3B8] mt-0.5">
-                  This email will be sent to all active subscribers who have not opted out.
+                  Send an email to all active subscribers or a single recipient.
                 </p>
               </div>
 
@@ -279,6 +306,59 @@ export default function BroadcastPage() {
                     className={INPUT}
                   />
                 </div>
+
+                {/* Send Mode */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-semibold text-[#3D4946]">
+                    Send To <span className="text-[#93000A]">*</span>
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="all"
+                        checked={sendMode === "all"}
+                        onChange={() => setSendMode("all")}
+                        className="w-4 h-4 accent-[#00685C]"
+                      />
+                      <span className="text-sm text-[#3D4946]">All Subscribers</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="single"
+                        checked={sendMode === "single"}
+                        onChange={() => setSendMode("single")}
+                        className="w-4 h-4 accent-[#00685C]"
+                      />
+                      <span className="text-sm text-[#3D4946]">Single Recipient</span>
+                    </label>
+                  </div>
+                  {sendMode === "all" && (
+                    <p className="text-xs text-[#94A3B8] mt-1">
+                      Sends to all patients and manually added recipients who haven't opted out.
+                    </p>
+                  )}
+                </div>
+
+                {/* Recipient Email (only in single mode) */}
+                {sendMode === "single" && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-semibold text-[#3D4946]">
+                      Recipient Email <span className="text-[#93000A]">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={recipientEmail}
+                      onChange={e => setRecipientEmail(e.target.value)}
+                      placeholder="patient@example.com"
+                      className={INPUT}
+                    />
+                    <p className="text-xs text-[#94A3B8]">
+                      Enter the email address of the person you want to send this broadcast to.
+                    </p>
+                  </div>
+                )}
 
                 {/* Message Before Flyer */}
                 <div className="flex flex-col gap-1">
@@ -422,6 +502,11 @@ export default function BroadcastPage() {
                         <p className="text-xs text-[#94A3B8]">noreply@dentlineclinic.com</p>
                       </div>
                     </div>
+                    {sendMode === "single" && recipientEmail && (
+                      <div className="mb-2 text-xs text-[#00685C] bg-[#F0FDFA] px-3 py-1.5 rounded-lg inline-block">
+                        To: {recipientEmail}
+                      </div>
+                    )}
                     <p className="text-sm font-bold text-[#0B1C30] mb-2">{subject || "(No subject)"}</p>
                     
                     {/* Preview: Message Before */}
