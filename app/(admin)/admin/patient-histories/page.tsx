@@ -16,15 +16,16 @@ type PatientHistory = {
   shortId: string;
   patientId: string;
   patientName: string;
+  hmo: string | null;
   initials: string;
   doctorId: string;
   doctorName: string;
   appointmentId: string;
   date: string;
   time: string;
-  amount: number;
+  amount: number | null;
   discount: number;
-  amountPaid: number;  // ✅ NEW
+  amountPaid: number;
   balance: number;
   paymentStatus: string;
   status: string;
@@ -36,6 +37,7 @@ type PatientHistory = {
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
   headPatientName?: string;
+  isCheckUp: boolean;
 };
 
 export type PaymentStats = {
@@ -64,11 +66,17 @@ const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-[#FEF3C7] text-[#92400E]",
 };
 
-const formatCurrency = (n: number) =>
-  new Intl.NumberFormat("en-NG", {
+const formatCurrency = (n: number | null) => {
+  if (n === null) return "—";
+  return new Intl.NumberFormat("en-NG", {
     style: "currency",
     currency: "NGN",
   }).format(n);
+};
+
+const isCheckUp = (history: any): boolean => {
+  return history.amount === null || history.amount === undefined;
+};
 
 export default function PatientHistoriesPage() {
   const [histories, setHistories] = useState<PatientHistory[]>([]);
@@ -88,11 +96,13 @@ export default function PatientHistoriesPage() {
   const [createApptId, setCreateApptId] = useState("");
   const [createAmount, setCreateAmount] = useState("");
   const [createDiscount, setCreateDiscount] = useState("");
+  const [isCheckUpVisit, setIsCheckUpVisit] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
 
-  const calculateBalance = (amount: number, paymentStatus: string): number => {
+  const calculateBalance = (amount: number | null, paymentStatus: string): number => {
+    if (amount === null) return 0;
     return paymentStatus === "PAID" ? 0 : amount;
   };
 
@@ -150,23 +160,25 @@ export default function PatientHistoriesPage() {
         const mapped = res.data.content.map((h) => {
           const { date, time } = formatDateSafe(h.appointmentDate);
           const displayName = getDisplayName(h);
+          const checkUp = isCheckUp(h);
 
           return {
             id: h.id,
             shortId: `HIS-${h.id.slice(0, 6).toUpperCase()}`,
             patientId: h.patientId,
             patientName: displayName,
+            hmo: h.hmo || null,
             initials: getInitials(displayName),
             doctorId: h.doctorId,
             doctorName: h.doctorName || "Unknown Doctor",
             appointmentId: h.appointmentId,
             date,
             time,
-            amount: h.amount ?? 0,
+            amount: h.amount ?? null,
             discount: h.discount ?? 0,
-            amountPaid: h.amountPaid ?? 0,  // ✅ NEW
+            amountPaid: h.amountPaid ?? 0,
             balance: h.balance ?? calculateBalance(
-              h.amount ?? 0,
+              h.amount ?? null,
               h.paymentStatus || "PENDING"
             ),
             paymentStatus: h.paymentStatus || "PENDING",
@@ -179,6 +191,7 @@ export default function PatientHistoriesPage() {
             familyMemberName: h.familyMemberName,
             appointmentType: h.appointmentType || "INDIVIDUAL",
             headPatientName: h.patientName,
+            isCheckUp: checkUp,
           };
         });
 
@@ -227,6 +240,7 @@ export default function PatientHistoriesPage() {
     setCreateApptId("");
     setCreateAmount("");
     setCreateDiscount("");
+    setIsCheckUpVisit(false);
     setCreateError(null);
     setCreateSuccess(null);
     setShowCreatePanel(true);
@@ -238,10 +252,14 @@ export default function PatientHistoriesPage() {
       return;
     }
 
-    const amount = parseFloat(createAmount);
-    if (!createAmount || isNaN(amount) || amount <= 0) {
-      setCreateError("Amount must be a positive number.");
-      return;
+    let amount: number | null = null;
+    if (!isCheckUpVisit) {
+      const parsedAmount = parseFloat(createAmount);
+      if (!createAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+        setCreateError("Amount must be a positive number.");
+        return;
+      }
+      amount = parsedAmount;
     }
 
     const discount = parseFloat(createDiscount) || 0;
@@ -250,7 +268,7 @@ export default function PatientHistoriesPage() {
       return;
     }
 
-    if (discount > amount) {
+    if (!isCheckUpVisit && discount > (amount || 0)) {
       setCreateError("Discount cannot exceed the total amount.");
       return;
     }
@@ -260,11 +278,16 @@ export default function PatientHistoriesPage() {
     setCreateSuccess(null);
 
     try {
-      const res = await createPatientHistory({
+      const payload: any = {
         appointmentId: createApptId,
-        amount,
         discount,
-      });
+      };
+      
+      if (!isCheckUpVisit && amount !== null) {
+        payload.amount = amount;
+      }
+
+      const res = await createPatientHistory(payload);
 
       if (res.success) {
         setCreateSuccess(res.message || "Patient history created successfully!");
@@ -278,6 +301,7 @@ export default function PatientHistoriesPage() {
           setCreateApptId("");
           setCreateAmount("");
           setCreateDiscount("");
+          setIsCheckUpVisit(false);
         }, 1500);
       } else {
         setCreateError(res.message || "Failed to create patient history.");
@@ -386,7 +410,7 @@ export default function PatientHistoriesPage() {
             <table className="w-full min-w-[1200px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
+                  {["ID", "PATIENT", "HMO", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -397,7 +421,7 @@ export default function PatientHistoriesPage() {
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(12)].map((__, j) => (
+                      {[...Array(13)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -406,7 +430,7 @@ export default function PatientHistoriesPage() {
                   ))
                 ) : histories.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={13} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No patient history records found.
                     </td>
                   </tr>
@@ -432,6 +456,9 @@ export default function PatientHistoriesPage() {
                             </div>
                           </div>
                         </td>
+                        <td className="px-6 py-4 text-sm text-[#3D4946]">
+                          {h.hmo || "—"}
+                        </td>
                         <td className="px-6 py-4">
                           {isFamily ? (
                             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
@@ -448,23 +475,33 @@ export default function PatientHistoriesPage() {
                           <p className="text-sm font-medium text-[#0B1C30]">{h.date}</p>
                           <p className="text-xs text-[#3D4946]">{h.time}</p>
                         </td>
-                        <td className="px-6 py-4 text-sm font-semibold text-[#0B1C30]">
-                          {formatCurrency(h.amount)}
+                        <td className="px-6 py-4">
+                          {h.isCheckUp ? (
+                            <span className="text-sm font-semibold text-[#0D9488]">Check-up</span>
+                          ) : (
+                            <span className="text-sm font-semibold text-[#0B1C30]">
+                              {formatCurrency(h.amount)}
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">
-                          {formatCurrency(h.discount || 0)}
+                          {h.isCheckUp ? "—" : formatCurrency(h.discount || 0)}
                         </td>
                         <td className="px-6 py-4 text-sm font-semibold text-[#2563EB]">
-                          {formatCurrency(h.amountPaid || 0)}
+                          {h.isCheckUp ? "—" : formatCurrency(h.amountPaid || 0)}
                         </td>
                         <td className="px-6 py-4 text-sm font-bold">
-                          <span className={h.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}>
-                            {formatCurrency(h.balance)}
-                          </span>
+                          {h.isCheckUp ? (
+                            <span className="text-[#94A3B8]">—</span>
+                          ) : (
+                            <span className={h.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}>
+                              {formatCurrency(h.balance)}
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                            {h.paymentStatus}
+                            {h.isCheckUp ? "COMPLETED" : h.paymentStatus}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -559,6 +596,7 @@ export default function PatientHistoriesPage() {
                     <div>
                       <p className="text-sm font-semibold text-[#0B1C30]">{selectedHistory.patientName}</p>
                       <p className="text-xs text-[#3D4946]">Patient ID: {selectedHistory.patientId?.slice(-8) || 'N/A'}</p>
+                      <p className="text-xs text-[#3D4946]">HMO: {selectedHistory.hmo || "None"}</p>
                       {selectedHistory.appointmentType === "FAMILY" && selectedHistory.headPatientName && (
                         <p className="text-xs text-[#94A3B8]">Head Patient: {selectedHistory.headPatientName}</p>
                       )}
@@ -607,33 +645,40 @@ export default function PatientHistoriesPage() {
 
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">Financial Details</p>
-                <div className="grid grid-cols-4 gap-3">
-                  <div>
-                    <p className="text-xs text-[#94A3B8]">Amount</p>
-                    <p className="text-sm font-bold text-[#0B1C30]">{formatCurrency(selectedHistory.amount)}</p>
+                {selectedHistory.isCheckUp ? (
+                  <div className="bg-[#F0FDFA] rounded-lg p-4 text-center border border-[#0D9488]">
+                    <p className="text-sm font-semibold text-[#0F766E]">Check-up / No Charge Visit</p>
+                    <p className="text-xs text-[#94A3B8] mt-1">This is a non-financial clinical record</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-[#94A3B8]">Discount</p>
-                    <p className="text-sm font-bold text-[#0D9488]">{formatCurrency(selectedHistory.discount || 0)}</p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-3">
+                    <div>
+                      <p className="text-xs text-[#94A3B8]">Amount</p>
+                      <p className="text-sm font-bold text-[#0B1C30]">{formatCurrency(selectedHistory.amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[#94A3B8]">Discount</p>
+                      <p className="text-sm font-bold text-[#0D9488]">{formatCurrency(selectedHistory.discount || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[#94A3B8]">Amount Paid</p>
+                      <p className="text-sm font-bold text-[#2563EB]">{formatCurrency(selectedHistory.amountPaid || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[#94A3B8]">Balance</p>
+                      <p className={`text-sm font-bold ${selectedHistory.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
+                        {formatCurrency(selectedHistory.balance)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-[#94A3B8]">Amount Paid</p>
-                    <p className="text-sm font-bold text-[#2563EB]">{formatCurrency(selectedHistory.amountPaid || 0)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[#94A3B8]">Balance</p>
-                    <p className={`text-sm font-bold ${selectedHistory.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
-                      {formatCurrency(selectedHistory.balance)}
-                    </p>
-                  </div>
-                </div>
+                )}
                 <div className="mt-3">
                   <p className="text-xs text-[#94A3B8]">Payment Status</p>
                   <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[selectedHistory.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                    {selectedHistory.paymentStatus}
+                    {selectedHistory.isCheckUp ? "COMPLETED (No Charge)" : selectedHistory.paymentStatus}
                   </span>
                 </div>
-                {selectedHistory.paymentStatus !== "PAID" && (
+                {!selectedHistory.isCheckUp && selectedHistory.paymentStatus !== "PAID" && (
                   <p className="text-xs text-[#94A3B8] mt-3 flex items-center gap-1.5">
                     <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -757,51 +802,89 @@ export default function PatientHistoriesPage() {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Amount <span className="text-[#93000A]">*</span>
-                </label>
+              <div className="flex items-center gap-3 bg-[#F8FAFC] rounded-lg p-3">
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="0.00"
-                  value={createAmount}
-                  onChange={(e) => setCreateAmount(e.target.value)}
+                  type="checkbox"
+                  id="isCheckUp"
+                  checked={isCheckUpVisit}
+                  onChange={(e) => {
+                    setIsCheckUpVisit(e.target.checked);
+                    if (e.target.checked) {
+                      setCreateAmount("");
+                    }
+                  }}
                   disabled={creating}
-                  className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-4 h-4 text-[#00685C] rounded border-[#E2E8F0] focus:ring-[#00685C] disabled:opacity-50"
                 />
+                <label htmlFor="isCheckUp" className="text-sm font-semibold text-[#0B1C30]">
+                  This is a check-up / no-charge visit
+                </label>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Discount
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={createDiscount}
-                  onChange={(e) => setCreateDiscount(e.target.value)}
-                  disabled={creating}
-                  className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <p className="text-xs text-[#94A3B8] mt-1">
-                  Discount applied to the total amount (optional)
-                </p>
-              </div>
-
-              {createAmount && parseFloat(createAmount) > 0 && (
-                <div className="bg-[#F8FAFC] rounded-lg p-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[#3D4946]">Balance after discount:</span>
-                    <span className="font-bold text-[#0B1C30]">
-                      {formatCurrency(
-                        parseFloat(createAmount) - (parseFloat(createDiscount) || 0)
-                      )}
-                    </span>
+              {!isCheckUpVisit && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
+                      Amount <span className="text-[#93000A]">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="0.00"
+                      value={createAmount}
+                      onChange={(e) => setCreateAmount(e.target.value)}
+                      disabled={creating}
+                      className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
+                      Discount
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={createDiscount}
+                      onChange={(e) => setCreateDiscount(e.target.value)}
+                      disabled={creating}
+                      className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <p className="text-xs text-[#94A3B8] mt-1">
+                      Discount applied to the total amount (optional)
+                    </p>
+                  </div>
+
+                  {createAmount && parseFloat(createAmount) > 0 && (
+                    <div className="bg-[#F8FAFC] rounded-lg p-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#3D4946]">Balance after discount:</span>
+                        <span className="font-bold text-[#0B1C30]">
+                          {formatCurrency(
+                            parseFloat(createAmount) - (parseFloat(createDiscount) || 0)
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {isCheckUpVisit && (
+                <div className="bg-[#F0FDFA] rounded-lg p-4 border border-[#0D9488]">
+                  <p className="text-sm font-semibold text-[#0F766E] flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Check-up / No-charge
+                  </p>
+                  <p className="text-xs text-[#3D4946] mt-1">
+                    This will create a clinical record with no financial obligation.
+                    The history will be marked as PAID and will not appear in outstanding payments.
+                  </p>
                 </div>
               )}
             </div>
@@ -828,7 +911,7 @@ export default function PatientHistoriesPage() {
                     Creating...
                   </>
                 ) : (
-                  'Create'
+                  isCheckUpVisit ? 'Create Check-up Record' : 'Create'
                 )}
               </button>
             </div>

@@ -16,16 +16,18 @@ type HistoryRow = {
   id: string;
   shortId: string;
   patientName: string;
+  hmo: string | null;
   initials: string;
   doctorName: string;
   observation: string;
   date: string;
   time: string;
-  amount: number;
+  amount: number | null;
   discount: number;
-  amountPaid: number;  // ✅ NEW
+  amountPaid: number;
   balance: number;
   paymentStatus: string;
+  isCheckUp: boolean;
 };
 
 type SummaryData = {
@@ -48,7 +50,7 @@ const currencyFormatter = new Intl.NumberFormat("en-NG", {
 
 const fmt = (n: number) => currencyFormatter.format(n);
 
-function formatDateSafe(raw: string | null | undefined) {
+const formatDateSafe = (raw: string | null | undefined) => {
   if (!raw) return { date: "—", time: "—" };
   const d = new Date(raw);
   if (isNaN(d.getTime())) return { date: "—", time: "—" };
@@ -56,16 +58,16 @@ function formatDateSafe(raw: string | null | undefined) {
     date: d.toLocaleDateString(),
     time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
   };
-}
+};
 
-function initials(name: string) {
+const initials = (name: string) => {
   return (name || "?")
     .split(" ")
     .map((n) => n[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
-}
+};
 
 export default function PaymentsPage() {
   const [rows, setRows] = useState<HistoryRow[]>([]);
@@ -102,21 +104,24 @@ export default function PaymentsPage() {
       const mapped: HistoryRow[] = res.data.content.map((h: any) => {
         const { date, time } = formatDateSafe(h.createdAt);
         const paymentStatus = h.paymentStatus || "PENDING";
+        const checkUp = h.amount === null || h.amount === undefined;
 
         return {
           id: h.id,
           shortId: `PAY-${h.id.slice(0, 6).toUpperCase()}`,
           patientName: h.patientName || "Unknown",
+          hmo: h.hmo || null,
           initials: initials(h.patientName || ""),
           doctorName: h.doctorName || "Unknown",
           observation: h.observation || "—",
           date,
           time,
-          amount: h.amount ?? 0,
+          amount: h.amount ?? null,
           discount: h.discount ?? 0,
-          amountPaid: h.amountPaid ?? 0,  // ✅ NEW
+          amountPaid: h.amountPaid ?? 0,
           balance: h.balance ?? 0,
           paymentStatus,
+          isCheckUp: checkUp,
         };
       });
 
@@ -246,7 +251,7 @@ export default function PaymentsPage() {
             <table className="w-full min-w-[1100px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "DOCTOR", "DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT STATUS", ""].map((h) => (
+                  {["ID", "PATIENT", "HMO", "DOCTOR", "DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT STATUS", ""].map((h) => (
                     <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
                       {h}
                     </th>
@@ -257,7 +262,7 @@ export default function PaymentsPage() {
                 {loading && rows.length === 0 ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(10)].map((__, j) => (
+                      {[...Array(11)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -266,7 +271,7 @@ export default function PaymentsPage() {
                   ))
                 ) : visible.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={11} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No payment records found.
                     </td>
                   </tr>
@@ -289,22 +294,39 @@ export default function PaymentsPage() {
                           <span className="text-sm font-semibold text-[#0B1C30]">{r.patientName}</span>
                         </div>
                       </td>
+                      <td className="px-6 py-4 text-sm text-[#3D4946]">
+                        {r.hmo || "—"}
+                      </td>
                       <td className="px-6 py-4 text-sm text-[#3D4946]">{r.doctorName}</td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium text-[#0B1C30]">{r.date}</p>
                         <p className="text-xs text-[#94A3B8]">{r.time}</p>
                       </td>
-                      <td className="px-6 py-4 text-sm font-bold text-[#0B1C30]">{fmt(r.amount)}</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{fmt(r.discount || 0)}</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-[#2563EB]">{fmt(r.amountPaid || 0)}</td>
                       <td className="px-6 py-4">
-                        <span className={`text-sm font-bold ${r.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
-                          {fmt(r.balance)}
-                        </span>
+                        {r.isCheckUp ? (
+                          <span className="text-sm font-semibold text-[#0D9488]">Check-up</span>
+                        ) : (
+                          <span className="text-sm font-bold text-[#0B1C30]">{fmt(r.amount || 0)}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">
+                        {r.isCheckUp ? "—" : fmt(r.discount || 0)}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-semibold text-[#2563EB]">
+                        {r.isCheckUp ? "—" : fmt(r.amountPaid || 0)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {r.isCheckUp ? (
+                          <span className="text-sm font-bold text-[#94A3B8]">—</span>
+                        ) : (
+                          <span className={`text-sm font-bold ${r.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}`}>
+                            {fmt(r.balance)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[r.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                          {r.paymentStatus}
+                          {r.isCheckUp ? "COMPLETED" : r.paymentStatus}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -373,26 +395,36 @@ export default function PaymentsPage() {
               <div>
                 <p className="text-base font-bold text-[#0B1C30]">{selected.patientName}</p>
                 <p className="text-xs text-[#94A3B8]">{selected.shortId}</p>
+                <p className="text-xs text-[#94A3B8]">HMO: {selected.hmo || "None"}</p>
                 <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${PAYMENT_COLORS[selected.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
-                  {selected.paymentStatus}
+                  {selected.isCheckUp ? "COMPLETED (No Charge)" : selected.paymentStatus}
                 </span>
               </div>
             </div>
 
             <div className="bg-[#F8FAFC] rounded-xl p-4 grid grid-cols-2 gap-4">
-              {[
-                { label: "Doctor", value: selected.doctorName },
-                { label: "Date", value: `${selected.date} ${selected.time}` },
-                { label: "Amount", value: fmt(selected.amount) },
-                { label: "Discount", value: fmt(selected.discount || 0) },
-                { label: "Amount Paid", value: fmt(selected.amountPaid || 0) },
-                { label: "Balance", value: fmt(selected.balance) },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest">{label}</p>
-                  <p className="text-sm font-semibold text-[#0B1C30] mt-0.5">{value}</p>
+              {selected.isCheckUp ? (
+                <div className="col-span-2 bg-[#F0FDFA] rounded-lg p-4 text-center border border-[#0D9488]">
+                  <p className="text-sm font-semibold text-[#0F766E]">Check-up / No Charge Visit</p>
+                  <p className="text-xs text-[#94A3B8] mt-1">This is a non-financial clinical record</p>
                 </div>
-              ))}
+              ) : (
+                <>
+                  {[
+                    { label: "Doctor", value: selected.doctorName },
+                    { label: "Date", value: `${selected.date} ${selected.time}` },
+                    { label: "Amount", value: fmt(selected.amount || 0) },
+                    { label: "Discount", value: fmt(selected.discount || 0) },
+                    { label: "Amount Paid", value: fmt(selected.amountPaid || 0) },
+                    { label: "Balance", value: fmt(selected.balance) },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest">{label}</p>
+                      <p className="text-sm font-semibold text-[#0B1C30] mt-0.5">{value}</p>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
 
             <div>
@@ -402,86 +434,98 @@ export default function PaymentsPage() {
               </p>
             </div>
 
-            {selected.paymentStatus === "PAID" && (
-              <div className="flex flex-col gap-2 border border-[#E2E8F0] rounded-xl p-4">
-                <p className="text-sm font-bold text-[#0B1C30]">Revert Payment</p>
-                <p className="text-xs text-[#94A3B8]">
-                  Mark this record as unpaid if the payment was recorded in error.
-                </p>
-                <button
-                  onClick={handleMarkUnpaid}
-                  disabled={actionLoading}
-                  className="w-full bg-[#93000A] text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-[#BA1A1A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {actionLoading ? (
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : "Mark as Unpaid"}
-                </button>
-              </div>
-            )}
+            {!selected.isCheckUp && (
+              <>
+                {selected.paymentStatus === "PAID" && (
+                  <div className="flex flex-col gap-2 border border-[#E2E8F0] rounded-xl p-4">
+                    <p className="text-sm font-bold text-[#0B1C30]">Revert Payment</p>
+                    <p className="text-xs text-[#94A3B8]">
+                      Mark this record as unpaid if the payment was recorded in error.
+                    </p>
+                    <button
+                      onClick={handleMarkUnpaid}
+                      disabled={actionLoading}
+                      className="w-full bg-[#93000A] text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-[#BA1A1A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {actionLoading ? (
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : "Mark as Unpaid"}
+                    </button>
+                  </div>
+                )}
 
-            {selected.paymentStatus === "PENDING" && (
-              <div className="flex flex-col gap-2 border border-[#FEF3C7] bg-[#FFFBEB] rounded-xl p-4">
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#92400E] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-sm font-bold text-[#92400E]">Payment Pending</p>
-                </div>
-                <p className="text-xs text-[#92400E]">
-                  This record is pending. Click below to mark it as unpaid so you can record a payment.
-                </p>
-                <button
-                  onClick={handleMarkUnpaid}
-                  disabled={actionLoading}
-                  className="w-full bg-[#92400E] text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-[#78350F] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {actionLoading ? (
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : "Mark as Unpaid to Record Payment"}
-                </button>
-              </div>
-            )}
-
-            {selected.paymentStatus === "UNPAID" && (
-              <div className="flex flex-col gap-3 border border-[#E2E8F0] rounded-xl p-4">
-                <div>
-                  <p className="text-sm font-bold text-[#0B1C30]">Record Payment</p>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">
-                    Amount must be ≤ balance ({fmt(selected.balance)}). Partial payments are allowed.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    max={selected.balance}
-                    placeholder={`Max ${fmt(selected.balance)}`}
-                    value={payAmount}
-                    onChange={(e) => setPayAmount(e.target.value)}
-                    disabled={actionLoading}
-                    className="flex-1 bg-white border border-[#F1F5F9] rounded-lg px-3 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
-                  />
-                  <button
-                    onClick={handleRecordPayment}
-                    disabled={actionLoading}
-                    className="bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {actionLoading ? (
-                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                {selected.paymentStatus === "PENDING" && (
+                  <div className="flex flex-col gap-2 border border-[#FEF3C7] bg-[#FFFBEB] rounded-xl p-4">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-[#92400E] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                    ) : "Record"}
-                  </button>
-                </div>
+                      <p className="text-sm font-bold text-[#92400E]">Payment Pending</p>
+                    </div>
+                    <p className="text-xs text-[#92400E]">
+                      This record is pending. Click below to mark it as unpaid so you can record a payment.
+                    </p>
+                    <button
+                      onClick={handleMarkUnpaid}
+                      disabled={actionLoading}
+                      className="w-full bg-[#92400E] text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-[#78350F] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {actionLoading ? (
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : "Mark as Unpaid to Record Payment"}
+                    </button>
+                  </div>
+                )}
+
+                {selected.paymentStatus === "UNPAID" && (
+                  <div className="flex flex-col gap-3 border border-[#E2E8F0] rounded-xl p-4">
+                    <div>
+                      <p className="text-sm font-bold text-[#0B1C30]">Record Payment</p>
+                      <p className="text-xs text-[#94A3B8] mt-0.5">
+                        Amount must be ≤ balance ({fmt(selected.balance)}). Partial payments are allowed.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        max={selected.balance}
+                        placeholder={`Max ${fmt(selected.balance)}`}
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        disabled={actionLoading}
+                        className="flex-1 bg-white border border-[#F1F5F9] rounded-lg px-3 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
+                      />
+                      <button
+                        onClick={handleRecordPayment}
+                        disabled={actionLoading}
+                        className="bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {actionLoading ? (
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        ) : "Record"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {selected.isCheckUp && (
+              <div className="bg-[#F0FDFA] rounded-lg p-4 text-center border border-[#0D9488]">
+                <p className="text-sm font-medium text-[#0F766E]">
+                  No payment actions available for check-up records
+                </p>
               </div>
             )}
           </div>

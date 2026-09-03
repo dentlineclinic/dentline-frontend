@@ -1,4 +1,3 @@
-// services/patientHistoryService.ts
 import api from "@/lib/axios";
 
 // ============================================
@@ -30,14 +29,15 @@ export interface PatientHistory {
   id: string;
   patientId: string;
   patientName: string;
+  hmo: string | null;
   doctorId: string;
   doctorName: string;
   appointmentId: string;
   appointmentDate: string;
   observation: string;
-  amount: number;
+  amount: number | null;
   discount: number;
-  amountPaid: number;  // ✅ NEW
+  amountPaid: number;
   balance: number;
   paymentStatus: string;
   status: string;
@@ -75,14 +75,15 @@ export interface RecordPaymentResponse {
     id: string;
     patientId: string;
     patientName: string;
+    hmo: string | null;
     doctorId: string;
     doctorName: string;
     appointmentId: string;
     appointmentDate: string;
     observation: string;
-    amount: number;
+    amount: number | null;
     discount: number;
-    amountPaid: number;  // ✅ NEW
+    amountPaid: number;
     balance: number;
     paymentStatus: string;
     status: string;
@@ -109,8 +110,8 @@ export interface PaymentStatsResponse {
 
 export interface CreatePatientHistoryRequest {
   appointmentId: string;
-  amount: number;
-  discount: number;
+  amount?: number | null;
+  discount?: number;
 }
 
 export interface UpdateObservationRequest {
