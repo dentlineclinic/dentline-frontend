@@ -9,20 +9,41 @@ declare global {
   }
 }
 
+/* ============================================
+   CONSENT CHECKS
+============================================ */
+
 /**
- * Check if analytics tracking is allowed (consent given)
+ * Check if analytics tracking is allowed.
  */
-const isTrackingAllowed = (): boolean => {
+const isAnalyticsTrackingAllowed = (): boolean => {
   if (typeof window === "undefined") return false;
   return getConsent("analytics");
 };
 
 /**
- * Track a custom event
+ * Check if advertising/Google Ads tracking is allowed.
  */
-export const trackEvent = (eventName: string, params?: Record<string, any>) => {
+const isAdvertisingTrackingAllowed = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return getConsent("advertising");
+};
+
+/* ============================================
+   GENERIC ANALYTICS EVENTS
+============================================ */
+
+/**
+ * Track a custom analytics event.
+ */
+export const trackEvent = (
+  eventName: string,
+  params?: Record<string, any>
+) => {
   if (typeof window === "undefined") return;
-  if (!isTrackingAllowed()) return;
+
+  // Normal analytics events require analytics consent
+  if (!isAnalyticsTrackingAllowed()) return;
 
   if (window.gtag) {
     window.gtag("event", eventName, params);
@@ -34,8 +55,15 @@ export const trackEvent = (eventName: string, params?: Record<string, any>) => {
   }
 };
 
+/* ============================================
+   GOOGLE ADS CONVERSION
+============================================ */
+
 /**
- * Track a Google Ads conversion
+ * Track a Google Ads conversion.
+ *
+ * Google Ads conversions require advertising consent,
+ * not analytics consent.
  */
 export const trackConversion = (
   conversionId: string,
@@ -44,12 +72,19 @@ export const trackConversion = (
   currency: string = "NGN"
 ) => {
   if (typeof window === "undefined") return;
-  if (!isTrackingAllowed()) return;
+
+  // Google Ads conversions require advertising consent
+  if (!isAdvertisingTrackingAllowed()) return;
+
+  if (!conversionId || !conversionLabel) return;
 
   const params: Record<string, any> = {
     send_to: `${conversionId}/${conversionLabel}`,
   };
 
+  // Only send a value if one was explicitly provided.
+  // This prevents accidentally overriding the Google Ads
+  // conversion's configured default value.
   if (value !== undefined) {
     params.value = value;
     params.currency = currency;
@@ -57,18 +92,28 @@ export const trackConversion = (
 
   if (window.gtag) {
     window.gtag("event", "conversion", params);
+  } else if (window.dataLayer) {
+    window.dataLayer.push({
+      event: "conversion",
+      ...params,
+    });
   }
 };
 
+/* ============================================
+   PAGE VIEW
+============================================ */
+
 /**
- * Track a page view
+ * Track a page view.
  */
 export const trackPageView = (path: string, title?: string) => {
   if (typeof window === "undefined") return;
-  if (!isTrackingAllowed()) return;
+
+  if (!isAnalyticsTrackingAllowed()) return;
 
   const tagId = process.env.NEXT_PUBLIC_GOOGLE_TAG_ID;
-  
+
   if (window.gtag && tagId) {
     window.gtag("config", tagId, {
       page_path: path,
@@ -78,13 +123,17 @@ export const trackPageView = (path: string, title?: string) => {
   }
 };
 
-// ============================================
-// DENTLINE SPECIFIC EVENTS
-// ============================================
+/* ============================================
+   DENTLINE SPECIFIC EVENTS
+============================================ */
 
 /**
- * Track when a patient books an appointment
- * This is your most important conversion!
+ * Track when a patient books an appointment.
+ *
+ * This tracks the analytics event.
+ * The Google Ads conversion can be added separately
+ * once the Appointment Booking conversion is created
+ * in Google Ads.
  */
 export const trackAppointmentBooked = (
   patientName: string,
@@ -101,7 +150,7 @@ export const trackAppointmentBooked = (
 };
 
 /**
- * Track when a patient books a family appointment
+ * Track when a patient books a family appointment.
  */
 export const trackFamilyAppointmentBooked = (
   headPatientName: string,
@@ -116,9 +165,12 @@ export const trackFamilyAppointmentBooked = (
 };
 
 /**
- * Track phone call clicks
+ * Track phone call clicks.
  */
-export const trackPhoneClick = (phoneNumber: string, source: string) => {
+export const trackPhoneClick = (
+  phoneNumber: string,
+  source: string
+) => {
   trackEvent("phone_click", {
     phone_number: phoneNumber,
     source: source,
@@ -126,9 +178,12 @@ export const trackPhoneClick = (phoneNumber: string, source: string) => {
 };
 
 /**
- * Track WhatsApp clicks
+ * Track WhatsApp clicks.
  */
-export const trackWhatsAppClick = (phoneNumber: string, source: string) => {
+export const trackWhatsAppClick = (
+  phoneNumber: string,
+  source: string
+) => {
   trackEvent("whatsapp_click", {
     phone_number: phoneNumber,
     source: source,
@@ -136,9 +191,13 @@ export const trackWhatsAppClick = (phoneNumber: string, source: string) => {
 };
 
 /**
- * Track product views
+ * Track product views.
  */
-export const trackProductView = (productId: string, productName: string, price: number) => {
+export const trackProductView = (
+  productId: string,
+  productName: string,
+  price: number
+) => {
   trackEvent("product_view", {
     product_id: productId,
     product_name: productName,
@@ -147,9 +206,13 @@ export const trackProductView = (productId: string, productName: string, price: 
 };
 
 /**
- * Track product added to cart
+ * Track product added to cart.
  */
-export const trackProductAddedToCart = (productId: string, productName: string, price: number) => {
+export const trackProductAddedToCart = (
+  productId: string,
+  productName: string,
+  price: number
+) => {
   trackEvent("add_to_cart", {
     product_id: productId,
     product_name: productName,
@@ -158,14 +221,18 @@ export const trackProductAddedToCart = (productId: string, productName: string, 
 };
 
 /**
- * Track product purchase
+ * Track product purchase.
  */
-export const trackProductPurchase = (orderId: string, total: number, items: any[]) => {
+export const trackProductPurchase = (
+  orderId: string,
+  total: number,
+  items: any[]
+) => {
   trackEvent("purchase", {
     order_id: orderId,
     value: total,
     currency: "NGN",
-    items: items.map(item => ({
+    items: items.map((item) => ({
       item_id: item.id,
       item_name: item.name,
       price: item.price,
@@ -175,17 +242,24 @@ export const trackProductPurchase = (orderId: string, total: number, items: any[
 };
 
 /**
- * Track broadcast sent
+ * Track broadcast sent.
  */
-export const trackBroadcastSent = (recipientCount: number, subject: string) => {
+export const trackBroadcastSent = (
+  recipientCount: number,
+  subject: string
+) => {
   trackEvent("broadcast_sent", {
     recipient_count: recipientCount,
     subject: subject,
   });
 };
 
+/* ============================================
+   PATIENT REGISTRATION
+============================================ */
+
 /**
- * Track patient registration (event only)
+ * Track patient registration as an analytics event.
  */
 export const trackPatientRegistration = (source?: string) => {
   trackEvent("patient_registered", {
@@ -194,47 +268,89 @@ export const trackPatientRegistration = (source?: string) => {
 };
 
 /**
- * Track patient sign-up as a Google Ads conversion
- * This should be called when a patient successfully completes registration
+ * Track patient sign-up as a Google Ads conversion.
+ *
+ * IMPORTANT:
+ * This should only be called after the backend
+ * confirms that registration was successful.
  */
-export const trackPatientSignUp = (source?: string, value?: number) => {
-  // Track as an event
+export const trackPatientSignUp = (
+  source?: string,
+  value?: number
+) => {
+  /*
+   * Track the normal analytics event.
+   *
+   * This uses analytics consent.
+   */
   trackEvent("patient_sign_up", {
     source: source || "direct",
   });
 
-  // Track as a Google Ads conversion if configured
-  const conversionId = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_ID || "";
-  const conversionLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL_PATIENT || "";
-  
+  /*
+   * Google Ads conversion configuration.
+   */
+  const conversionId =
+    process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_ID || "";
+
+  const conversionLabel =
+    process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL_PATIENT || "";
+
+  /*
+   * Track the Google Ads conversion.
+   *
+   * This uses advertising consent.
+   */
   if (conversionId && conversionLabel) {
-    trackConversion(conversionId, conversionLabel, value);
+    trackConversion(
+      conversionId,
+      conversionLabel,
+      value
+    );
   }
 };
 
+/* ============================================
+   NEWSLETTER
+============================================ */
+
 /**
- * Track newsletter subscription
+ * Track newsletter subscription.
  */
-export const trackNewsletterSubscription = (email: string) => {
+export const trackNewsletterSubscription = (
+  email: string
+) => {
   trackEvent("newsletter_subscription", {
-    email: email,
+    email,
   });
 };
 
+/* ============================================
+   EMERGENCY CALL
+============================================ */
+
 /**
- * Track emergency call
+ * Track emergency call.
  */
-export const trackEmergencyCall = (source: string) => {
+export const trackEmergencyCall = (
+  source: string
+) => {
   trackEvent("emergency_call", {
-    source: source,
+    source,
   });
 };
 
+/* ============================================
+   LOCATION / DIRECTIONS
+============================================ */
+
 /**
- * Track location/directions click
+ * Track location/directions click.
  */
-export const trackLocationClick = (branch: string) => {
+export const trackLocationClick = (
+  branch: string
+) => {
   trackEvent("location_click", {
-    branch: branch,
+    branch,
   });
 };

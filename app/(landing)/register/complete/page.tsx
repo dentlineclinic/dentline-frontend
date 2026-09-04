@@ -98,7 +98,7 @@ export default function CompleteRegistrationPage() {
       errors.emergencyContactName = "Emergency contact name is required.";
     if (!emergencyContactPhone.trim())
       errors.emergencyContactPhone = "Emergency contact phone is required.";
-    
+
 
     return errors;
   };
@@ -159,8 +159,8 @@ export default function CompleteRegistrationPage() {
     mutation.mutate(payload, {
       onSuccess: () => {
         // 🎯 Track patient sign-up as a Google Ads conversion
-        trackPatientSignUp("website_registration", 0);
-        
+        trackPatientSignUp("website_registration");
+
         sessionStorage.removeItem("reg_identifier");
         sessionStorage.removeItem("reg_otp_verified");
         router.push("/login");
@@ -530,7 +530,7 @@ export default function CompleteRegistrationPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">
-                  HMO 
+                  HMO
                 </label>
                 <select
                   value={hmo}
@@ -551,7 +551,7 @@ export default function CompleteRegistrationPage() {
 
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">
-                  HMO ID 
+                  HMO ID
                 </label>
                 <input
                   type="text"
