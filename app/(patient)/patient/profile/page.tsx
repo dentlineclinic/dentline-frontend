@@ -551,7 +551,7 @@ function PatientProfilePageInner() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-[#3D4946]">Medical History</label>
+                <label className="text-sm font-semibold text-[#3D4946]">Medical History / Allergies</label>
                 <textarea
                   rows={4}
                   value={medicalHistory}

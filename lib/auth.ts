@@ -49,9 +49,16 @@ export function applyAuthSuccess(data: AuthResponseData): void {
   window.dispatchEvent(new Event("user-auth-updated"));
 }
 
-/** Clears all auth state — tokens, localStorage, and cookies. */
+/** Clears all auth state — tokens, localStorage auth keys, and cookies. */
 export function clearAuthState(): void {
-  localStorage.clear();
+  // Only remove auth-specific keys, don't nuke the whole localStorage
+  Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
   document.cookie = `${COOKIE_KEYS.TOKEN}=; path=/; max-age=0; samesite=strict`;
   document.cookie = `${COOKIE_KEYS.ROLE}=; path=/; max-age=0; samesite=strict`;
+}
+
+/** Updates the token cookie after a silent refresh so the proxy middleware stays in sync. */
+export function updateTokenCookie(accessToken: string): void {
+  const cookieOpts = "path=/; samesite=strict; max-age=86400";
+  document.cookie = `${COOKIE_KEYS.TOKEN}=${accessToken}; ${cookieOpts}`;
 }

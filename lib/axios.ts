@@ -1,4 +1,6 @@
 import axios, { AxiosError } from "axios";
+import { clearAuthState, updateTokenCookie } from "@/lib/auth";
+import { STORAGE_KEYS } from "@/lib/constants";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -46,10 +48,11 @@ api.interceptors.response.use(
       if (typeof window === "undefined") return Promise.reject(error);
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
+        const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 
         if (!refreshToken) {
-          localStorage.clear();
+          // No refresh token — clear auth and redirect to login
+          clearAuthState();
           window.location.href = "/login";
           return Promise.reject(error);
         }
@@ -61,14 +64,20 @@ api.interceptors.response.use(
 
         const newAccessToken = res.data.data.accessToken;
 
-        localStorage.setItem("token", newAccessToken);
+        // Persist new access token
+        localStorage.setItem(STORAGE_KEYS.TOKEN, newAccessToken);
+
+        // Also update the cookie so the proxy middleware sees the fresh token
+        updateTokenCookie(newAccessToken);
+
         api.defaults.headers.common["Authorization"] = `Bearer ${newAccessToken}`;
         originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
         return api(originalRequest);
       } catch {
-        localStorage.clear();
+        // Refresh failed (expired or invalid refresh token) — full sign-out
+        clearAuthState();
         window.location.href = "/login";
       }
     }

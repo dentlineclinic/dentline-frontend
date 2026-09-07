@@ -565,7 +565,7 @@ export default function PatientsPage() {
             {/* Medical history */}
             <div className="flex flex-col gap-2">
               <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest border-b border-[#F1F5F9] pb-2">
-                Medical History
+                Medical History / Allergies
               </p>
               <p className="text-sm text-[#485F83] leading-relaxed bg-[#F8FAFC] rounded-lg p-4">
                 {selected.medicalHistory}
