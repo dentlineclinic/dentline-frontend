@@ -202,10 +202,11 @@ export default function MedicalHistoryPage() {
     }
   };
 
-  const allTotalAmount = allHistories.reduce((sum, h) => sum + h.amount, 0);
+  const allTotalAmount = allHistories.reduce((sum, h) => sum + (h.amount || 0), 0);
   const allPaidAmount = allHistories
     .filter(h => h.paymentStatus === "PAID")
-    .reduce((sum, h) => sum + h.amount, 0);
+    .reduce((sum, h) => sum + (h.amount || 0), 0);
+  const checkupCount = allHistories.filter(h => !h.amount || h.amount === 0).length;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -274,7 +275,7 @@ export default function MedicalHistoryPage() {
                   ₦{allTotalAmount.toLocaleString()}
                 </p>
                 <p className="text-xs text-[#0D9488] mt-1">
-                  ₦{allPaidAmount.toLocaleString()} paid
+                  ₦{allPaidAmount.toLocaleString()} paid{checkupCount > 0 ? ` · ${checkupCount} checkup${checkupCount !== 1 ? "s" : ""}` : ""}
                 </p>
               </div>
               <div className="w-12 h-12 bg-[#F0FDFA] rounded-xl flex items-center justify-center">
@@ -490,7 +491,9 @@ export default function MedicalHistoryPage() {
                             d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
-                        ₦{history.amount.toLocaleString()}
+                        {(history.amount === 0 || history.amount === null || history.amount === undefined)
+                          ? <span className="font-semibold text-[#0D9488]">Checkup</span>
+                          : `₦${history.amount.toLocaleString()}`}
                       </span>
                       <span
                         className={`text-xs font-bold px-2 py-1 rounded-full ${
@@ -650,7 +653,11 @@ export default function MedicalHistoryPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-[#94A3B8]">Amount</p>
-                    <p className="text-lg font-bold text-[#0B1C30]">₦{selectedHistory.amount.toLocaleString()}</p>
+                    <p className="text-lg font-bold text-[#0B1C30]">
+                      {(selectedHistory.amount === 0 || selectedHistory.amount === null || selectedHistory.amount === undefined)
+                        ? <span className="text-[#0D9488]">Checkup</span>
+                        : `₦${selectedHistory.amount.toLocaleString()}`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-[#94A3B8]">Payment Status</p>

@@ -15,7 +15,8 @@ export interface ToothObservation {
 }
 
 export interface AddToothObservationRequest {
-  fdiCode: string;
+  fdiCode?: string;  // Legacy single tooth - optional now
+  fdiCodes?: string[]; // New multi-tooth support
   toothType: "PERMANENT" | "PRIMARY";
   diagnosis: string;
   treatment: string;
@@ -43,7 +44,9 @@ export interface PatientHistory {
   status: string;
   createdAt: string;
   imageUrls: string[];
+  imageIds: string[];
   videoUrls: string[];
+  videoIds: string[];
   familyMemberId?: string;
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
@@ -138,7 +141,7 @@ export const fetchPatientHistories = async (
   }
 
   let endpoint = "/patient-history/all";
-  
+
   if (search && search.trim()) {
     endpoint = "/patient-history/search";
     params.name = search.trim();
@@ -341,6 +344,41 @@ export const deleteToothObservation = async (
 ): Promise<SinglePatientHistoryResponse> => {
   const res = await api.delete(
     `/patient-history/${historyId}/tooth-observation/${toothObservationId}`
+  );
+  return res.data;
+};
+
+
+// Add this to patientHistoryService.ts after the existing types
+
+export interface PatientSearchResult {
+  patientId: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+}
+
+export interface PatientSearchResponse {
+  success: boolean;
+  message: string;
+  data: {
+    content: PatientSearchResult[];
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;
+  };
+}
+
+// Add this API function
+export const searchPatientsForHistory = async (
+  name: string,
+  page = 0,
+  size = 10
+): Promise<PatientSearchResponse> => {
+  const res = await api.get<PatientSearchResponse>(
+    "/patient-history/patients/search",
+    { params: { name, page, size } }
   );
   return res.data;
 };

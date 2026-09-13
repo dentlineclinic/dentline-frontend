@@ -93,11 +93,13 @@ const TOOTH_SIZE: Record<ToothKind, { w: number; h: number }> = {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface ToothChartProps {
-  selectedTooth: string | null;
+  selectedTeeth: string[];
   onToothSelect: (fdiCode: string, toothType: "PERMANENT" | "PRIMARY") => void;
+  onToothDeselect: (fdiCode: string) => void;
   toothType: "PERMANENT" | "PRIMARY";
   existingObservations?: string[];
   isReadOnly?: boolean;
+  maxSelection?: number;
 }
 
 // ── Single tooth cell (SVG-based shape) ──────────────────────────────────────
@@ -110,9 +112,10 @@ interface ToothCellProps {
   isReadOnly: boolean;
   onHover: (code: string | null) => void;
   onClick: () => void;
+  onContextMenu?: () => void;
 }
 
-function ToothCell({ tooth, isUpper, isSelected, isExisting, isHovered, isReadOnly, onHover, onClick }: ToothCellProps) {
+function ToothCell({ tooth, isUpper, isSelected, isExisting, isHovered, isReadOnly, onHover, onClick, onContextMenu }: ToothCellProps) {
   const { w, h } = TOOTH_SIZE[tooth.kind];
 
   // Colour scheme
@@ -140,8 +143,7 @@ function ToothCell({ tooth, isUpper, isSelected, isExisting, isHovered, isReadOn
 
   // Upper: crown at bottom (close to midline), root at top
   // Lower: crown at top (close to midline), root at bottom
-  const crownH = isUpper ? h * 0.55 : h * 0.55;
-  const rootH  = h - crownH;
+  const rootH  = isUpper ? h * 0.45 : h * 0.45;
 
   const upperPath = `
     M ${rx} 0
@@ -173,7 +175,13 @@ function ToothCell({ tooth, isUpper, isSelected, isExisting, isHovered, isReadOn
       onMouseEnter={() => !isReadOnly && onHover(tooth.code)}
       onMouseLeave={() => !isReadOnly && onHover(null)}
       onClick={() => { if (!isReadOnly && !isExisting) onClick(); }}
-      title={`${tooth.code} – ${tooth.label}${isExisting ? " (Already observed)" : ""}`}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (!isReadOnly && isSelected && onContextMenu) {
+          onContextMenu();
+        }
+      }}
+      title={`${tooth.code} – ${tooth.label}${isExisting ? " (Already observed)" : ""}${isSelected ? " (Right-click to deselect)" : ""}`}
     >
       {/* FDI code above upper teeth, below lower teeth */}
       {isUpper && (
@@ -224,20 +232,21 @@ function ToothCell({ tooth, isUpper, isSelected, isExisting, isHovered, isReadOn
 interface ArchProps {
   teeth: ToothDef[];
   isUpper: boolean;
-  selectedTooth: string | null;
+  selectedTeeth: string[];
   existingObservations: string[];
   isReadOnly: boolean;
   hoveredTooth: string | null;
   toothType: "PERMANENT" | "PRIMARY";
   onHover: (code: string | null) => void;
   onSelect: (code: string) => void;
+  onDeselect: (code: string) => void;
 }
 
-function Arch({ teeth, isUpper, selectedTooth, existingObservations, isReadOnly, hoveredTooth, toothType, onHover, onSelect }: ArchProps) {
+function Arch({ teeth, isUpper, selectedTeeth, existingObservations, isReadOnly, hoveredTooth, toothType, onHover, onSelect, onDeselect }: ArchProps) {
   // Split into left half and right half for midline marker
   const midpoint = Math.floor(teeth.length / 2);
-  const rightHalf = teeth.slice(0, midpoint);   // patient's right
-  const leftHalf  = teeth.slice(midpoint);       // patient's left
+  const rightHalf = teeth.slice(0, midpoint);
+  const leftHalf  = teeth.slice(midpoint);
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -254,12 +263,13 @@ function Arch({ teeth, isUpper, selectedTooth, existingObservations, isReadOnly,
               key={tooth.code}
               tooth={tooth}
               isUpper={isUpper}
-              isSelected={selectedTooth === tooth.code}
+              isSelected={selectedTeeth.includes(tooth.code)}
               isExisting={existingObservations.includes(tooth.code)}
               isHovered={hoveredTooth === tooth.code}
               isReadOnly={isReadOnly}
               onHover={onHover}
               onClick={() => onSelect(tooth.code)}
+              onContextMenu={() => onDeselect(tooth.code)}
             />
           ))}
         </div>
@@ -274,12 +284,13 @@ function Arch({ teeth, isUpper, selectedTooth, existingObservations, isReadOnly,
               key={tooth.code}
               tooth={tooth}
               isUpper={isUpper}
-              isSelected={selectedTooth === tooth.code}
+              isSelected={selectedTeeth.includes(tooth.code)}
               isExisting={existingObservations.includes(tooth.code)}
               isHovered={hoveredTooth === tooth.code}
               isReadOnly={isReadOnly}
               onHover={onHover}
               onClick={() => onSelect(tooth.code)}
+              onContextMenu={() => onDeselect(tooth.code)}
             />
           ))}
         </div>
@@ -302,17 +313,27 @@ function HoverTooltip({ code, teeth }: { code: string | null; teeth: ToothDef[] 
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function ToothChart({
-  selectedTooth,
+  selectedTeeth = [],
   onToothSelect,
+  onToothDeselect,
   toothType,
   existingObservations = [],
   isReadOnly = false,
+  maxSelection = 32,
 }: ToothChartProps) {
   const [hoveredTooth, setHoveredTooth] = useState<string | null>(null);
 
   const upperTeeth = toothType === "PERMANENT" ? UPPER_PERMANENT : UPPER_PRIMARY;
   const lowerTeeth = toothType === "PERMANENT" ? LOWER_PERMANENT : LOWER_PRIMARY;
   const allTeeth   = [...upperTeeth, ...lowerTeeth];
+
+  const handleToothSelect = (code: string) => {
+    if (selectedTeeth.length >= maxSelection) {
+      // You can add a toast notification here
+      return;
+    }
+    onToothSelect(code, toothType);
+  };
 
   return (
     <div className="w-full bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] p-4 sm:p-6 select-none">
@@ -330,13 +351,14 @@ export default function ToothChart({
         <Arch
           teeth={upperTeeth}
           isUpper={true}
-          selectedTooth={selectedTooth}
+          selectedTeeth={selectedTeeth}
           existingObservations={existingObservations}
           isReadOnly={isReadOnly}
           hoveredTooth={hoveredTooth}
           toothType={toothType}
           onHover={setHoveredTooth}
-          onSelect={(code) => onToothSelect(code, toothType)}
+          onSelect={handleToothSelect}
+          onDeselect={onToothDeselect}
         />
 
         {/* Occlusal gap */}
@@ -353,18 +375,37 @@ export default function ToothChart({
         <Arch
           teeth={lowerTeeth}
           isUpper={false}
-          selectedTooth={selectedTooth}
+          selectedTeeth={selectedTeeth}
           existingObservations={existingObservations}
           isReadOnly={isReadOnly}
           hoveredTooth={hoveredTooth}
           toothType={toothType}
           onHover={setHoveredTooth}
-          onSelect={(code) => onToothSelect(code, toothType)}
+          onSelect={handleToothSelect}
+          onDeselect={onToothDeselect}
         />
       </div>
 
+      {/* Selected teeth count and clear button */}
+      {selectedTeeth.length > 0 && (
+        <div className="mt-3 flex items-center justify-between px-2">
+          <span className="text-xs text-[#3D4946]">
+            {selectedTeeth.length} tooth{selectedTeeth.length > 1 ? 's' : ''} selected 
+            {maxSelection > 0 && ` (max ${maxSelection})`}
+          </span>
+          <button
+            onClick={() => {
+              selectedTeeth.forEach(code => onToothDeselect(code));
+            }}
+            className="text-xs font-semibold text-[#93000A] hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {/* Legend */}
-      <div className="flex flex-wrap justify-center gap-4 mt-5 pt-4 border-t border-[#E2E8F0]">
+      <div className="flex flex-wrap justify-center gap-4 mt-3 pt-4 border-t border-[#E2E8F0]">
         {[
           { fill: "#FFFFFF", stroke: "#94A3B8", label: "Available" },
           { fill: "#F0FDFA", stroke: "#00685C", label: "Hover" },
@@ -385,15 +426,10 @@ export default function ToothChart({
         ))}
       </div>
 
-      {/* Selected tooth info */}
-      {selectedTooth && (
-        <div className="mt-3 text-center">
-          <span className="inline-flex items-center gap-1.5 bg-[#F0FDFA] border border-[#00685C]/30 text-[#00685C] text-xs font-semibold px-3 py-1.5 rounded-full">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-            Tooth {selectedTooth} selected — {allTeeth.find(t => t.code === selectedTooth)?.label}
-          </span>
+      {/* Info about right-click deselect */}
+      {selectedTeeth.length > 0 && !isReadOnly && (
+        <div className="mt-2 text-center text-xs text-[#94A3B8]">
+          💡 Right-click a selected tooth to deselect it
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-
+import type { SinglePatientHistoryResponse } from "./patientHistoryService";
 
 // Add this to your doctorService.ts file
 
@@ -251,6 +251,54 @@ export const uploadDoctorProfilePhoto = async (
 };
 
 
+
+
+export const deleteHistoryImage = async (
+  historyId: string,
+  imageId: string
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.delete(`/patient-history/${historyId}/image/${imageId}`);
+  return res.data;
+};
+
+export const deleteHistoryVideo = async (
+  historyId: string,
+  videoId: string
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.delete(`/patient-history/${historyId}/video/${videoId}`);
+  return res.data;
+};
+
+export const uploadHistoryImage = async (
+  historyId: string,
+  file: File
+): Promise<SinglePatientHistoryResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await api.post(
+    `/patient-history/${historyId}/upload/image`,
+    formData
+  );
+
+  return res.data;
+};
+
+export const uploadHistoryVideo = async (
+  historyId: string,
+  file: File
+): Promise<SinglePatientHistoryResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await api.post(
+    `/patient-history/${historyId}/upload/video`,
+    formData
+  );
+
+  return res.data;
+};
+
 export const updateObservation = async (
   historyId: string,
   observation: string
@@ -266,51 +314,5 @@ export const markHistoryAsCompleted = async (
   historyId: string
 ): Promise<BasicResponse> => {
   const res = await api.patch(`/patient-history/${historyId}/complete`);
-  return res.data;
-};
-
-export const uploadHistoryImage = async (
-  historyId: string,
-  file: File
-): Promise<BasicResponse> => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const res = await api.post(
-    `/patient-history/${historyId}/upload/image`,
-    formData
-  );
-
-  return res.data;
-};
-
-export const uploadHistoryVideo = async (
-  historyId: string,
-  file: File
-): Promise<BasicResponse> => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const res = await api.post(
-    `/patient-history/${historyId}/upload/video`,
-    formData
-  );
-
-  return res.data;
-};
-
-export const deleteHistoryImage = async (
-  historyId: string,
-  imageId: string
-): Promise<BasicResponse> => {
-  const res = await api.delete(`/patient-history/${historyId}/image/${imageId}`);
-  return res.data;
-};
-
-export const deleteHistoryVideo = async (
-  historyId: string,
-  videoId: string
-): Promise<BasicResponse> => {
-  const res = await api.delete(`/patient-history/${historyId}/video/${videoId}`);
   return res.data;
 };
