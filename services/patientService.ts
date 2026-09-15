@@ -22,11 +22,14 @@ type Patient = {
 
 export interface CreatePatientRequest {
   name: string;
-  email: string;
+  email?: string;              
   password: string;
-  phoneNumber: string;
-  dateOfBirth: string;
-  gender: string;
+  phoneNumber?: string;        
+  dateOfBirth?: string;       
+  gender?: string;           
+  hmo?: string;                
+  hmoId?: string;              
+  lastVerificationType: "EMAIL" | "PHONE";  
 }
 
 export interface CreatePatientResponse {
@@ -34,9 +37,13 @@ export interface CreatePatientResponse {
   message: string;
   data: {
     id: string;
+    patientId?: string;
+    userId?: string;
     name: string;
-    email: string;
+    email?: string | null;
+    phoneNumber?: string | null;
     role: string;
+    lastVerificationType?: "EMAIL" | "PHONE";
   };
 }
 
@@ -309,4 +316,51 @@ export const updatePatientProfile = async (
 ): Promise<{ success: boolean; message: string; data: PatientDto }> => {
   const res = await api.patch(`/users/patients/user/${userId}/profile`, payload);
   return res.data;
+};
+
+
+export const fetchPatientsByDateRange = async (
+  startDate: string, // ISO format: "YYYY-MM-DD"
+  endDate: string,   // ISO format: "YYYY-MM-DD"
+  page = 0,
+  size = 10
+) => {
+  try {
+    const response = await api.get<PatientResponse>(
+      "/users/patients/by-date",
+      {
+        params: {
+          startDate,
+          endDate,
+          page,
+          size,
+        },
+      }
+    );
+
+    return {
+      success: response.data.success ?? true,
+      data: {
+        content: response.data?.data?.content || [],
+        totalElements: response.data?.data?.totalElements || 0,
+        totalPages: response.data?.data?.totalPages || 0,
+        size: response.data?.data?.size || size,
+        number: response.data?.data?.number || page,
+      },
+      message: response.data?.message || "Patients retrieved",
+    };
+  } catch (error) {
+    console.error("Error fetching patients by date range:", error);
+    return {
+      success: false,
+      data: {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        size: size,
+        number: page,
+      },
+      message: "Failed to fetch patients by date range",
+    };
+  }
 };

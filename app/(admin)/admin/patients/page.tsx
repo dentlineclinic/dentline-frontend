@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { fetchPatients, createPatient } from "@/services/patientService";
+import {
+  fetchPatients,
+  fetchPatientsByDateRange,
+  createPatient,
+} from "@/services/patientService";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +29,8 @@ type Patient = {
   hmoId: string;
 };
 
+type VerificationType = "EMAIL" | "PHONE";
+
 type CreatePatientForm = {
   name: string;
   email: string;
@@ -32,7 +38,32 @@ type CreatePatientForm = {
   phoneNumber: string;
   dateOfBirth: string;
   gender: string;
+  hmo: string;                       // NEW
+  hmoId: string;                     // NEW
+  lastVerificationType: VerificationType; // NEW
 };
+
+type DateFilterMode = "all" | "range";
+
+// HMO options mirrored from the backend enum
+const HMO_OPTIONS: { value: string; label: string }[] = [
+  { value: "RELIANCE", label: "Reliance" },
+  { value: "LEADWAY", label: "Leadway" },
+  { value: "REDCARE", label: "Redcare" },
+  { value: "NOOR", label: "Noor" },
+  { value: "LIFE_WORTH", label: "Life Worth" },
+  { value: "LIFE_ACTION", label: "Life Action" },
+  { value: "PHILLIPS", label: "Phillips" },
+  { value: "VEO", label: "Veo" },
+  { value: "ASPIRE", label: "Aspire" },
+  { value: "MEDIPLAN", label: "Mediplan" },
+  { value: "AVILIA", label: "Avilia" },
+  { value: "THT", label: "THT" },
+  { value: "HCI", label: "HCI" },
+  { value: "NOVO", label: "Novo" },
+  { value: "ALTU", label: "Altu" },
+  { value: "AXAMANSARD", label: "AXA Mansard" },
+];
 
 function DetailRow({ label, value }: { label: string; value: string | number }) {
   return (
@@ -84,6 +115,18 @@ function IdDetailRow({ label, id, shortId }: { label: string; id: string; shortI
   );
 }
 
+const DEFAULT_CREATE_FORM: CreatePatientForm = {
+  name: "",
+  email: "",
+  password: "",
+  phoneNumber: "",
+  dateOfBirth: "",
+  gender: "",
+  hmo: "",
+  hmoId: "",
+  lastVerificationType: "EMAIL",
+};
+
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,78 +136,108 @@ export default function PatientsPage() {
   const [genderFilter, setGenderFilter] = useState("All");
   const [selected, setSelected] = useState<Patient | null>(null);
 
+  // ===== date range filter state =====
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [appliedDateRange, setAppliedDateRange] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
+
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const size = 10;
 
   // Create patient panel state
   const [showCreatePanel, setShowCreatePanel] = useState(false);
-  const [createForm, setCreateForm] = useState<CreatePatientForm>({
-    name: "",
-    email: "",
-    password: "",
-    phoneNumber: "",
-    dateOfBirth: "",
-    gender: "",
-  });
+  const [createForm, setCreateForm] = useState<CreatePatientForm>(DEFAULT_CREATE_FORM);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   const [showPageSuccess, setShowPageSuccess] = useState(false);
 
-  const loadPatients = useCallback(async (pageNum: number, pageSize: number, searchTerm: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetchPatients(pageNum, pageSize, searchTerm);
+  const loadPatients = useCallback(
+    async (
+      pageNum: number,
+      pageSize: number,
+      searchTerm: string,
+      dateRange: { start: string; end: string } | null
+    ) => {
+      setLoading(true);
+      setError(null);
+      try {
+        let response;
+        if (dateRange) {
+          response = await fetchPatientsByDateRange(
+            dateRange.start,
+            dateRange.end,
+            pageNum,
+            pageSize
+          );
+        } else {
+          response = await fetchPatients(pageNum, pageSize, searchTerm);
+        }
 
-      if (response.success && response.data) {
-        const mapped = response.data.content.map((p: any) => {
-          // Get the ID from various possible field names
-          const patientId = p?.id || p?.patientId || p?.userId || `unknown-${Math.random().toString(36).substr(2, 9)}`;
-          
-          return {
-            id: patientId,
-            shortId: patientId !== 'unknown' ? `PAT-${String(patientId).slice(0, 6).toUpperCase()}` : 'PAT-UNKNOWN',
-            fullName: p?.name || p?.fullName || 'Unknown Patient',
-            initials: p?.name || p?.fullName
-              ? (p?.name || p?.fullName)
-                  .split(" ")
-                  .map((n: string) => n?.[0] || '')
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase() || 'UN'
-              : 'UN',
-            email: p?.email || 'No email',
-            status: p?.status || 'Active',
-            phoneNumber: p?.phoneNumber || p?.phone || 'N/A',
-            dateOfBirth: p?.dateOfBirth || p?.dob || new Date().toISOString(),
-            gender: p?.gender || 'Unknown',
-            emergencyContactName: p?.emergencyContactName || p?.emergency_contact_name || 'N/A',
-            emergencyContactPhone: p?.emergencyContactPhone || p?.emergency_contact_phone || 'N/A',
-            medicalHistory: p?.medicalHistory || p?.medical_history || 'No history',
-            referenceCode: p?.referenceCode || p?.reference_code || 'N/A',
-            referencePoints: p?.referencePoints ?? p?.reference_points ?? 0,
-            lastVisit: p?.lastVisit || p?.last_visit || 'N/A',
-            hmo: p?.hmo || 'N/A',
-            hmoId: p?.hmoId || 'N/A',
-          };
-        });
+        if (response.success && response.data) {
+          const mapped = response.data.content.map((p: any) => {
+            const patientId =
+              p?.id ||
+              p?.patientId ||
+              p?.userId ||
+              `unknown-${Math.random().toString(36).substr(2, 9)}`;
 
-        setPatients(mapped);
-        setTotalPages(response.data.totalPages || 0);
-      } else {
-        setError(response.message || "Failed to load patients.");
+            return {
+              id: patientId,
+              shortId:
+                patientId !== "unknown"
+                  ? `PAT-${String(patientId).slice(0, 6).toUpperCase()}`
+                  : "PAT-UNKNOWN",
+              fullName: p?.name || p?.fullName || "Unknown Patient",
+              initials:
+                p?.name || p?.fullName
+                  ? (p?.name || p?.fullName)
+                      .split(" ")
+                      .map((n: string) => n?.[0] || "")
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase() || "UN"
+                  : "UN",
+              email: p?.email || "No email",
+              status: p?.status || "Active",
+              phoneNumber: p?.phoneNumber || p?.phone || "N/A",
+              dateOfBirth: p?.dateOfBirth || p?.dob || new Date().toISOString(),
+              gender: p?.gender || "Unknown",
+              emergencyContactName:
+                p?.emergencyContactName || p?.emergency_contact_name || "N/A",
+              emergencyContactPhone:
+                p?.emergencyContactPhone || p?.emergency_contact_phone || "N/A",
+              medicalHistory:
+                p?.medicalHistory || p?.medical_history || "No history",
+              referenceCode: p?.referenceCode || p?.reference_code || "N/A",
+              referencePoints: p?.referencePoints ?? p?.reference_points ?? 0,
+              lastVisit: p?.lastVisit || p?.last_visit || "N/A",
+              hmo: p?.hmo || "N/A",
+              hmoId: p?.hmoId || "N/A",
+            };
+          });
+
+          setPatients(mapped);
+          setTotalPages(response.data.totalPages || 0);
+        } else {
+          setError(response.message || "Failed to load patients.");
+        }
+      } catch (err) {
+        setError("Failed to load patients.");
+        console.error("Error loading patients:", err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError("Failed to load patients.");
-      console.error("Error loading patients:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
-  // Debounce search input – wait 500ms after typing stops
+  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(0);
@@ -174,28 +247,41 @@ export default function PatientsPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Initial load and search/pagination changes
   useEffect(() => {
-    loadPatients(page, size, search);
-  }, [page, size, search, loadPatients]);
+    loadPatients(page, size, search, appliedDateRange);
+  }, [page, size, search, appliedDateRange, loadPatients]);
 
-  // Reset to first page when gender filter changes
   useEffect(() => {
     if (page !== 0) {
       setPage(0);
     }
   }, [genderFilter]);
 
-  // Open create patient panel
+  // ===== date range handlers =====
+  const applyDateRange = () => {
+    if (!startDate || !endDate) {
+      setError("Please select both start and end dates.");
+      return;
+    }
+    if (new Date(startDate) > new Date(endDate)) {
+      setError("Start date cannot be after end date.");
+      return;
+    }
+    setError(null);
+    setPage(0);
+    setAppliedDateRange({ start: startDate, end: endDate });
+  };
+
+  const clearDateRange = () => {
+    setStartDate("");
+    setEndDate("");
+    setAppliedDateRange(null);
+    setPage(0);
+  };
+
+  // ===== create panel handlers =====
   const openCreatePanel = () => {
-    setCreateForm({
-      name: "",
-      email: "",
-      password: "",
-      phoneNumber: "",
-      dateOfBirth: "",
-      gender: "",
-    });
+    setCreateForm(DEFAULT_CREATE_FORM);
     setCreateError(null);
     setCreateSuccess(null);
     setShowCreatePanel(true);
@@ -209,7 +295,9 @@ export default function PatientsPage() {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setCreateForm((prev) => ({ ...prev, [name]: value }));
   };
@@ -220,12 +308,9 @@ export default function PatientsPage() {
   };
 
   const handleCreatePatient = async () => {
+    // --- Base validations ---
     if (!createForm.name.trim()) {
       setCreateError("Name is required.");
-      return;
-    }
-    if (!createForm.email.trim()) {
-      setCreateError("Email is required.");
       return;
     }
     if (!createForm.password.trim()) {
@@ -233,20 +318,29 @@ export default function PatientsPage() {
       return;
     }
     if (!validatePassword(createForm.password)) {
-      setCreateError("Password must be at least 8 characters, include a capital letter and a number.");
+      setCreateError(
+        "Password must be at least 8 characters, include a capital letter and a number."
+      );
       return;
     }
-    if (!createForm.phoneNumber.trim()) {
-      setCreateError("Phone number is required.");
+
+    // --- Conditional identifier validation based on verification method ---
+    if (createForm.lastVerificationType === "EMAIL" && !createForm.email.trim()) {
+      setCreateError("Email is required when verification method is EMAIL.");
       return;
     }
-    if (!createForm.dateOfBirth) {
-      setCreateError("Date of birth is required.");
+    if (createForm.lastVerificationType === "PHONE" && !createForm.phoneNumber.trim()) {
+      setCreateError("Phone number is required when verification method is PHONE.");
       return;
     }
-    if (!createForm.gender) {
-      setCreateError("Gender is required.");
-      return;
+
+    // --- Email format check (only if provided) ---
+    if (createForm.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(createForm.email.trim())) {
+        setCreateError("Please enter a valid email address.");
+        return;
+      }
     }
 
     setCreating(true);
@@ -254,12 +348,20 @@ export default function PatientsPage() {
     setCreateSuccess(null);
 
     try {
+      // Build payload — only send optional fields when they have a value
       const normalizedPayload = {
-        ...createForm,
-        phoneNumber: createForm.phoneNumber.replace(/\s+/g, ""),
+        name: createForm.name.trim(),
+        password: createForm.password,
+        lastVerificationType: createForm.lastVerificationType,
+        email: createForm.email.trim() || undefined,
+        phoneNumber: createForm.phoneNumber.replace(/\s+/g, "").trim() || undefined,
+        dateOfBirth: createForm.dateOfBirth || undefined,
+        gender: createForm.gender || undefined,
+        hmo: createForm.hmo || undefined,
+        hmoId: createForm.hmoId.trim() || undefined,
       };
 
-      const response = await createPatient(normalizedPayload);
+      const response = await createPatient(normalizedPayload as any);
 
       if (response.success) {
         setCreateSuccess("Patient created successfully!");
@@ -269,15 +371,8 @@ export default function PatientsPage() {
         setTimeout(() => {
           setShowCreatePanel(false);
           setPage(0);
-          loadPatients(0, size, search);
-          setCreateForm({
-            name: "",
-            email: "",
-            password: "",
-            phoneNumber: "",
-            dateOfBirth: "",
-            gender: "",
-          });
+          loadPatients(0, size, search, appliedDateRange);
+          setCreateForm(DEFAULT_CREATE_FORM);
         }, 1000);
       } else {
         setCreateError(response.message || "Failed to create patient.");
@@ -289,7 +384,7 @@ export default function PatientsPage() {
     }
   };
 
-  const visible = patients.filter(p => {
+  const visible = patients.filter((p) => {
     const matchesGender = genderFilter === "All" || p.gender === genderFilter;
     return matchesGender;
   });
@@ -298,10 +393,12 @@ export default function PatientsPage() {
     setPage(newPage);
   };
 
+  const requireEmail = createForm.lastVerificationType === "EMAIL";
+  const requirePhone = createForm.lastVerificationType === "PHONE";
+
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-4 lg:gap-6">
-
         {/* Success banner */}
         {showPageSuccess && (
           <div className="flex items-center gap-3 bg-[#DCFCE7] border border-[#86EFAC] text-[#166534] px-4 py-3 rounded-lg text-sm font-semibold">
@@ -322,38 +419,96 @@ export default function PatientsPage() {
         )}
 
         {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="flex gap-2">
-              <input
-                type="search"
-                placeholder="Search patient name..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-full sm:w-72"
-              />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-wrap">
+              <div className="flex gap-2">
+                <input
+                  type="search"
+                  placeholder="Search patient name..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  disabled={!!appliedDateRange}
+                  className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-full sm:w-72 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+              <select
+                value={genderFilter}
+                onChange={(e) => setGenderFilter(e.target.value)}
+                className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#3D4946] outline-none"
+              >
+                <option value="All">All Genders</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+                <option value="OTHER">Other</option>
+              </select>
             </div>
-            <select
-              value={genderFilter}
-              onChange={e => setGenderFilter(e.target.value)}
-              className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#3D4946] outline-none"
-            >
-              <option value="All">All Genders</option>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-              <option value="OTHER">Other</option>
-            </select>
+            <div className="flex gap-3">
+              <p className="text-sm text-[#3D4946] self-center">
+                {loading ? "Loading…" : `${visible.length} patients`}
+              </p>
+              <button
+                onClick={openCreatePanel}
+                className="bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors"
+              >
+                + Create Patient
+              </button>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <p className="text-sm text-[#3D4946] self-center">
-              {loading ? "Loading…" : `${visible.length} patients`}
-            </p>
-            <button
-              onClick={openCreatePanel}
-              className="bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors"
-            >
-              + Create Patient
-            </button>
+
+          {/* Date range filter row */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white border border-[#F1F5F9] rounded-lg px-4 py-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-[#3D4946]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-sm font-semibold text-[#3D4946]">
+                Filter by creation date
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="text-xs text-[#94A3B8] uppercase tracking-widest">From</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                max={endDate || undefined}
+                className="bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+              />
+
+              <label className="text-xs text-[#94A3B8] uppercase tracking-widest">To</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate || undefined}
+                className="bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+              />
+
+              <button
+                onClick={applyDateRange}
+                disabled={!startDate || !endDate}
+                className="bg-[#00685C] text-white text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Apply
+              </button>
+
+              {appliedDateRange && (
+                <button
+                  onClick={clearDateRange}
+                  className="text-sm font-semibold text-[#93000A] hover:text-[#6B0007] transition-colors px-3 py-1.5 rounded-lg hover:bg-[#FFDAD6]"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {appliedDateRange && (
+              <span className="text-xs text-[#0F766E] bg-[#F0FDFA] px-3 py-1 rounded-full font-semibold ml-auto">
+                Showing: {appliedDateRange.start} → {appliedDateRange.end}
+              </span>
+            )}
           </div>
         </div>
 
@@ -369,8 +524,11 @@ export default function PatientsPage() {
             <table className="w-full min-w-[640px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["NAME", "EMAIL", "GENDER", "DATE OF BIRTH", "STATUS", ""].map(h => (
-                    <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
+                  {["NAME", "EMAIL", "GENDER", "DATE OF BIRTH", "STATUS", ""].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest"
+                    >
                       {h}
                     </th>
                   ))}
@@ -395,10 +553,7 @@ export default function PatientsPage() {
                   </tr>
                 ) : (
                   visible.map((p, i) => {
-                    // Skip rendering if patient data is invalid
-                    if (!p || !p.id) {
-                      return null;
-                    }
+                    if (!p || !p.id) return null;
                     return (
                       <tr
                         key={p.id}
@@ -421,10 +576,9 @@ export default function PatientsPage() {
                         <td className="px-6 py-4 text-sm text-[#3D4946]">
                           {p.dateOfBirth !== "N/A" && p.dateOfBirth
                             ? new Date(p.dateOfBirth).toLocaleDateString("en-US", {
-                              month: "short", day: "numeric", year: "numeric",
-                            })
-                            : "N/A"
-                          }
+                                month: "short", day: "numeric", year: "numeric",
+                              })
+                            : "N/A"}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`text-xs font-bold px-3 py-1 rounded-full ${p.status === "Active" ? "bg-[#F0FDFA] text-[#0F766E]" : "bg-[#F1F5F9] text-[#64748B]"}`}>
@@ -445,7 +599,7 @@ export default function PatientsPage() {
           </div>
         </div>
 
-        {/* Pagination UI */}
+        {/* Pagination */}
         {!loading && totalPages > 0 && (
           <div className="flex items-center justify-between mt-6">
             <button
@@ -455,11 +609,9 @@ export default function PatientsPage() {
             >
               Previous
             </button>
-
             <span className="text-sm text-[#3D4946]">
               Page {page + 1} of {totalPages}
             </span>
-
             <button
               disabled={page >= totalPages - 1}
               onClick={() => handlePageChange(page + 1)}
@@ -477,42 +629,27 @@ export default function PatientsPage() {
         )}
       </main>
 
-      {/* OVERLAY for detail panel */}
+      {/* Overlays */}
       {selected && (
-        <div
-          className="fixed inset-0 backdrop-blur-sm bg-white/30 z-40"
-          onClick={() => setSelected(null)}
-        />
+        <div className="fixed inset-0 backdrop-blur-sm bg-white/30 z-40" onClick={() => setSelected(null)} />
       )}
-
-      {/* OVERLAY for create panel */}
       {showCreatePanel && (
-        <div
-          className="fixed inset-0 backdrop-blur-sm bg-white/30 z-40"
-          onClick={closeCreatePanel}
-        />
+        <div className="fixed inset-0 backdrop-blur-sm bg-white/30 z-40" onClick={closeCreatePanel} />
       )}
 
-      {/* DETAIL PANEL */}
+      {/* DETAIL PANEL (unchanged) */}
       {selected && selected.id && (
         <div className="fixed top-0 right-0 bottom-0 w-full sm:w-96 bg-white shadow-2xl z-50 flex flex-col">
-          {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
             <h2 className="text-base font-bold text-[#0B1C30]">Patient Details</h2>
-            <button
-              onClick={() => setSelected(null)}
-              className="text-[#94A3B8] hover:text-[#475569]"
-            >
+            <button onClick={() => setSelected(null)} className="text-[#94A3B8] hover:text-[#475569]">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-6">
-
-            {/* Avatar + name */}
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xl font-bold text-[#0F766E] flex-shrink-0">
                 {selected.initials}
@@ -533,7 +670,6 @@ export default function PatientsPage() {
               </div>
             </div>
 
-            {/* Personal info */}
             <div className="flex flex-col gap-4">
               <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest border-b border-[#F1F5F9] pb-2">
                 Personal Information
@@ -543,17 +679,19 @@ export default function PatientsPage() {
 
               <DetailRow label="Email" value={selected.email} />
               <DetailRow label="Phone Number" value={selected.phoneNumber} />
-              <DetailRow label="Date of Birth" value={
-                selected.dateOfBirth !== "N/A" && selected.dateOfBirth
-                  ? new Date(selected.dateOfBirth).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-                  : "N/A"
-              } />
+              <DetailRow
+                label="Date of Birth"
+                value={
+                  selected.dateOfBirth !== "N/A" && selected.dateOfBirth
+                    ? new Date(selected.dateOfBirth).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                    : "N/A"
+                }
+              />
               <DetailRow label="Gender" value={selected.gender} />
               <DetailRow label="HMO" value={selected.hmo} />
               <DetailRow label="HMO ID" value={selected.hmoId} />
             </div>
 
-            {/* Emergency contact */}
             <div className="flex flex-col gap-4">
               <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest border-b border-[#F1F5F9] pb-2">
                 Emergency Contact
@@ -562,7 +700,6 @@ export default function PatientsPage() {
               <DetailRow label="Phone" value={selected.emergencyContactPhone} />
             </div>
 
-            {/* Medical history */}
             <div className="flex flex-col gap-2">
               <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest border-b border-[#F1F5F9] pb-2">
                 Medical History / Allergies
@@ -572,7 +709,6 @@ export default function PatientsPage() {
               </p>
             </div>
 
-            {/* Rewards */}
             <div className="flex flex-col gap-4">
               <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest border-b border-[#F1F5F9] pb-2">
                 Rewards
@@ -580,21 +716,16 @@ export default function PatientsPage() {
               <div className="flex items-center justify-between bg-[#F0FDFA] rounded-xl px-5 py-4">
                 <div>
                   <p className="text-xs text-[#3D4946]">Reference Code</p>
-                  <p className="text-sm font-bold text-[#0B1C30] mt-0.5 font-mono">
-                    {selected.referenceCode}
-                  </p>
+                  <p className="text-sm font-bold text-[#0B1C30] mt-0.5 font-mono">{selected.referenceCode}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-[#3D4946]">Reference Points</p>
-                  <p className="text-2xl font-bold text-[#00685C]">
-                    {selected.referencePoints}
-                  </p>
+                  <p className="text-2xl font-bold text-[#00685C]">{selected.referencePoints}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Footer */}
           <div className="px-6 py-4 border-t border-[#F1F5F9]">
             <button
               onClick={() => setSelected(null)}
@@ -606,10 +737,9 @@ export default function PatientsPage() {
         </div>
       )}
 
-      {/* CREATE PATIENT PANEL */}
+      {/* CREATE PATIENT PANEL — UPDATED */}
       {showCreatePanel && (
         <div className="fixed top-0 right-0 bottom-0 w-full sm:w-96 bg-white shadow-2xl z-50 flex flex-col">
-          {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
             <h2 className="text-base font-bold text-[#0B1C30]">Create New Patient</h2>
             <button
@@ -623,7 +753,6 @@ export default function PatientsPage() {
             </button>
           </div>
 
-          {/* Body - Form */}
           <div className="flex-1 overflow-y-auto px-6 py-6">
             {createSuccess && (
               <div className="mb-4 bg-[#DCFCE7] text-[#166534] text-sm font-semibold px-4 py-3 rounded-lg">
@@ -637,6 +766,7 @@ export default function PatientsPage() {
             )}
 
             <form className="flex flex-col gap-5" onSubmit={(e) => e.preventDefault()}>
+              {/* Full Name */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Full Name <span className="text-[#93000A]">*</span>
@@ -649,13 +779,33 @@ export default function PatientsPage() {
                   disabled={creating}
                   placeholder="Enter patient's full name"
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
-                  required
                 />
               </div>
 
+              {/* Verification Method */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Email Address <span className="text-[#93000A]">*</span>
+                  Verification Method <span className="text-[#93000A]">*</span>
+                </label>
+                <select
+                  name="lastVerificationType"
+                  value={createForm.lastVerificationType}
+                  onChange={handleInputChange}
+                  disabled={creating}
+                  className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
+                >
+                  <option value="EMAIL">Email — patient logs in with email</option>
+                  <option value="PHONE">Phone — patient logs in with phone number</option>
+                </select>
+                <p className="text-xs text-[#94A3B8] mt-1">
+                  Only the chosen identifier below will be required.
+                </p>
+              </div>
+
+              {/* Email (conditional requiredness) */}
+              <div>
+                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
+                  Email Address {requireEmail && <span className="text-[#93000A]">*</span>}
                 </label>
                 <input
                   type="email"
@@ -665,10 +815,15 @@ export default function PatientsPage() {
                   disabled={creating}
                   placeholder="patient@example.com"
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
-                  required
                 />
+                {requirePhone && (
+                  <p className="text-xs text-[#94A3B8] mt-1">
+                    Optional — patient will log in with phone number.
+                  </p>
+                )}
               </div>
 
+              {/* Password */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
                   Password <span className="text-[#93000A]">*</span>
@@ -681,16 +836,16 @@ export default function PatientsPage() {
                   disabled={creating}
                   placeholder="Minimum 8 characters, 1 capital letter, 1 number"
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
-                  required
                 />
                 <p className="text-xs text-[#94A3B8] mt-1">
-                  Password must be at least 8 characters, include a capital letter and a number
+                  Must be at least 8 characters, include a capital letter and a number.
                 </p>
               </div>
 
+              {/* Phone Number (conditional requiredness) */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Phone Number <span className="text-[#93000A]">*</span>
+                  Phone Number {requirePhone && <span className="text-[#93000A]">*</span>}
                 </label>
                 <input
                   type="tel"
@@ -700,14 +855,17 @@ export default function PatientsPage() {
                   disabled={creating}
                   placeholder="+2348012345678"
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
-                  required
                 />
-                <p className="text-xs text-[#94A3B8] mt-1">Format: +2348012345678 (no spaces)</p>
+                <p className="text-xs text-[#94A3B8] mt-1">
+                  Format: +2348012345678 (no spaces)
+                  {requireEmail && " — Optional for EMAIL verification."}
+                </p>
               </div>
 
+              {/* Date of Birth (optional) */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Date of Birth <span className="text-[#93000A]">*</span>
+                  Date of Birth
                 </label>
                 <input
                   type="date"
@@ -716,13 +874,13 @@ export default function PatientsPage() {
                   onChange={handleInputChange}
                   disabled={creating}
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
-                  required
                 />
               </div>
 
+              {/* Gender (optional) */}
               <div>
                 <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Gender <span className="text-[#93000A]">*</span>
+                  Gender
                 </label>
                 <select
                   name="gender"
@@ -730,18 +888,55 @@ export default function PatientsPage() {
                   onChange={handleInputChange}
                   disabled={creating}
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
-                  required
                 >
-                  <option value="">Select Gender</option>
+                  <option value="">Not specified</option>
                   <option value="MALE">Male</option>
                   <option value="FEMALE">Female</option>
                   <option value="OTHER">Other</option>
                 </select>
               </div>
+
+              {/* HMO (optional) */}
+              <div>
+                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
+                  HMO <span className="text-xs font-normal text-[#94A3B8]">(Optional)</span>
+                </label>
+                <select
+                  name="hmo"
+                  value={createForm.hmo}
+                  onChange={handleInputChange}
+                  disabled={creating}
+                  className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
+                >
+                  <option value="">No HMO</option>
+                  {HMO_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* HMO ID (only shown when HMO chosen) */}
+              {createForm.hmo && (
+                <div>
+                  <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
+                    HMO Member ID <span className="text-xs font-normal text-[#94A3B8]">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="hmoId"
+                    value={createForm.hmoId}
+                    onChange={handleInputChange}
+                    disabled={creating}
+                    placeholder="Enter HMO member ID"
+                    className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50"
+                  />
+                </div>
+              )}
             </form>
           </div>
 
-          {/* Footer */}
           <div className="px-6 py-4 border-t border-[#F1F5F9] flex gap-3">
             <button
               onClick={closeCreatePanel}
@@ -764,7 +959,7 @@ export default function PatientsPage() {
                   Creating...
                 </>
               ) : (
-                'Create Patient'
+                "Create Patient"
               )}
             </button>
           </div>
