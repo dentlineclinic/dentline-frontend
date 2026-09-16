@@ -48,6 +48,41 @@ export const getBroadcastRecipients = async (
   return res.data;
 };
 
+// ── Search + Opt-out / Opt-in ─────────────────────────────────────────────────
+
+export const searchBroadcastRecipient = async (
+  email: string
+): Promise<{ success: boolean; message: string; data: BroadcastRecipient } | null> => {
+  try {
+    const res = await api.get("/admin/broadcasts/recipients/search", {
+      params: { email },
+    });
+    return res.data;
+  } catch (err: any) {
+    // 404 = no recipient found — return null instead of throwing
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
+};
+
+export const optOutBroadcastRecipient = async (
+  email: string
+): Promise<{ success: boolean; message: string; data: BroadcastRecipient }> => {
+  const res = await api.patch("/admin/broadcasts/recipients/opt-out", null, {
+    params: { email },
+  });
+  return res.data;
+};
+
+export const optInBroadcastRecipient = async (
+  email: string
+): Promise<{ success: boolean; message: string; data: BroadcastRecipient }> => {
+  const res = await api.patch("/admin/broadcasts/recipients/opt-in", null, {
+    params: { email },
+  });
+  return res.data;
+};
+
 // ── Send broadcast ────────────────────────────────────────────────────────────
 
 // Updated to accept FormData

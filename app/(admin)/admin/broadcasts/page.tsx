@@ -9,6 +9,9 @@ import {
   sendBroadcast,
   getBroadcastHistory,
   importRecipientsFromCsv,
+  searchBroadcastRecipient,
+  optOutBroadcastRecipient,
+  optInBroadcastRecipient,
   type BroadcastRecipient,
   type BroadcastHistoryDto,
   type ImportRecipientsResponse,
@@ -52,7 +55,7 @@ export default function BroadcastPage() {
   const [imageWidth, setImageWidth] = useState(80);
   const [imagePosition, setImagePosition] = useState<"top" | "between" | "bottom">("between");
   const [sending, setSending] = useState(false);
-  
+
   // ── Single Recipient Mode ────────────────────────────────────────────────
   const [recipientEmail, setRecipientEmail] = useState("");
   const [sendMode, setSendMode] = useState<"all" | "single">("all");
@@ -61,7 +64,7 @@ export default function BroadcastPage() {
   const handleFlyerImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setFlyerImage(file);
-    
+
     // Create preview
     if (file) {
       const reader = new FileReader();
@@ -81,18 +84,18 @@ export default function BroadcastPage() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate
-    if (!subject.trim()) { 
-      toast.error("Subject is required."); 
-      return; 
+    if (!subject.trim()) {
+      toast.error("Subject is required.");
+      return;
     }
-    
+
     if (!messageBeforeFlyer.trim() && !messageAfterFlyer.trim()) {
       toast.error("At least one message section is required.");
       return;
     }
-    
+
     // Validate recipient email if in single mode
     if (sendMode === "single") {
       if (!recipientEmail.trim()) {
@@ -104,35 +107,35 @@ export default function BroadcastPage() {
         return;
       }
     }
-    
+
     setSending(true);
     try {
       const formData = new FormData();
       formData.append("subject", subject.trim());
-      
+
       // Always send both message parts (they can be empty)
       formData.append("messageBeforeFlyer", messageBeforeFlyer.trim());
       formData.append("messageAfterFlyer", messageAfterFlyer.trim());
-      
+
       // Image settings
       formData.append("imageWidth", imageWidth.toString());
       formData.append("imagePosition", imagePosition);
-      
+
       // Upload flyer image if selected
       if (flyerImage) {
         formData.append("flyerImage", flyerImage);
       }
-      
+
       // Add recipient email if in single mode
       if (sendMode === "single") {
         formData.append("recipientEmail", recipientEmail.trim());
       }
-      
+
       const res = await sendBroadcast(formData);
       toast.success(
         `Broadcast sent to ${res.data.recipientCount} recipient${res.data.recipientCount !== 1 ? "s" : ""}.`
       );
-      
+
       // Reset form
       setSubject("");
       setMessageBeforeFlyer("");
@@ -142,7 +145,7 @@ export default function BroadcastPage() {
       setImageWidth(80);
       setImagePosition("between");
       setRecipientEmail("");
-      
+
     } catch (err: any) {
       toast.error(err.message || "Failed to send broadcast.");
     } finally {
@@ -162,6 +165,16 @@ export default function BroadcastPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  const [searchEmail, setSearchEmail] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState<BroadcastRecipient | null>(null);
+  const [searchNotFound, setSearchNotFound] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
+
+  // ── Opt-out / Opt-in in flight ────────────────────────────────────────────
+  const [togglingEmail, setTogglingEmail] = useState<string | null>(null);
 
   const loadRecipients = useCallback(async (p: number) => {
     setRecLoading(true);
@@ -191,6 +204,70 @@ export default function BroadcastPage() {
       toast.error(err.message || "Failed to add recipient.");
     } finally {
       setAdding(false);
+    }
+  };
+
+  // ── Search handler ────────────────────────────────────────────────────────
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = searchEmail.trim();
+    if (!email) {
+      toast.error("Please enter an email to search.");
+      return;
+    }
+    setSearching(true);
+    setSearchResult(null);
+    setSearchNotFound(false);
+    setSearchActive(true);
+    try {
+      const res = await searchBroadcastRecipient(email);
+      if (res?.data) {
+        setSearchResult(res.data);
+      } else {
+        setSearchNotFound(true);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Search failed.");
+      setSearchActive(false);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchEmail("");
+    setSearchResult(null);
+    setSearchNotFound(false);
+    setSearchActive(false);
+  };
+
+  // ── Opt-out / Opt-in toggler ──────────────────────────────────────────────
+  const handleToggleOptOut = async (recipient: BroadcastRecipient) => {
+    setTogglingEmail(recipient.email);
+    try {
+      const res = recipient.optOut
+        ? await optInBroadcastRecipient(recipient.email)
+        : await optOutBroadcastRecipient(recipient.email);
+
+      toast.success(
+        recipient.optOut
+          ? `${recipient.email} has been opted back in.`
+          : `${recipient.email} has been opted out.`
+      );
+
+      // Update list if present
+      setRecipients(prev =>
+        prev.map(r => (r.email === recipient.email ? res.data : r))
+      );
+
+      // Update search result if it's the same email
+      if (searchResult?.email === recipient.email) {
+        setSearchResult(res.data);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update recipient.");
+    } finally {
+      setTogglingEmail(null);
     }
   };
 
@@ -380,7 +457,7 @@ export default function BroadcastPage() {
                   <label className="text-sm font-semibold text-[#3D4946]">
                     Flyer Image <span className="text-xs font-normal text-[#94A3B8]">(optional)</span>
                   </label>
-                  
+
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-[#008375] transition-colors cursor-pointer">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -417,9 +494,9 @@ export default function BroadcastPage() {
                   {/* Image preview */}
                   {flyerImagePreview && (
                     <div className="mt-2">
-                      <img 
-                        src={flyerImagePreview} 
-                        alt="Flyer preview" 
+                      <img
+                        src={flyerImagePreview}
+                        alt="Flyer preview"
                         className="max-h-48 w-auto rounded-lg border border-[#E2E8F0]"
                         style={{ maxWidth: `${imageWidth}%` }}
                       />
@@ -508,7 +585,7 @@ export default function BroadcastPage() {
                       </div>
                     )}
                     <p className="text-sm font-bold text-[#0B1C30] mb-2">{subject || "(No subject)"}</p>
-                    
+
                     {/* Preview: Message Before */}
                     {messageBeforeFlyer && (
                       <div className="mb-3">
@@ -518,20 +595,20 @@ export default function BroadcastPage() {
                         </p>
                       </div>
                     )}
-                    
+
                     {/* Preview: Flyer */}
                     {flyerImagePreview && (
                       <div className="my-3 border-t border-[#E2E8F0] pt-3">
                         <p className="text-xs text-[#94A3B8] mb-2">Flyer Image ({imagePosition}):</p>
-                        <img 
-                          src={flyerImagePreview} 
-                          alt="Flyer preview" 
+                        <img
+                          src={flyerImagePreview}
+                          alt="Flyer preview"
                           className="rounded-lg border border-[#E2E8F0]"
                           style={{ maxWidth: `${imageWidth}%` }}
                         />
                       </div>
                     )}
-                    
+
                     {/* Preview: Message After */}
                     {messageAfterFlyer && (
                       <div className="mt-3 border-t border-[#E2E8F0] pt-3">
@@ -582,6 +659,125 @@ export default function BroadcastPage() {
                 Add Recipient
               </button>
             </div>
+
+            {/* ── Search bar ── */}
+            <form
+              onSubmit={handleSearch}
+              className="bg-white border border-[#F1F5F9] rounded-xl p-4 shadow-sm flex flex-col sm:flex-row gap-3 items-stretch sm:items-center"
+            >
+              <div className="relative flex-1">
+                <svg
+                  className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                </svg>
+                <input
+                  type="email"
+                  value={searchEmail}
+                  onChange={e => setSearchEmail(e.target.value)}
+                  placeholder="Search recipient by email…"
+                  className={`${INPUT} pl-10`}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={searching}
+                  className="flex items-center justify-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-5 py-3 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50"
+                >
+                  {searching ? <Spinner small /> : null}
+                  {searching ? "Searching…" : "Search"}
+                </button>
+                {searchActive && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="text-sm font-semibold text-[#3D4946] border border-[#E2E8F0] px-5 py-3 rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {/* ── Search result ── */}
+            {searchActive && !searching && searchResult && (
+              <div className="bg-white border border-[#00685C]/30 rounded-xl p-5 shadow-sm">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="text-sm font-bold text-[#0B1C30] truncate">
+                        {searchResult.name || "Unnamed recipient"}
+                      </p>
+                      <span
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                          searchResult.optOut
+                            ? "bg-[#FFDAD6] text-[#93000A]"
+                            : "bg-[#DCFCE7] text-[#166534]"
+                        }`}
+                      >
+                        {searchResult.optOut ? "Opted Out" : "Active"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[#3D4946] mt-1 truncate">{searchResult.email}</p>
+                  </div>
+                  <button
+                    onClick={() => handleToggleOptOut(searchResult)}
+                    disabled={togglingEmail === searchResult.email}
+                    className={`text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap ${
+                      searchResult.optOut
+                        ? "bg-[#00685C] text-white hover:bg-[#008375]"
+                        : "bg-[#93000A] text-white hover:bg-[#B91C1C]"
+                    }`}
+                  >
+                    {togglingEmail === searchResult.email
+                      ? "Updating…"
+                      : searchResult.optOut
+                      ? "Opt In"
+                      : "Opt Out"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {searchActive && !searching && searchNotFound && (
+              <div className="bg-[#FEF3C7] border border-[#F59E0B]/30 rounded-xl p-5 shadow-sm flex items-start gap-3">
+                <svg className="w-5 h-5 text-[#92400E] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold text-[#92400E]">No recipient found</p>
+                  <p className="text-xs text-[#92400E] mt-0.5">
+                    No broadcast recipient matches <span className="font-mono">{searchEmail}</span>.
+                    You can opt them out directly using the button below — a record will be created automatically.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      const email = searchEmail.trim();
+                      if (!email) return;
+                      setTogglingEmail(email);
+                      try {
+                        const res = await optOutBroadcastRecipient(email);
+                        toast.success(`${email} has been opted out.`);
+                        setSearchResult(res.data);
+                        setSearchNotFound(false);
+                      } catch (err: any) {
+                        toast.error(err.message || "Failed to opt out.");
+                      } finally {
+                        setTogglingEmail(null);
+                      }
+                    }}
+                    disabled={togglingEmail === searchEmail.trim()}
+                    className="mt-3 text-sm font-semibold bg-[#93000A] text-white px-4 py-2 rounded-lg hover:bg-[#B91C1C] transition-colors disabled:opacity-50"
+                  >
+                    {togglingEmail === searchEmail.trim() ? "Opting out…" : "Opt Out This Email"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Add form */}
             {showAddForm && (
@@ -643,10 +839,10 @@ export default function BroadcastPage() {
             {/* Table */}
             <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[500px]">
+                <table className="w-full min-w-[640px]">
                   <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                     <tr>
-                      {["NAME", "EMAIL", "STATUS", "ADDED"].map(h => (
+                      {["NAME", "EMAIL", "STATUS", "ADDED", "ACTION"].map(h => (
                         <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">{h}</th>
                       ))}
                     </tr>
@@ -655,7 +851,7 @@ export default function BroadcastPage() {
                     {recLoading ? (
                       [...Array(5)].map((_, i) => (
                         <tr key={i} className="border-t border-[#F8FAFC]">
-                          {[...Array(4)].map((__, j) => (
+                          {[...Array(5)].map((__, j) => (
                             <td key={j} className="px-6 py-4">
                               <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                             </td>
@@ -664,7 +860,7 @@ export default function BroadcastPage() {
                       ))
                     ) : recipients.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                        <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                           No recipients yet. Add your first subscriber.
                         </td>
                       </tr>
@@ -688,6 +884,19 @@ export default function BroadcastPage() {
                             {r.createdAt
                               ? new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                               : "—"}
+                          </td>
+                          <td className="px-6 py-4">
+                            <button
+                              onClick={() => handleToggleOptOut(r)}
+                              disabled={togglingEmail === r.email}
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap ${
+                                r.optOut
+                                  ? "bg-[#00685C] text-white hover:bg-[#008375]"
+                                  : "bg-[#93000A] text-white hover:bg-[#B91C1C]"
+                              }`}
+                            >
+                              {togglingEmail === r.email ? "…" : r.optOut ? "Opt In" : "Opt Out"}
+                            </button>
                           </td>
                         </tr>
                       ))
