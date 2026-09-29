@@ -8,5 +8,6 @@ export const useAdminLogin = () => {
     onSuccess: (response) => {
       applyAuthSuccess(response.data.data);
     },
+    retry: false,
   });
 };

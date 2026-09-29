@@ -48,6 +48,7 @@ const doctorNavItems = [
       </svg>
     ),
   },
+   
 ];
 
 export default function DoctorLayout({ children }: { children: React.ReactNode }) {

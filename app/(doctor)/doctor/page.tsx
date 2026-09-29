@@ -8,11 +8,19 @@ import { STATUS_COLORS } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
+const MODULE_COLORS: Record<string, string> = {
+  DENTAL: "bg-[#E5EEFF] text-[#1E40AF]",
+  DERMATOLOGY: "bg-[#FCE7F3] text-[#9D174D]",
+};
+
 export default function DoctorDashboard() {
   const { data: response, isLoading: loading, error: queryError } = useDoctorDashboard();
 
   const dashboard = response?.data ?? null;
   const error = queryError ? (queryError as Error).message || "Failed to load dashboard." : null;
+
+  const module = dashboard?.clinicalModule;
+  const moduleLabel = module === "DERMATOLOGY" ? "Dermatology" : "Dental";
 
   // Sync name + photo to localStorage so TopBar updates
   useEffect(() => {
@@ -29,12 +37,12 @@ export default function DoctorDashboard() {
       color: "text-[#00685C]",
     },
     {
-      label: "Completed",
+      label: "Completed Records",
       value: dashboard?.completedHistories?.toString() ?? "0",
       color: "text-[#0B1C30]",
     },
     {
-      label: "Pending",
+      label: "Pending Records",
       value: dashboard?.pendingHistories?.toString() ?? "0",
       color: "text-[#435B7E]",
     },
@@ -47,16 +55,13 @@ export default function DoctorDashboard() {
     },
   ];
 
-  // Helper function to get display name for appointments
   const getDisplayName = (appt: any) => {
-    // For family appointments, show the family member name
     if (appt.appointmentType === "FAMILY" && appt.familyMemberName) {
       return appt.familyMemberName;
     }
     return appt.patientName || "Unknown Patient";
   };
 
-  // Helper function to get initials
   const getInitials = (name: string) => {
     if (!name) return "??";
     return name
@@ -70,7 +75,7 @@ export default function DoctorDashboard() {
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar
-        title="Doctor Dashboard"
+        title={`${moduleLabel} Doctor Dashboard`}
         subtitle={dashboard?.today
           ? new Date(dashboard.today).toLocaleDateString("en-US", {
               weekday: "long", month: "long", day: "numeric",
@@ -79,6 +84,18 @@ export default function DoctorDashboard() {
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6 lg:gap-8">
+
+        {/* Module badge */}
+        {module && (
+          <div className="flex items-center gap-3">
+            <span className={`text-xs font-bold px-3 py-1 rounded-full ${MODULE_COLORS[module]}`}>
+              {moduleLabel} Module
+            </span>
+            <span className="text-xs text-[#94A3B8]">
+              Your dashboard shows {moduleLabel.toLowerCase()} data only.
+            </span>
+          </div>
+        )}
 
         {error && (
           <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
@@ -102,7 +119,7 @@ export default function DoctorDashboard() {
           ))}
         </div>
 
-        {/* Today's Assigned Appointments */}
+        {/* Today's Appointments */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg sm:text-xl font-semibold text-[#0B1C30]">
@@ -147,7 +164,7 @@ export default function DoctorDashboard() {
                       const displayName = getDisplayName(appt);
                       const initials = getInitials(displayName);
                       const isFamily = appt.appointmentType === "FAMILY";
-                      
+
                       return (
                         <tr
                           key={appt.id}
@@ -218,7 +235,9 @@ export default function DoctorDashboard() {
               </svg>
             </div>
             <h4 className="text-base font-semibold text-[#0B1C30]">Patient Records</h4>
-            <p className="text-sm text-[#3D4946] mt-1">View and update patient history</p>
+            <p className="text-sm text-[#3D4946] mt-1">
+              View and update {moduleLabel.toLowerCase()} patient history
+            </p>
           </Link>
 
           <Link href="/doctor/reviews" className="bg-white border border-[#F1F5F9] rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">

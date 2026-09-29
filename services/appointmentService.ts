@@ -223,3 +223,11 @@ export const cancelAppointment = async (appointmentId: string) => {
   const response = await api.patch(`/appointments/${appointmentId}/cancel`);
   return response.data;
 };
+
+
+// ── Fetch a single appointment by ID (used to detect module for record creation) ──
+
+export const fetchAppointmentById = async (appointmentId: string) => {
+  const response = await api.get(`/appointments/${appointmentId}`);
+  return response.data;
+};

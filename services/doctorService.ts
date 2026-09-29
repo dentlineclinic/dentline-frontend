@@ -1,6 +1,8 @@
 import api from "@/lib/axios";
 import type { SinglePatientHistoryResponse } from "./patientHistoryService";
 
+export type ClinicalModule = "DENTAL" | "DERMATOLOGY";
+
 // Add this to your doctorService.ts file
 
 export interface AssignedAppointmentsResponse {
@@ -12,6 +14,24 @@ export interface AssignedAppointmentsResponse {
     totalPages: number;
     size: number;
     number: number;
+  };
+}
+
+export interface DoctorDashboardResponse {
+  success: boolean;
+  message: string;
+  data: {
+    doctorName: string;
+    profilePhotoUrl: string | null;
+    today: string;
+    clinicalModule?: ClinicalModule;   // ← NEW
+    todayAssignedAppointments: number;
+    todayAppointments: DashboardAppointment[];
+    completedHistories: number;
+    pendingHistories: number;
+    totalReviews: number;
+    averageRating: number;
+    ratingPercent: number;
   };
 }
 
@@ -67,14 +87,18 @@ export interface Doctor {
   status: string;
   mustChangePassword: boolean;
   specialization: string;
+  clinicalModule?: ClinicalModule;   // ← NEW
 }
+
 export interface CreateDoctorRequest {
   name: string;
   email: string;
   password: string;
   specialization: string;
   licenseNumber: string;
+  clinicalModule: ClinicalModule;    // ← NEW
 }
+
 export interface DoctorAppointment {
   id: string;
   patientId: string;
@@ -101,6 +125,7 @@ export interface DoctorDto {
   licenseNumber?: string;
   specialization?: string;
   qualifications?: string;
+  clinicalModule?: ClinicalModule;   // ← NEW
 }
 
 export interface DoctorProfileResponse {
@@ -120,6 +145,7 @@ export interface DoctorAppointmentsResponse {
     number: number;
   };
 }
+
 export interface CreateDoctorResponse {
   success: boolean;
   message: string;
@@ -170,6 +196,7 @@ export const createDoctor = async (payload: CreateDoctorRequest) => {
   );
   return response.data;
 };
+
 export const changePassword = async (
   payload: {
     currentPassword: string;
@@ -201,22 +228,6 @@ export interface DashboardAppointment {
 }
 
 
-export interface DoctorDashboardResponse {
-  success: boolean;
-  message: string;
-  data: {
-    doctorName: string;
-    profilePhotoUrl: string | null;
-    today: string;
-    todayAssignedAppointments: number;
-    todayAppointments: DashboardAppointment[];
-    completedHistories: number;
-    pendingHistories: number;
-    totalReviews: number;
-    averageRating: number;
-    ratingPercent: number;
-  };
-}
 
 export const fetchDoctorDashboard = async (): Promise<DoctorDashboardResponse> => {
   const res = await api.get("/doctor/dashboard");
@@ -250,9 +261,6 @@ export const uploadDoctorProfilePhoto = async (
   return res.data;
 };
 
-
-
-
 export const deleteHistoryImage = async (
   historyId: string,
   imageId: string
@@ -260,6 +268,16 @@ export const deleteHistoryImage = async (
   const res = await api.delete(`/patient-history/${historyId}/image/${imageId}`);
   return res.data;
 };
+
+
+// ── Current doctor's own profile (used to determine their clinical module) ──
+
+export const fetchMyDoctorProfile = async (): Promise<DoctorProfileResponse> => {
+  const res = await api.get("/users/doctors/me");
+  return res.data;
+};
+
+
 
 export const deleteHistoryVideo = async (
   historyId: string,

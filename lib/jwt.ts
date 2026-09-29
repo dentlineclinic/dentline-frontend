@@ -11,6 +11,8 @@ export interface JwtPayload {
 export const ROLE_ROUTE_MAP: Record<string, string> = {
   ADMIN: "/admin",
   DOCTOR: "/doctor",
+  DERMATOLOGIST: "/dermatologist",
+  PILATES_INSTRUCTOR: "/instructor",
   PATIENT: "/patient",
 };
 
@@ -28,11 +30,18 @@ export function decodeJwtPayload(token: string): JwtPayload | null {
 
     // Base64URL → Base64 → decode
     const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const padded = base64.padEnd(
+      base64.length + ((4 - (base64.length % 4)) % 4),
+      "="
+    );
     const jsonStr = atob(padded);
     const payload = JSON.parse(jsonStr);
 
-    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    if (
+      typeof payload !== "object" ||
+      payload === null ||
+      Array.isArray(payload)
+    ) {
       return null;
     }
 

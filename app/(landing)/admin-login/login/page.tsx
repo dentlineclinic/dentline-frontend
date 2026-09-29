@@ -25,11 +25,20 @@ export default function AdminLoginPage() {
     mutation.mutate({ email: email.trim(), password });
   };
 
+  // ── Error handling ──────────────────────────────────────────────
+  // The authService throws an Error whose .message is the server's
+  // ApiResponse.message (or a status-based fallback). We render it
+  // directly. Locked accounts get a distinct amber treatment.
+  const isLockedError =
+    mutation.isError &&
+    mutation.error instanceof Error &&
+    mutation.error.message.toLowerCase().includes("locked");
+
   const errorMessage =
     mutation.isError && mutation.error instanceof Error
       ? mutation.error.message
       : mutation.isError
-      ? "Invalid credentials. Please try again."
+      ? "Unable to sign in. Please try again."
       : null;
 
   return (
@@ -86,7 +95,14 @@ export default function AdminLoginPage() {
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
               {/* Error */}
               {errorMessage && (
-                <div className="bg-[#FFDAD6] border border-[#FCA5A5] text-[#93000A] px-4 py-3 rounded-lg text-sm font-semibold">
+                <div
+                  role="alert"
+                  className={
+                    isLockedError
+                      ? "bg-[#FFF4E5] border border-[#F5A623] text-[#7A4A00] px-4 py-3 rounded-lg text-sm font-semibold"
+                      : "bg-[#FFDAD6] border border-[#FCA5A5] text-[#93000A] px-4 py-3 rounded-lg text-sm font-semibold"
+                  }
+                >
                   {errorMessage}
                 </div>
               )}
@@ -105,11 +121,12 @@ export default function AdminLoginPage() {
                   <input
                     type="email"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin@dentline.com"
                     required
                     autoFocus
-                    className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-4 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"
+                    disabled={isLockedError}
+                    className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-4 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -128,14 +145,15 @@ export default function AdminLoginPage() {
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-12 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"
+                    disabled={isLockedError}
+                    className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-12 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(v => !v)}
+                    onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#00685C]"
                     aria-label="Toggle password visibility"
                   >
@@ -156,7 +174,7 @@ export default function AdminLoginPage() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={mutation.isPending}
+                disabled={mutation.isPending || isLockedError}
                 className="w-full bg-[#00685C] text-white font-semibold text-base py-4 rounded-lg shadow-sm hover:bg-[#008375] transition-colors flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {mutation.isPending ? (

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchPatientDashboard } from "@/services/patientService";
+import { fetchPatientDashboard,fetchPatientFullDashboard } from "@/services/patientService";
 import { fetchDoctorDashboard } from "@/services/doctorService";
 import { queryKeys } from "@/lib/queryKeys";
+
 
 /**
  * Patient dashboard — cached for 1 minute.
@@ -25,6 +26,21 @@ export function useDoctorDashboard() {
     queryKey: queryKeys.doctorDashboard,
     queryFn: fetchDoctorDashboard,
     staleTime: 1000 * 60,
+    gcTime: 1000 * 60 * 5,
+    retry: 2,
+  });
+}
+
+
+/**
+ * Full patient dashboard — dental + dermatology + Pilates.
+ * Cached for 30 seconds.
+ */
+export function usePatientFullDashboard() {
+  return useQuery({
+    queryKey: ["patient", "dashboard", "full"],
+    queryFn: fetchPatientFullDashboard,
+    staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
     retry: 2,
   });

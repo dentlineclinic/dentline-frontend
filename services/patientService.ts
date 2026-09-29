@@ -364,3 +364,60 @@ export const fetchPatientsByDateRange = async (
     };
   }
 };
+
+
+// ============================================
+// FULL PATIENT DASHBOARD (dental + derm + pilates)
+// ============================================
+
+export interface DermatologyRecordSummary {
+  id: string;
+  doctorName: string | null;
+  appointmentDate: string | null;
+  observation: string;
+  status: string;
+  paymentStatus: string;
+}
+
+export interface PilatesBookingSummary {
+  id: string;
+  sessionName: string | null;
+  sessionDate?: string | null; // may not be present; fall back to sessionName + status
+  status: string;
+  bookedAt: string;
+}
+
+export interface PatientFullDashboardDto {
+  patientName: string;
+  today: string;
+  profilePhotoUrl: string | null;
+  referenceCode: string | null;
+  referencePoints: number;
+
+  // Dental
+  completedAppointments: number;
+  totalAppointments: number;
+  nextAppointmentDate: string | null;
+  recentHistories: PatientHistoryDto[];
+
+  // Dermatology
+  dermatologyAppointmentsTotal: number;
+  dermatologyRecordsCompleted: number;
+  recentDermatologyRecords: DermatologyRecordSummary[];
+
+  // Pilates
+  activeSubscriptionsCount: number;
+  totalCreditsRemaining: number;
+  upcomingPilatesBookings: PilatesBookingSummary[];
+}
+
+export interface PatientFullDashboardResponse {
+  success: boolean;
+  message: string;
+  data: PatientFullDashboardDto;
+}
+
+export const fetchPatientFullDashboard = async (): Promise<PatientFullDashboardResponse> => {
+  const res = await api.get("/patient/dashboard/full");
+  return res.data;
+};

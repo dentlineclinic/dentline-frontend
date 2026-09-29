@@ -382,3 +382,193 @@ export const searchPatientsForHistory = async (
   );
   return res.data;
 };
+
+
+// ============================================
+// DERMATOLOGY PAYMENT
+// ============================================
+
+export const recordDermatologyPayment = async (
+  dermatologyRecordId: string,
+  amountPaid: number,
+  notes?: string
+) => {
+  const res = await api.post(
+    `/dermatology/${dermatologyRecordId}/payment`,
+    { amountPaid, notes }
+  );
+  return res.data;
+};
+
+export const markDermatologyPaymentUnpaid = async (
+  dermatologyRecordId: string
+) => {
+  const res = await api.patch(
+    `/dermatology/${dermatologyRecordId}/mark-unpaid`
+  );
+  return res.data;
+};
+
+
+// ============================================
+// DERMATOLOGY RECORD CREATION
+// ============================================
+
+export interface CreateDermatologyRecordRequest {
+  appointmentId: string;
+  observation?: string;   // optional — doctor fills in later
+  amount?: number | null;
+  discount?: number;
+}
+
+export const createDermatologyRecord = async (
+  payload: CreateDermatologyRecordRequest
+): Promise<SinglePatientHistoryResponse> => {
+  const res = await api.post("/dermatology", payload);
+  return res.data;
+};
+
+// ============================================
+// DERMATOLOGY RECORD MANAGEMENT (doctor-side)
+// ============================================
+
+export interface DermatologySkinCondition {
+  id: string;
+  dermatologyRecordId: string;
+  conditionName: string;
+  affectedArea: string | null;
+  severity: "MILD" | "MODERATE" | "SEVERE";
+  diagnosis: string | null;
+  treatment: string | null;
+  createdAt: string;
+}
+
+export interface DermatologyImage {
+  id: string;
+  dermatologyRecordId: string;
+  imageUrl: string;
+  uploadedAt: string;
+}
+
+export interface DermatologyRecordDetail {
+  id: string;
+  patientId: string;
+  patientName: string;
+  doctorId: string;
+  doctorName: string;
+  appointmentId: string;
+  appointmentDate: string;
+  appointmentType: "INDIVIDUAL" | "FAMILY";
+  familyMemberId?: string;
+  familyMemberName?: string;
+  observation: string | null;
+  amount: number | null;
+  discount: number;
+  amountPaid: number;
+  balance: number;
+  paymentStatus: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  skinConditions: DermatologySkinCondition[];
+  images: DermatologyImage[];
+}
+
+export interface SingleDermatologyRecordResponse {
+  success: boolean;
+  message: string;
+  data: DermatologyRecordDetail;
+}
+
+export interface AddSkinConditionRequest {
+  dermatologyRecordId: string;
+  conditionName: string;
+  affectedArea?: string;
+  severity?: "MILD" | "MODERATE" | "SEVERE";
+  diagnosis?: string;
+  treatment?: string;
+}
+
+export interface UpdateSkinConditionRequest {
+  conditionName: string;
+  affectedArea?: string;
+  severity?: "MILD" | "MODERATE" | "SEVERE";
+  diagnosis?: string;
+  treatment?: string;
+}
+
+export const fetchDermatologyRecordById = async (
+  id: string
+): Promise<SingleDermatologyRecordResponse> => {
+  const res = await api.get(`/dermatology/${id}`);
+  return res.data;
+};
+
+export const updateDermatologyObservation = async (
+  recordId: string,
+  observation: string
+): Promise<SingleDermatologyRecordResponse> => {
+  const res = await api.patch(`/dermatology/${recordId}/observation`, { observation });
+  return res.data;
+};
+
+export const addSkinCondition = async (
+  recordId: string,
+  payload: Omit<AddSkinConditionRequest, "dermatologyRecordId">
+): Promise<SingleDermatologyRecordResponse> => {
+  const res = await api.post(`/dermatology/${recordId}/conditions`, {
+    dermatologyRecordId: recordId,
+    ...payload,
+  });
+  return res.data;
+};
+
+export const updateSkinCondition = async (
+  recordId: string,
+  conditionId: string,
+  payload: UpdateSkinConditionRequest
+): Promise<SingleDermatologyRecordResponse> => {
+  const res = await api.patch(
+    `/dermatology/${recordId}/conditions/${conditionId}`,
+    payload
+  );
+  return res.data;
+};
+
+export const deleteSkinCondition = async (
+  recordId: string,
+  conditionId: string
+): Promise<SingleDermatologyRecordResponse> => {
+  const res = await api.delete(`/dermatology/${recordId}/conditions/${conditionId}`);
+  return res.data;
+};
+
+export const uploadDermatologyImage = async (
+  recordId: string,
+  file: File
+): Promise<SingleDermatologyRecordResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await api.post(
+    `/dermatology/${recordId}/upload/image`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return res.data;
+};
+
+export const deleteDermatologyImage = async (
+  recordId: string,
+  imageId: string
+): Promise<SingleDermatologyRecordResponse> => {
+  const res = await api.delete(`/dermatology/${recordId}/image/${imageId}`);
+  return res.data;
+};
+
+export const completeDermatologyRecord = async (
+  recordId: string
+): Promise<SingleDermatologyRecordResponse> => {
+  const res = await api.patch(`/dermatology/${recordId}/complete`);
+  return res.data;
+};

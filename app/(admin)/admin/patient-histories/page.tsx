@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { toast } from "react-toastify";
-import api from "@/lib/axios";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useAllClinicalRecords } from "@/hooks/useClinicalRecords";
+import { ClinicalModule } from "@/services/clinicalRecordService";
 import {
-  fetchPatientHistories,
-  fetchPaymentStats,
-  createPatientHistory
+  createPatientHistory,
+  createDermatologyRecord,
 } from "@/services/patientHistoryService";
+import { fetchAppointmentById } from "@/services/appointmentService";
 
 export const dynamic = "force-dynamic";
 
-type PatientHistory = {
+type HistoryRow = {
   id: string;
   shortId: string;
   patientId: string;
   patientName: string;
-  hmo: string | null;
   initials: string;
   doctorId: string;
   doctorName: string;
@@ -31,28 +30,15 @@ type PatientHistory = {
   status: string;
   observation: string;
   createdAt: string;
-  imageUrls: string[];
-  videoUrls: string[];
   familyMemberId?: string;
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
   headPatientName?: string;
   isCheckUp: boolean;
+  module: ClinicalModule;
 };
 
-export type PaymentStats = {
-  totalRecords: number;
-  totalBilled: number;
-  totalRevenue: number;
-  totalOutstanding: number;
-  paidCount: number;
-  pendingCount: number;
-  unpaidCount: number;
-  completedCount: number;
-  completedRatePercent: number;
-};
-
-type SelectedHistory = PatientHistory;
+type ModuleFilter = "ALL" | ClinicalModule;
 
 const PAYMENT_COLORS: Record<string, string> = {
   PAID: "bg-[#DCFCE7] text-[#166534]",
@@ -66,32 +52,48 @@ const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-[#FEF3C7] text-[#92400E]",
 };
 
+const MODULE_COLORS: Record<string, string> = {
+  DENTAL: "bg-[#E5EEFF] text-[#1E40AF]",
+  DERMATOLOGY: "bg-[#FCE7F3] text-[#9D174D]",
+};
+
 const formatCurrency = (n: number | null) => {
-  if (n === null) return "—";
+  if (n === null || n === undefined) return "—";
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
     currency: "NGN",
   }).format(n);
 };
 
-const isCheckUp = (history: any): boolean => {
-  return history.amount === null || history.amount === undefined;
+const formatDateSafe = (dateString: string | null | undefined) => {
+  if (!dateString) return { date: "—", time: "—" };
+  const dt = new Date(dateString);
+  if (isNaN(dt.getTime())) return { date: "—", time: "—" };
+  return {
+    date: dt.toLocaleDateString(),
+    time: dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  };
 };
 
-export default function PatientHistoriesPage() {
-  const [histories, setHistories] = useState<PatientHistory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const getInitials = (name: string | null | undefined) => {
+  if (!name) return "NA";
+  return name
+    .split(" ")
+    .map((n: string) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+};
+
+export default function ClinicalRecordsPage() {
   const [search, setSearch] = useState("");
-  const [paymentFilter, setPaymentFilter] = useState("All");
-  const [selectedHistory, setSelectedHistory] = useState<SelectedHistory | null>(null);
-  const [stats, setStats] = useState<PaymentStats | null>(null);
+  const [moduleFilter, setModuleFilter] = useState<ModuleFilter>("ALL");
+  const [selectedHistory, setSelectedHistory] = useState<HistoryRow | null>(null);
 
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
   const size = 10;
 
+  // ── Create History modal state ────────────────────────────────────────
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [createApptId, setCreateApptId] = useState("");
   const [createAmount, setCreateAmount] = useState("");
@@ -101,141 +103,153 @@ export default function PatientHistoriesPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
 
-  const calculateBalance = (amount: number | null, paymentStatus: string): number => {
-    if (amount === null) return 0;
-    return paymentStatus === "PAID" ? 0 : amount;
-  };
+  // ── Appointment lookup state ──────────────────────────────────────────
+  const [detectedModule, setDetectedModule] = useState<ClinicalModule | null>(null);
+  const [detectedPatientName, setDetectedPatientName] = useState<string | null>(null);
+  const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "notfound" | "unassigned">("idle");
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
-  const formatDateSafe = (dateString: string | null | undefined) => {
-    if (!dateString) return { date: "—", time: "—" };
-    const dt = new Date(dateString);
-    if (isNaN(dt.getTime())) return { date: "—", time: "—" };
-    return {
-      date: dt.toLocaleDateString(),
-      time: dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    };
-  };
+  const recordTypeParam: ClinicalModule | undefined =
+    moduleFilter === "ALL" ? undefined : moduleFilter;
 
-  const getInitials = (name: string | null | undefined) => {
-    if (!name) return "NA";
-    return name
-      .split(" ")
-      .map((n: string) => n[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase();
-  };
+  const { data, isLoading, isError, error, refetch } = useAllClinicalRecords(
+    page,
+    size,
+    recordTypeParam
+  );
 
-  const getDisplayName = (history: any) => {
-    if (history.appointmentType === "FAMILY" && history.familyMemberName) {
-      return history.familyMemberName;
+  const allRows: HistoryRow[] = useMemo(() => {
+    const records = data?.content ?? [];
+    return records.map((r) => {
+      const { date, time } = formatDateSafe(r.appointmentDate || r.createdAt);
+      const displayName = r.familyMemberName || r.patientName || "Unknown Patient";
+      const checkUp = r.amount === null || r.amount === undefined;
+      const module = r.recordType;
+
+      return {
+        id: r.id,
+        shortId: `${module === "DENTAL" ? "HIS" : "DERM"}-${r.id.slice(0, 6).toUpperCase()}`,
+        patientId: r.patientId,
+        patientName: displayName,
+        initials: getInitials(displayName),
+        doctorId: r.doctorId || "",
+        doctorName: r.doctorName || "Unknown Doctor",
+        appointmentId: r.appointmentId || "",
+        date,
+        time,
+        amount: r.amount ?? null,
+        discount: r.discount ?? 0,
+        amountPaid: r.amountPaid ?? 0,
+        balance: r.balance ?? 0,
+        paymentStatus: r.paymentStatus || "PENDING",
+        status: r.status || "PENDING",
+        observation: r.summary || "No observation notes",
+        createdAt: r.createdAt ? new Date(r.createdAt).toLocaleString() : "—",
+        familyMemberId: r.familyMemberId || undefined,
+        familyMemberName: r.familyMemberName || undefined,
+        appointmentType: r.familyMemberId ? "FAMILY" : "INDIVIDUAL",
+        headPatientName: r.familyMemberId ? r.patientName : undefined,
+        isCheckUp: checkUp,
+        module,
+      };
+    });
+  }, [data]);
+
+  const filteredRows = useMemo(() => {
+    if (!search.trim()) return allRows;
+    const term = search.trim().toLowerCase();
+    return allRows.filter(
+      (r) =>
+        r.patientName.toLowerCase().includes(term) ||
+        r.doctorName.toLowerCase().includes(term) ||
+        r.shortId.toLowerCase().includes(term)
+    );
+  }, [allRows, search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [moduleFilter, search]);
+
+  const totalPages = data?.totalPages ?? 0;
+  const totalElements = data?.totalElements ?? 0;
+
+  const openDetails = (history: HistoryRow) => setSelectedHistory({ ...history });
+  const closeDetails = () => setSelectedHistory(null);
+  const handlePageChange = (newPage: number) => setPage(newPage);
+
+  const dentalCount = allRows.filter((r) => r.module === "DENTAL").length;
+  const dermCount = allRows.filter((r) => r.module === "DERMATOLOGY").length;
+
+  // ── Appointment lookup (debounced) ────────────────────────────────────
+  const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lookupRequestIdRef = useRef(0);
+
+  const lookupAppointment = async (appointmentId: string) => {
+    const trimmed = appointmentId.trim();
+    if (!trimmed) {
+      setLookupStatus("idle");
+      setDetectedModule(null);
+      setDetectedPatientName(null);
+      setLookupError(null);
+      return;
     }
-    return history.patientName || "Unknown Patient";
-  };
 
-  const loadStats = useCallback(async () => {
-    try {
-      const res = await fetchPaymentStats();
-      if (res.success) {
-        setStats(res.data);
-      }
-    } catch (err) {
-      console.error("Failed to load payment stats:", err);
-    }
-  }, []);
-
-  const loadHistories = useCallback(async (pageNum: number, pageSize: number, searchTerm: string, paymentStatus: string) => {
-    setLoading(true);
-    setError(null);
+    const requestId = ++lookupRequestIdRef.current;
+    setLookupStatus("loading");
+    setLookupError(null);
 
     try {
-      const res = await fetchPatientHistories(
-        pageNum,
-        pageSize,
-        searchTerm,
-        paymentStatus
-      );
+      const res = await fetchAppointmentById(trimmed);
+      // Stale response guard
+      if (requestId !== lookupRequestIdRef.current) return;
 
-      if (res.success) {
-        const mapped = res.data.content.map((h) => {
-          const { date, time } = formatDateSafe(h.appointmentDate);
-          const displayName = getDisplayName(h);
-          const checkUp = isCheckUp(h);
-
-          return {
-            id: h.id,
-            shortId: `HIS-${h.id.slice(0, 6).toUpperCase()}`,
-            patientId: h.patientId,
-            patientName: displayName,
-            hmo: h.hmo || null,
-            initials: getInitials(displayName),
-            doctorId: h.doctorId,
-            doctorName: h.doctorName || "Unknown Doctor",
-            appointmentId: h.appointmentId,
-            date,
-            time,
-            amount: h.amount ?? null,
-            discount: h.discount ?? 0,
-            amountPaid: h.amountPaid ?? 0,
-            balance: h.balance ?? calculateBalance(
-              h.amount ?? null,
-              h.paymentStatus || "PENDING"
-            ),
-            paymentStatus: h.paymentStatus || "PENDING",
-            status: h.status || "PENDING",
-            observation: h.observation || "No observation notes",
-            createdAt: h.createdAt ? new Date(h.createdAt).toLocaleString() : "—",
-            imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
-            videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
-            familyMemberId: h.familyMemberId,
-            familyMemberName: h.familyMemberName,
-            appointmentType: h.appointmentType || "INDIVIDUAL",
-            headPatientName: h.patientName,
-            isCheckUp: checkUp,
-          };
-        });
-
-        setHistories(mapped);
-        setTotalPages(res.data.totalPages);
-        setTotalElements(res.data.totalElements);
-      } else {
-        setError(res.message || "Failed to load patient histories.");
+      const appt = res?.data;
+      if (!appt) {
+        setLookupStatus("notfound");
+        setLookupError("Appointment not found.");
+        setDetectedModule(null);
+        setDetectedPatientName(null);
+        return;
       }
+
+      // If the appointment has no module (doctor not assigned yet)
+      if (!appt.clinicalModule) {
+        setLookupStatus("unassigned");
+        setLookupError(
+          "This appointment hasn't been assigned to a doctor yet. Assign a doctor first so we know which module to create the record under."
+        );
+        setDetectedModule(null);
+        setDetectedPatientName(appt.patientName || null);
+        return;
+      }
+
+      setLookupStatus("found");
+      setDetectedModule(appt.clinicalModule);
+      setDetectedPatientName(appt.patientName || null);
+      setLookupError(null);
     } catch (err: any) {
-      console.error("Error loading histories:", err);
-      setError(err.message || "Failed to load patient histories.");
-    } finally {
-      setLoading(false);
+      if (requestId !== lookupRequestIdRef.current) return;
+      setLookupStatus("notfound");
+      setLookupError(err?.message || "Appointment not found.");
+      setDetectedModule(null);
+      setDetectedPatientName(null);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+    if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
 
-  const currentPageCompletedCount = histories.filter(h => h.status === "COMPLETED").length;
-  const currentPageCompletionRate = histories.length
-    ? Math.round((currentPageCompletedCount / histories.length) * 100)
-    : 0;
-
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      loadHistories(page, size, search, paymentFilter);
-    }, 400);
+    lookupTimerRef.current = setTimeout(() => {
+      lookupAppointment(createApptId);
+    }, 500);
 
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
+      if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
     };
-  }, [page, search, paymentFilter, loadHistories]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createApptId]);
 
+  // ── Create History handlers ───────────────────────────────────────────
   const openCreatePanel = () => {
     setCreateApptId("");
     setCreateAmount("");
@@ -243,12 +257,29 @@ export default function PatientHistoriesPage() {
     setIsCheckUpVisit(false);
     setCreateError(null);
     setCreateSuccess(null);
+    setDetectedModule(null);
+    setDetectedPatientName(null);
+    setLookupStatus("idle");
+    setLookupError(null);
     setShowCreatePanel(true);
+  };
+
+  const closeCreatePanel = () => {
+    if (creating) return;
+    setShowCreatePanel(false);
   };
 
   const createHistory = async () => {
     if (!createApptId.trim()) {
       setCreateError("Please enter an appointment ID.");
+      return;
+    }
+
+    if (lookupStatus !== "found" || !detectedModule) {
+      setCreateError(
+        lookupError ||
+          "Cannot create a record until we detect the appointment's clinical module."
+      );
       return;
     }
 
@@ -279,107 +310,53 @@ export default function PatientHistoriesPage() {
 
     try {
       const payload: any = {
-        appointmentId: createApptId,
+        appointmentId: createApptId.trim(),
         discount,
       };
-      
+
       if (!isCheckUpVisit && amount !== null) {
         payload.amount = amount;
       }
 
-      const res = await createPatientHistory(payload);
+      // ✅ Route to the correct endpoint based on the detected module
+      const res =
+        detectedModule === "DERMATOLOGY"
+          ? await createDermatologyRecord(payload)
+          : await createPatientHistory(payload);
 
       if (res.success) {
-        setCreateSuccess(res.message || "Patient history created successfully!");
+        const moduleLabel = detectedModule === "DERMATOLOGY" ? "Dermatology" : "Dental";
+        setCreateSuccess(
+          res.message || `${moduleLabel} record created successfully!`
+        );
 
         setTimeout(async () => {
-          await Promise.all([
-            loadHistories(page, size, search, paymentFilter),
-            loadStats(),
-          ]);
+          await refetch();
           setShowCreatePanel(false);
           setCreateApptId("");
           setCreateAmount("");
           setCreateDiscount("");
           setIsCheckUpVisit(false);
+          setDetectedModule(null);
+          setDetectedPatientName(null);
+          setLookupStatus("idle");
         }, 1500);
       } else {
-        setCreateError(res.message || "Failed to create patient history.");
+        setCreateError(res.message || "Failed to create record.");
       }
     } catch (err: any) {
-      setCreateError(err.message || "Failed to create patient history.");
+      setCreateError(err.message || "Failed to create record.");
     } finally {
       setCreating(false);
     }
   };
 
-  const openDetails = (history: PatientHistory) => {
-    setSelectedHistory({ ...history });
-  };
-
-  const closeDetails = () => {
-    setSelectedHistory(null);
-  };
-
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-  };
-
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10 flex flex-col gap-6">
-
-        {stats ? (
-          <div className="grid grid-cols-3 gap-6">
-            <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-              <p className="text-sm text-[#3D4946]">Total Records</p>
-              <p className="text-3xl font-bold text-[#0B1C30] mt-1">
-                {stats.totalRecords}
-              </p>
-              <p className="text-xs text-[#0D9488] mt-1">Patient history entries</p>
-            </div>
-
-            <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-              <p className="text-sm text-[#3D4946]">Total Revenue</p>
-              <p className="text-3xl font-bold text-[#0B1C30] mt-1">
-                {formatCurrency(stats.totalRevenue)}
-              </p>
-              <p className="text-xs text-[#0D9488] mt-1">
-                Outstanding: {formatCurrency(stats.totalOutstanding)}
-              </p>
-            </div>
-
-            <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-              <p className="text-sm text-[#3D4946]">Payment Breakdown</p>
-              <p className="text-xs text-[#3D4946] mt-2">
-                Paid: {stats.paidCount} · Pending: {stats.pendingCount} · Unpaid: {stats.unpaidCount}
-              </p>
-              <p className="text-xs text-[#0D9488] mt-1">
-                Completion Rate: {stats.completedRatePercent}%
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-6">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
-                <div className="h-3 bg-[#F1F5F9] rounded animate-pulse w-1/2 mb-3" />
-                <div className="h-8 bg-[#F1F5F9] rounded animate-pulse w-3/4 mb-2" />
-                <div className="h-3 bg-[#F1F5F9] rounded animate-pulse w-1/3" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && histories.length > 0 && (
-          <div className="text-xs text-[#94A3B8] bg-[#F8FAFC] rounded-lg px-4 py-2">
-            Current page: {histories.length} records ·
-            {currentPageCompletedCount} completed ({currentPageCompletionRate}% completion rate)
-          </div>
-        )}
-
+        {/* Filters row with Create History button */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <input
               type="search"
               placeholder="Search by patient, doctor or ID…"
@@ -387,21 +364,48 @@ export default function PatientHistoriesPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#6B7280] outline-none focus:border-[#00685C] w-72"
             />
-            <button
-              onClick={openCreatePanel}
-              className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors flex-shrink-0"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Create History
-            </button>
+
+            <div className="inline-flex rounded-lg border border-[#E2E8F0] overflow-hidden bg-white">
+              {(["ALL", "DENTAL", "DERMATOLOGY"] as ModuleFilter[]).map((m) => {
+                const active = moduleFilter === m;
+                const label =
+                  m === "ALL"
+                    ? `All (${dentalCount + dermCount})`
+                    : m === "DENTAL"
+                    ? `Dental (${dentalCount})`
+                    : `Dermatology (${dermCount})`;
+
+                return (
+                  <button
+                    key={m}
+                    onClick={() => setModuleFilter(m)}
+                    className={`px-4 py-2 text-xs font-semibold transition-colors border-r border-[#E2E8F0] last:border-r-0 ${
+                      active
+                        ? "bg-[#00685C] text-white"
+                        : "bg-white text-[#3D4946] hover:bg-[#F8FAFC]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          <button
+            onClick={openCreatePanel}
+            className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors flex-shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create History
+          </button>
         </div>
 
-        {error && (
+        {isError && (
           <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-lg">
-            {error}
+            {(error as any)?.message || "Failed to load clinical records."}
           </div>
         )}
 
@@ -410,15 +414,18 @@ export default function PatientHistoriesPage() {
             <table className="w-full min-w-[1200px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "HMO", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
-                    <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
+                  {["ID", "MODULE", "PATIENT", "TYPE", "DOCTOR", "DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT", "STATUS", "ACTIONS"].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest"
+                    >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {isLoading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
                       {[...Array(13)].map((__, j) => (
@@ -428,26 +435,41 @@ export default function PatientHistoriesPage() {
                       ))}
                     </tr>
                   ))
-                ) : histories.length === 0 ? (
+                ) : filteredRows.length === 0 ? (
                   <tr>
                     <td colSpan={13} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
-                      No patient history records found.
+                      No clinical records found.
                     </td>
                   </tr>
                 ) : (
-                  histories.map((h) => {
+                  filteredRows.map((h) => {
                     const isFamily = h.appointmentType === "FAMILY";
-                    
+                    const isDerm = h.module === "DERMATOLOGY";
+
                     return (
-                      <tr key={h.id} className="hover:bg-[#F8FAFC] transition-colors border-t border-[#F8FAFC]">
-                        <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{h.shortId}</td>
+                      <tr
+                        key={h.id}
+                        className="hover:bg-[#F8FAFC] transition-colors border-t border-[#F8FAFC]"
+                      >
+                        <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">
+                          {h.shortId}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`text-xs font-bold px-2 py-0.5 rounded-full ${MODULE_COLORS[h.module]}`}
+                          >
+                            {isDerm ? "Dermatology" : "Dental"}
+                          </span>
+                        </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-[#CCFBF1] flex items-center justify-center text-xs font-bold text-[#0F766E] flex-shrink-0">
                               {h.initials}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-[#0B1C30]">{h.patientName}</p>
+                              <p className="text-sm font-semibold text-[#0B1C30]">
+                                {h.patientName}
+                              </p>
                               {isFamily && h.headPatientName && (
                                 <p className="text-xs text-[#94A3B8]">
                                   Head: {h.headPatientName}
@@ -455,9 +477,6 @@ export default function PatientHistoriesPage() {
                               )}
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-[#3D4946]">
-                          {h.hmo || "—"}
                         </td>
                         <td className="px-6 py-4">
                           {isFamily ? (
@@ -494,18 +513,28 @@ export default function PatientHistoriesPage() {
                           {h.isCheckUp ? (
                             <span className="text-[#94A3B8]">—</span>
                           ) : (
-                            <span className={h.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}>
+                            <span
+                              className={h.balance === 0 ? "text-[#0F766E]" : "text-[#93000A]"}
+                            >
                               {formatCurrency(h.balance)}
                             </span>
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                          <span
+                            className={`text-xs font-bold px-3 py-1 rounded-full ${
+                              PAYMENT_COLORS[h.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"
+                            }`}
+                          >
                             {h.isCheckUp ? "COMPLETED" : h.paymentStatus}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[h.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                          <span
+                            className={`text-xs font-bold px-3 py-1 rounded-full ${
+                              STATUS_COLORS[h.status] ?? "bg-[#F1F5F9] text-[#64748B]"
+                            }`}
+                          >
                             {h.status.replace("_", " ")}
                           </span>
                         </td>
@@ -526,7 +555,7 @@ export default function PatientHistoriesPage() {
           </div>
         </div>
 
-        {!loading && totalPages > 0 && (
+        {!isLoading && totalPages > 0 && (
           <div className="flex items-center justify-between mt-6">
             <button
               disabled={page === 0}
@@ -550,18 +579,28 @@ export default function PatientHistoriesPage() {
           </div>
         )}
 
-        {!loading && (
+        {!isLoading && (
           <p className="text-sm text-[#3D4946]">
-            Showing {histories.length} of {totalElements} records
+            Showing {filteredRows.length} of {totalElements} records
           </p>
         )}
       </main>
 
+      {/* Details Modal (unchanged from previous version) */}
       {selectedHistory && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-6 border-b border-[#F1F5F9]">
-              <h2 className="text-xl font-bold text-[#0B1C30]">Patient History Details</h2>
+              <div>
+                <h2 className="text-xl font-bold text-[#0B1C30]">Clinical Record</h2>
+                <span
+                  className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${
+                    MODULE_COLORS[selectedHistory.module]
+                  }`}
+                >
+                  {selectedHistory.module === "DERMATOLOGY" ? "Dermatology" : "Dental"}
+                </span>
+              </div>
               <button
                 onClick={closeDetails}
                 className="text-[#94A3B8] hover:text-[#475569] transition-colors"
@@ -576,7 +615,9 @@ export default function PatientHistoriesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest">Record ID</p>
-                  <p className="text-sm font-semibold text-[#0D9488] mt-1">{selectedHistory.shortId}</p>
+                  <p className="text-sm font-semibold text-[#0D9488] mt-1">
+                    {selectedHistory.shortId}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest">Appointment ID</p>
@@ -595,10 +636,13 @@ export default function PatientHistoriesPage() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-[#0B1C30]">{selectedHistory.patientName}</p>
-                      <p className="text-xs text-[#3D4946]">Patient ID: {selectedHistory.patientId?.slice(-8) || 'N/A'}</p>
-                      <p className="text-xs text-[#3D4946]">HMO: {selectedHistory.hmo || "None"}</p>
+                      <p className="text-xs text-[#3D4946]">
+                        Patient ID: {selectedHistory.patientId?.slice(-8) || "N/A"}
+                      </p>
                       {selectedHistory.appointmentType === "FAMILY" && selectedHistory.headPatientName && (
-                        <p className="text-xs text-[#94A3B8]">Head Patient: {selectedHistory.headPatientName}</p>
+                        <p className="text-xs text-[#94A3B8]">
+                          Head Patient: {selectedHistory.headPatientName}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -608,7 +652,9 @@ export default function PatientHistoriesPage() {
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-2">Doctor Information</p>
                   <div>
                     <p className="text-sm font-semibold text-[#0B1C30]">{selectedHistory.doctorName}</p>
-                    <p className="text-xs text-[#3D4946]">Doctor ID: {selectedHistory.doctorId?.slice(-8) || 'N/A'}</p>
+                    <p className="text-xs text-[#3D4946]">
+                      Doctor ID: {selectedHistory.doctorId?.slice(-8) || "N/A"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -627,7 +673,9 @@ export default function PatientHistoriesPage() {
                   <div>
                     <p className="text-xs text-[#94A3B8]">Type</p>
                     <p className="text-sm font-medium text-[#0B1C30]">
-                      {selectedHistory.appointmentType === "FAMILY" ? "Family Appointment" : "Individual Appointment"}
+                      {selectedHistory.appointmentType === "FAMILY"
+                        ? "Family Appointment"
+                        : "Individual Appointment"}
                     </p>
                   </div>
                   <div>
@@ -635,8 +683,12 @@ export default function PatientHistoriesPage() {
                     <p className="text-sm font-medium text-[#0B1C30]">{selectedHistory.createdAt}</p>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-xs text-[#94A3B8]">History Status</p>
-                    <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[selectedHistory.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                    <p className="text-xs text-[#94A3B8]">Status</p>
+                    <span
+                      className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${
+                        STATUS_COLORS[selectedHistory.status] ?? "bg-[#F1F5F9] text-[#64748B]"
+                      }`}
+                    >
                       {selectedHistory.status.replace("_", " ")}
                     </span>
                   </div>
@@ -674,18 +726,14 @@ export default function PatientHistoriesPage() {
                 )}
                 <div className="mt-3">
                   <p className="text-xs text-[#94A3B8]">Payment Status</p>
-                  <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${PAYMENT_COLORS[selectedHistory.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
+                  <span
+                    className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${
+                      PAYMENT_COLORS[selectedHistory.paymentStatus] ?? "bg-[#F1F5F9] text-[#64748B]"
+                    }`}
+                  >
                     {selectedHistory.isCheckUp ? "COMPLETED (No Charge)" : selectedHistory.paymentStatus}
                   </span>
                 </div>
-                {!selectedHistory.isCheckUp && selectedHistory.paymentStatus !== "PAID" && (
-                  <p className="text-xs text-[#94A3B8] mt-3 flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    To record or manage payments, go to the <strong className="text-[#0D9488]">Payments</strong> page.
-                  </p>
-                )}
               </div>
 
               <div className="bg-[#F8FAFC] rounded-lg p-4">
@@ -694,47 +742,6 @@ export default function PatientHistoriesPage() {
                   {selectedHistory.observation || "No observation notes available"}
                 </p>
               </div>
-
-              {selectedHistory.imageUrls.length > 0 && (
-                <div className="bg-[#F8FAFC] rounded-lg p-4">
-                  <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
-                    Clinical Images ({selectedHistory.imageUrls.length})
-                  </p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {selectedHistory.imageUrls.map((url, i) => (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                        className="block aspect-square rounded-lg overflow-hidden border border-[#E2E8F0] hover:opacity-90 transition-opacity bg-[#E2E8F0]">
-                        <img src={url} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedHistory.videoUrls.length > 0 && (
-                <div className="bg-[#F8FAFC] rounded-lg p-4">
-                  <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
-                    Clinical Videos ({selectedHistory.videoUrls.length})
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {selectedHistory.videoUrls.map((url, i) => (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-lg px-4 py-3 hover:border-[#00685C] transition-colors">
-                        <div className="w-8 h-8 bg-[#F0FDFA] rounded-lg flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <span className="text-sm text-[#0B1C30] font-medium truncate flex-1">Video {i + 1}</span>
-                        <svg className="w-4 h-4 text-[#94A3B8] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="flex justify-end p-6 border-t border-[#F1F5F9]">
@@ -749,20 +756,21 @@ export default function PatientHistoriesPage() {
         </div>
       )}
 
+      {/* ✅ Create History Modal (module-aware) */}
       {showCreatePanel && (
         <div
           className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget && !creating) {
-              setShowCreatePanel(false);
+              closeCreatePanel();
             }
           }}
         >
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="flex justify-between items-center p-6 border-b border-[#F1F5F9]">
-              <h2 className="text-xl font-bold text-[#0B1C30]">Create Patient History</h2>
+              <h2 className="text-xl font-bold text-[#0B1C30]">Create Clinical Record</h2>
               <button
-                onClick={() => !creating && setShowCreatePanel(false)}
+                onClick={closeCreatePanel}
                 disabled={creating}
                 className="text-[#94A3B8] hover:text-[#475569] transition-colors disabled:opacity-50"
               >
@@ -773,6 +781,36 @@ export default function PatientHistoriesPage() {
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Module detection banner */}
+              {lookupStatus === "loading" && (
+                <div className="bg-[#F8FAFC] text-[#3D4946] text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-2">
+                  <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Looking up appointment…
+                </div>
+              )}
+
+              {lookupStatus === "found" && detectedModule && (
+                <div className={`text-xs font-semibold px-3 py-2 rounded-lg ${MODULE_COLORS[detectedModule]}`}>
+                  ✓ Detected: <strong>{detectedModule === "DERMATOLOGY" ? "Dermatology" : "Dental"}</strong> appointment
+                  {detectedPatientName ? ` — ${detectedPatientName}` : ""}
+                </div>
+              )}
+
+              {lookupStatus === "unassigned" && (
+                <div className="bg-[#FEF3C7] text-[#92400E] text-xs font-semibold px-3 py-2 rounded-lg">
+                  ⚠ {lookupError}
+                </div>
+              )}
+
+              {lookupStatus === "notfound" && lookupError && (
+                <div className="bg-[#FFDAD6] text-[#93000A] text-xs font-semibold px-3 py-2 rounded-lg">
+                  ✕ {lookupError}
+                </div>
+              )}
+
               {createSuccess && (
                 <div className="bg-[#DCFCE7] text-[#166534] text-sm font-semibold px-4 py-3 rounded-lg">
                   {createSuccess}
@@ -798,7 +836,7 @@ export default function PatientHistoriesPage() {
                   className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-[#94A3B8] mt-1">
-                  Enter the appointment ID to link this history record
+                  We'll auto-detect whether this is a Dental or Dermatology appointment
                 </p>
               </div>
 
@@ -809,9 +847,7 @@ export default function PatientHistoriesPage() {
                   checked={isCheckUpVisit}
                   onChange={(e) => {
                     setIsCheckUpVisit(e.target.checked);
-                    if (e.target.checked) {
-                      setCreateAmount("");
-                    }
+                    if (e.target.checked) setCreateAmount("");
                   }}
                   disabled={creating}
                   className="w-4 h-4 text-[#00685C] rounded border-[#E2E8F0] focus:ring-[#00685C] disabled:opacity-50"
@@ -883,7 +919,7 @@ export default function PatientHistoriesPage() {
                   </p>
                   <p className="text-xs text-[#3D4946] mt-1">
                     This will create a clinical record with no financial obligation.
-                    The history will be marked as PAID and will not appear in outstanding payments.
+                    The record will be marked as PAID and will not appear in outstanding payments.
                   </p>
                 </div>
               )}
@@ -891,7 +927,7 @@ export default function PatientHistoriesPage() {
 
             <div className="flex justify-end gap-3 p-6 border-t border-[#F1F5F9]">
               <button
-                onClick={() => setShowCreatePanel(false)}
+                onClick={closeCreatePanel}
                 disabled={creating}
                 className="px-4 py-2 text-sm font-semibold text-[#3D4946] hover:text-[#0B1C30] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -899,7 +935,7 @@ export default function PatientHistoriesPage() {
               </button>
               <button
                 onClick={createHistory}
-                disabled={creating}
+                disabled={creating || lookupStatus !== "found"}
                 className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creating ? (
@@ -910,8 +946,10 @@ export default function PatientHistoriesPage() {
                     </svg>
                     Creating...
                   </>
+                ) : isCheckUpVisit ? (
+                  "Create Check-up Record"
                 ) : (
-                  isCheckUpVisit ? 'Create Check-up Record' : 'Create'
+                  "Create"
                 )}
               </button>
             </div>

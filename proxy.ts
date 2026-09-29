@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { decodeJwtPayload, isTokenExpired, ROLE_ROUTE_MAP } from "@/lib/jwt";
 
-const PROTECTED_PREFIXES = ["/admin", "/doctor", "/patient"];
+const PROTECTED_PREFIXES = [
+  "/admin",
+  "/doctor",
+  "/dermatologist",
+  "/instructor",
+  "/patient",
+];
 const AUTH_PREFIXES = ["/login", "/register", "/admin-login"];
 
 function isProtected(pathname: string): boolean {

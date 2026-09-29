@@ -32,6 +32,8 @@ function getInitials(name: string): string {
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrator",
   DOCTOR: "Doctor",
+  DERMATOLOGIST: "Dermatologist",
+  PILATES_INSTRUCTOR: "Pilates Instructor",
   PATIENT: "Patient",
 };
 

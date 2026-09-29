@@ -1,48 +1,67 @@
-// app/(landing)/login/page.tsx
-'use client';
+"use client";
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import { useLogin } from "@/hooks/useLogin";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { STORAGE_KEYS } from "@/lib/constants";
+
+type LoginRole = "PATIENT" | "DOCTOR" | "PILATES_INSTRUCTOR";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<"PATIENT" | "DOCTOR">("PATIENT");
+  const [selectedRole, setSelectedRole] = useState<LoginRole>("PATIENT");
   const router = useRouter();
 
   const loginMutation = useLogin();
 
-  // Handle redirect based on role after successful login
   useEffect(() => {
-    if (loginMutation.isSuccess) {
-      const role = localStorage.getItem("userRole");
-      const mustChangePassword = localStorage.getItem("mustChangePassword") === "true";
+    if (!loginMutation.isSuccess) return;
 
-      // If patient must change password, redirect to profile with reason
-      if (mustChangePassword && role === "PATIENT") {
-        router.push("/patient/profile?reason=must_change_password");
-        return;
-      }
+    const role = localStorage.getItem(STORAGE_KEYS.USER_ROLE);
+    const mustChangePassword =
+      localStorage.getItem(STORAGE_KEYS.MUST_CHANGE_PASSWORD) === "true";
 
-      // Normal redirect based on role
-      if (role === "DOCTOR") {
-        router.push("/doctor");
-      } else if (role === "PATIENT") {
-        router.push("/patient");
-      } else {
-        router.push("/");
-      }
+    if (mustChangePassword && role === "PATIENT") {
+      router.push("/patient/profile?reason=must_change_password");
+      return;
+    }
+    if (mustChangePassword && role === "PILATES_INSTRUCTOR") {
+      router.push("/instructor/profile?reason=must_change_password");
+      return;
+    }
+
+    if (role === "DOCTOR") {
+      router.push("/doctor");
+    } else if (role === "PATIENT") {
+      router.push("/patient");
+    } else if (role === "PILATES_INSTRUCTOR") {
+      router.push("/instructor");
+    } else {
+      router.push("/");
     }
   }, [loginMutation.isSuccess, router]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const trimmedIdentifier = identifier.trim();
+
+    if (
+      (selectedRole === "DOCTOR" || selectedRole === "PILATES_INSTRUCTOR") &&
+      !EMAIL_RE.test(trimmedIdentifier)
+    ) {
+      return;
+    }
+
     loginMutation.mutate({
-      identifier: identifier.trim(),
+      identifier: trimmedIdentifier,
       password: password.trim(),
       role: selectedRole,
     });
@@ -50,13 +69,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8F9FF] to-white flex flex-col">
-      {/* Background decorations */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#008375]/10 rounded-full blur-[80px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#BBD3FD]/20 rounded-full blur-[80px]" />
       </div>
 
-      {/* Main */}
       <main className="flex-1 flex items-center justify-center px-6 py-20">
         <div className="w-full max-w-[1000px] bg-white rounded-xl shadow-xl border border-[#BDC9C5]/30 overflow-hidden flex">
           {/* Left: Branding */}
@@ -69,16 +86,20 @@ export default function LoginPage() {
                 height={28}
                 className="object-contain shrink-0 block"
               />
-              <span className="text-white font-semibold text-2xl tracking-tight">Dentline Clinic</span>
+              <span className="text-white font-semibold text-2xl tracking-tight">
+                Dentline Clinic
+              </span>
             </div>
 
             <div className="flex flex-col gap-3">
               <h1 className="text-white font-bold text-4xl leading-tight">
-                Excellence in<br />Aesthetics Care.
+                Excellence in
+                <br />
+                Aesthetics Care.
               </h1>
               <p className="text-white/80 text-lg leading-relaxed">
-                Welcome back to your professional portal. Access patient records, manage
-                appointments, and deliver clinical excellence.
+                Welcome back to your professional portal. Access patient records,
+                manage appointments, and deliver clinical excellence.
               </p>
             </div>
 
@@ -91,7 +112,9 @@ export default function LoginPage() {
                   />
                 ))}
               </div>
-              <span className="text-white text-sm font-semibold">Joined by 50+ Specialists</span>
+              <span className="text-white text-sm font-semibold">
+                Joined by 50+ Specialists
+              </span>
             </div>
           </div>
 
@@ -105,60 +128,92 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-              {/* Error Message */}
               {loginMutation.isError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                  {loginMutation.error?.message || "Login failed. Please check your credentials."}
+                  {loginMutation.error?.message ||
+                    "Login failed. Please check your credentials."}
                 </div>
               )}
 
               {/* Role Selection */}
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-semibold text-[#3D4946]">Login as</label>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
+                <label className="text-sm font-semibold text-[#3D4946]">
+                  Login as
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <RoleButton
+                    active={selectedRole === "PATIENT"}
                     onClick={() => setSelectedRole("PATIENT")}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${
-                      selectedRole === "PATIENT"
-                        ? "border-[#00685C] bg-[#00685C]/5 text-[#00685C]"
-                        : "border-[#BDC9C5] bg-white text-[#485F83] hover:border-[#00685C]/50"
-                    }`}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Patient
-                  </button>
-                  <button
-                    type="button"
+                    label="Patient"
+                    icon={
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    }
+                  />
+                  <RoleButton
+                    active={selectedRole === "DOCTOR"}
                     onClick={() => setSelectedRole("DOCTOR")}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${
-                      selectedRole === "DOCTOR"
-                        ? "border-[#00685C] bg-[#00685C]/5 text-[#00685C]"
-                        : "border-[#BDC9C5] bg-white text-[#485F83] hover:border-[#00685C]/50"
-                    }`}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21v-2a4 4 0 00-4-4H9a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-                    </svg>
-                    Doctor
-                  </button>
+                    label="Doctor"
+                    icon={
+                      <>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M19 21v-2a4 4 0 00-4-4H9a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
+                        />
+                      </>
+                    }
+                  />
+                  <RoleButton
+                    active={selectedRole === "PILATES_INSTRUCTOR"}
+                    onClick={() => setSelectedRole("PILATES_INSTRUCTOR")}
+                    label="Pilates"
+                    icon={
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    }
+                  />
                 </div>
               </div>
 
-              {/* Email / Identifier */}
+              {/* Identifier */}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-semibold text-[#3D4946]">
                   {selectedRole === "PATIENT"
                     ? "Email Address or Phone Number"
-                    : "Doctor Email"}
+                    : selectedRole === "DOCTOR"
+                      ? "Doctor Email"
+                      : "Instructor Email"}
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B7280]">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
                     </svg>
                   </span>
                   <input
@@ -168,7 +223,9 @@ export default function LoginPage() {
                     placeholder={
                       selectedRole === "PATIENT"
                         ? "email@example.com or +2348012345678"
-                        : "doctor@dentline.com"
+                        : selectedRole === "DOCTOR"
+                          ? "doctor@dentline.com"
+                          : "instructor@dentline.com"
                     }
                     required
                     className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-4 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"
@@ -179,8 +236,13 @@ export default function LoginPage() {
               {/* Password */}
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-semibold text-[#3D4946]">Secure Password</label>
-                  <Link href="/forgot-password" className="text-sm font-semibold text-[#00685C] hover:underline">
+                  <label className="text-sm font-semibold text-[#3D4946]">
+                    Secure Password
+                  </label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm font-semibold text-[#00685C] hover:underline"
+                  >
                     Forgot Password?
                   </Link>
                 </div>
@@ -194,8 +256,18 @@ export default function LoginPage() {
                     className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-12 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"
                   />
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B7280]">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
                     </svg>
                   </span>
                   <button
@@ -204,15 +276,29 @@ export default function LoginPage() {
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#00685C]"
                     aria-label="Toggle password visibility"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
                     </svg>
                   </button>
                 </div>
               </div>
 
-              {/* Submit */}
               <button
                 type="submit"
                 disabled={loginMutation.isPending}
@@ -220,28 +306,55 @@ export default function LoginPage() {
               >
                 {loginMutation.isPending ? (
                   <>
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <svg
+                      className="animate-spin h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     Logging in...
                   </>
                 ) : (
                   <>
-                    Login as {selectedRole.toLowerCase()}
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    Login
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M14 5l7 7m0 0l-7 7m7-7H3"
+                      />
                     </svg>
                   </>
                 )}
               </button>
             </form>
 
-            {/* Divider */}
             <div className="mt-10 pt-10 border-t border-[#BDC9C5]/30">
               <p className="text-base text-[#485F83] text-center">
                 If you don't have an account?{" "}
-                <Link href="/register" className="font-semibold text-[#00685C] hover:underline">
+                <Link
+                  href="/register"
+                  className="font-semibold text-[#00685C] hover:underline"
+                >
                   register
                 </Link>
               </p>
@@ -250,7 +363,6 @@ export default function LoginPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-[#BDC9C5]/20 px-6 py-8">
         <div className="max-w-[1280px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-[#485F83]">
@@ -259,5 +371,40 @@ export default function LoginPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// ── Small helper component for role buttons ──────────────────────────────
+function RoleButton({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-3 rounded-lg border-2 transition-all flex items-center justify-center gap-2 text-sm font-semibold ${
+        active
+          ? "border-[#00685C] bg-[#00685C]/5 text-[#00685C]"
+          : "border-[#BDC9C5] bg-white text-[#485F83] hover:border-[#00685C]/50"
+      }`}
+    >
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        {icon}
+      </svg>
+      {label}
+    </button>
   );
 }
