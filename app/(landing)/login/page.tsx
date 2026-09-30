@@ -2,10 +2,39 @@
 'use client';
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLogin } from "@/hooks/useLogin";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+
+/**
+ * ✅ NEW — normalizes a phone number on the client before sending.
+ * - If the value contains "@", returns it lowercased + trimmed (email).
+ * - Otherwise, strips whitespace/dashes/parens/dots and ensures a leading "+".
+ * - If the user typed a Nigerian local number ("080..."), leaves it as-is;
+ *   the backend's PhoneNumberUtil will convert it to E.164.
+ */
+function normalizeIdentifier(raw: string): string {
+  const value = raw.trim();
+  if (!value) return value;
+
+  // Email — just lowercase + trim
+  if (value.includes("@")) {
+    return value.toLowerCase();
+  }
+
+  // Phone — remove formatting characters
+  let cleaned = value.replace(/[\s\-().]/g, "");
+
+  // If user typed "00" prefix (Europe style), convert to "+"
+  if (cleaned.startsWith("00")) {
+    cleaned = "+" + cleaned.substring(2);
+  }
+
+  // If it starts with a digit and no "+", leave it — backend handles local format (e.g. 0801...)
+  // We do NOT force-add "+" here because Nigerian locals start with 0.
+  return cleaned;
+}
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
@@ -16,19 +45,29 @@ export default function LoginPage() {
 
   const loginMutation = useLogin();
 
+  // ✅ NEW — derived flag: is the user typing a phone number (vs an email)?
+  const looksLikePhone = useMemo(() => {
+    const v = identifier.trim();
+    return v.length > 0 && !v.includes("@");
+  }, [identifier]);
+
+  // ✅ NEW — does the phone appear to already include a country code?
+  const hasCountryCode = useMemo(() => {
+    const v = identifier.replace(/[\s\-().]/g, "");
+    return v.startsWith("+") || v.startsWith("00");
+  }, [identifier]);
+
   // Handle redirect based on role after successful login
   useEffect(() => {
     if (loginMutation.isSuccess) {
       const role = localStorage.getItem("userRole");
       const mustChangePassword = localStorage.getItem("mustChangePassword") === "true";
 
-      // If patient must change password, redirect to profile with reason
       if (mustChangePassword && role === "PATIENT") {
         router.push("/patient/profile?reason=must_change_password");
         return;
       }
 
-      // Normal redirect based on role
       if (role === "DOCTOR") {
         router.push("/doctor");
       } else if (role === "PATIENT") {
@@ -41,8 +80,11 @@ export default function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const cleaned = normalizeIdentifier(identifier);
+
     loginMutation.mutate({
-      identifier: identifier.trim(),
+      identifier: cleaned,
       password: password.trim(),
       role: selectedRole,
     });
@@ -164,16 +206,32 @@ export default function LoginPage() {
                   <input
                     type="text"
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value.trimStart())}
+                    // ✅ CHANGED: no trimStart — let the user type freely; we clean at submit
+                    onChange={(e) => setIdentifier(e.target.value)}
                     placeholder={
                       selectedRole === "PATIENT"
-                        ? "email@example.com or +2348012345678"
+                        ? "email@example.com  or  +2348012345678"
                         : "doctor@dentline.com"
                     }
+                    autoComplete="username"
+                    inputMode={looksLikePhone ? "tel" : "email"}
                     required
                     className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-4 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"
                   />
                 </div>
+
+                {/* ✅ NEW — helper hint for phone numbers */}
+                {selectedRole === "PATIENT" && looksLikePhone && (
+                  <p
+                    className={`text-xs mt-1 ${
+                      hasCountryCode ? "text-[#0D9488]" : "text-[#94A3B8]"
+                    }`}
+                  >
+                    {hasCountryCode
+                      ? "Country code detected — you can log in with this number."
+                      : "Tip: include your country code with a “+”, e.g. +14155552671 (US), +447911123456 (UK), +2348012345678 (Nigeria)."}
+                  </p>
+                )}
               </div>
 
               {/* Password */}
@@ -190,6 +248,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                     required
                     className="w-full bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-12 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors"
                   />
