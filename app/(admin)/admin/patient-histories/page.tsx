@@ -6,7 +6,14 @@ import api from "@/lib/axios";
 import {
   fetchPatientHistories,
   fetchPaymentStats,
-  createPatientHistory
+  createPatientHistory,
+  // ✅ NEW
+  type ClinicLocation,
+  type DentalProcedure,
+  CLINIC_LOCATION_OPTIONS,
+  CLINIC_LOCATION_LABELS,
+  DENTAL_PROCEDURE_OPTIONS,
+  DENTAL_PROCEDURE_LABELS,
 } from "@/services/patientHistoryService";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +45,9 @@ type PatientHistory = {
   appointmentType?: "INDIVIDUAL" | "FAMILY";
   headPatientName?: string;
   isCheckUp: boolean;
+  // ✅ NEW
+  location: ClinicLocation | null;
+  procedures: DentalProcedure[];
 };
 
 export type PaymentStats = {
@@ -97,6 +107,9 @@ export default function PatientHistoriesPage() {
   const [createAmount, setCreateAmount] = useState("");
   const [createDiscount, setCreateDiscount] = useState("");
   const [isCheckUpVisit, setIsCheckUpVisit] = useState(false);
+  // ✅ NEW
+  const [createLocation, setCreateLocation] = useState<ClinicLocation | "">("");
+  const [createProcedures, setCreateProcedures] = useState<DentalProcedure[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -192,6 +205,9 @@ export default function PatientHistoriesPage() {
             appointmentType: h.appointmentType || "INDIVIDUAL",
             headPatientName: h.patientName,
             isCheckUp: checkUp,
+            // ✅ NEW
+            location: (h.location as ClinicLocation) ?? null,
+            procedures: Array.isArray(h.procedures) ? (h.procedures as DentalProcedure[]) : [],
           };
         });
 
@@ -241,14 +257,35 @@ export default function PatientHistoriesPage() {
     setCreateAmount("");
     setCreateDiscount("");
     setIsCheckUpVisit(false);
+    setCreateLocation("");       // ✅ NEW
+    setCreateProcedures([]);     // ✅ NEW
     setCreateError(null);
     setCreateSuccess(null);
     setShowCreatePanel(true);
   };
 
+  // ✅ NEW: toggle a procedure in the multi-select
+  const toggleProcedure = (proc: DentalProcedure) => {
+    setCreateProcedures((prev) =>
+      prev.includes(proc) ? prev.filter((p) => p !== proc) : [...prev, proc]
+    );
+  };
+
   const createHistory = async () => {
     if (!createApptId.trim()) {
       setCreateError("Please enter an appointment ID.");
+      return;
+    }
+
+    // ✅ NEW: location required
+    if (!createLocation) {
+      setCreateError("Please select a clinic location.");
+      return;
+    }
+
+    // ✅ NEW: at least one procedure required
+    if (createProcedures.length === 0) {
+      setCreateError("Please select at least one procedure.");
       return;
     }
 
@@ -281,8 +318,10 @@ export default function PatientHistoriesPage() {
       const payload: any = {
         appointmentId: createApptId,
         discount,
+        location: createLocation,          // ✅ NEW
+        procedures: createProcedures,      // ✅ NEW
       };
-      
+
       if (!isCheckUpVisit && amount !== null) {
         payload.amount = amount;
       }
@@ -302,6 +341,8 @@ export default function PatientHistoriesPage() {
           setCreateAmount("");
           setCreateDiscount("");
           setIsCheckUpVisit(false);
+          setCreateLocation("");        // ✅ NEW
+          setCreateProcedures([]);      // ✅ NEW
         }, 1500);
       } else {
         setCreateError(res.message || "Failed to create patient history.");
@@ -323,6 +364,32 @@ export default function PatientHistoriesPage() {
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
+  };
+
+  // ✅ NEW: small badge renderer for procedure list
+  const renderProcedureBadges = (procedures: DentalProcedure[], max = 3) => {
+    if (!procedures || procedures.length === 0) {
+      return <span className="text-xs text-[#94A3B8]">—</span>;
+    }
+    const shown = procedures.slice(0, max);
+    const extra = procedures.length - shown.length;
+    return (
+      <div className="flex flex-wrap gap-1">
+        {shown.map((p) => (
+          <span
+            key={p}
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#E5EEFF] text-[#435B7E]"
+          >
+            {DENTAL_PROCEDURE_LABELS[p]}
+          </span>
+        ))}
+        {extra > 0 && (
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#64748B]">
+            +{extra}
+          </span>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -407,11 +474,30 @@ export default function PatientHistoriesPage() {
 
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
+            <table className="w-full min-w-[1400px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["ID", "PATIENT", "HMO", "TYPE", "DOCTOR", "APPOINTMENT DATE", "AMOUNT", "DISCOUNT", "AMOUNT PAID", "BALANCE", "PAYMENT STATUS", "HISTORY STATUS", "ACTIONS"].map(h => (
-                    <th key={h} className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest">
+                  {[
+                    "ID",
+                    "PATIENT",
+                    "HMO",
+                    "TYPE",
+                    "LOCATION",      // ✅ NEW
+                    "PROCEDURES",    // ✅ NEW
+                    "DOCTOR",
+                    "APPOINTMENT DATE",
+                    "AMOUNT",
+                    "DISCOUNT",
+                    "AMOUNT PAID",
+                    "BALANCE",
+                    "PAYMENT STATUS",
+                    "HISTORY STATUS",
+                    "ACTIONS",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest"
+                    >
                       {h}
                     </th>
                   ))}
@@ -421,7 +507,7 @@ export default function PatientHistoriesPage() {
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(13)].map((__, j) => (
+                      {[...Array(15)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -430,14 +516,14 @@ export default function PatientHistoriesPage() {
                   ))
                 ) : histories.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
+                    <td colSpan={15} className="px-6 py-10 text-center text-sm text-[#94A3B8]">
                       No patient history records found.
                     </td>
                   </tr>
                 ) : (
                   histories.map((h) => {
                     const isFamily = h.appointmentType === "FAMILY";
-                    
+
                     return (
                       <tr key={h.id} className="hover:bg-[#F8FAFC] transition-colors border-t border-[#F8FAFC]">
                         <td className="px-6 py-4 text-sm font-semibold text-[#0D9488]">{h.shortId}</td>
@@ -469,6 +555,20 @@ export default function PatientHistoriesPage() {
                               Individual
                             </span>
                           )}
+                        </td>
+                        {/* ✅ NEW: LOCATION */}
+                        <td className="px-6 py-4">
+                          {h.location ? (
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0FDFA] text-[#0F766E]">
+                              {CLINIC_LOCATION_LABELS[h.location]}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-[#94A3B8]">—</span>
+                          )}
+                        </td>
+                        {/* ✅ NEW: PROCEDURES */}
+                        <td className="px-6 py-4">
+                          {renderProcedureBadges(h.procedures)}
                         </td>
                         <td className="px-6 py-4 text-sm text-[#3D4946]">{h.doctorName}</td>
                         <td className="px-6 py-4">
@@ -557,6 +657,7 @@ export default function PatientHistoriesPage() {
         )}
       </main>
 
+      {/* ===================== DETAILS MODAL ===================== */}
       {selectedHistory && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -639,6 +740,42 @@ export default function PatientHistoriesPage() {
                     <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[selectedHistory.status] ?? "bg-[#F1F5F9] text-[#64748B]"}`}>
                       {selectedHistory.status.replace("_", " ")}
                     </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ✅ NEW: Location & Procedures section */}
+              <div className="bg-[#F8FAFC] rounded-lg p-4">
+                <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
+                  Clinic & Procedures
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-[#94A3B8]">Location</p>
+                    {selectedHistory.location ? (
+                      <span className="inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full bg-[#F0FDFA] text-[#0F766E]">
+                        {CLINIC_LOCATION_LABELS[selectedHistory.location]}
+                      </span>
+                    ) : (
+                      <p className="text-sm font-medium text-[#94A3B8]">—</p>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-[#94A3B8] mb-1">Procedures</p>
+                    {selectedHistory.procedures && selectedHistory.procedures.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedHistory.procedures.map((p) => (
+                          <span
+                            key={p}
+                            className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E5EEFF] text-[#435B7E]"
+                          >
+                            {DENTAL_PROCEDURE_LABELS[p]}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[#94A3B8]">—</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -749,6 +886,7 @@ export default function PatientHistoriesPage() {
         </div>
       )}
 
+      {/* ===================== CREATE MODAL ===================== */}
       {showCreatePanel && (
         <div
           className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4"
@@ -758,7 +896,7 @@ export default function PatientHistoriesPage() {
             }
           }}
         >
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-6 border-b border-[#F1F5F9]">
               <h2 className="text-xl font-bold text-[#0B1C30]">Create Patient History</h2>
               <button
@@ -800,6 +938,63 @@ export default function PatientHistoriesPage() {
                 <p className="text-xs text-[#94A3B8] mt-1">
                   Enter the appointment ID to link this history record
                 </p>
+              </div>
+
+              {/* ✅ NEW: Clinic Location */}
+              <div>
+                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
+                  Clinic Location <span className="text-[#93000A]">*</span>
+                </label>
+                <select
+                  value={createLocation}
+                  onChange={(e) => setCreateLocation(e.target.value as ClinicLocation | "")}
+                  disabled={creating}
+                  className="w-full bg-white border border-[#F1F5F9] rounded-lg px-4 py-2 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select location…</option>
+                  {CLINIC_LOCATION_OPTIONS.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {CLINIC_LOCATION_LABELS[loc]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ✅ NEW: Procedures multi-select */}
+              <div>
+                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
+                  Procedures <span className="text-[#93000A]">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-[#F8FAFC] rounded-lg p-3 max-h-60 overflow-y-auto">
+                  {DENTAL_PROCEDURE_OPTIONS.map((proc) => {
+                    const checked = createProcedures.includes(proc);
+                    return (
+                      <label
+                        key={proc}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm transition-colors ${
+                          checked
+                            ? "bg-[#CCFBF1] text-[#0F766E] font-semibold"
+                            : "bg-white text-[#3D4946] hover:bg-[#F1F5F9]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleProcedure(proc)}
+                          disabled={creating}
+                          className="w-4 h-4 text-[#00685C] rounded border-[#E2E8F0] focus:ring-[#00685C] disabled:opacity-50"
+                        />
+                        {DENTAL_PROCEDURE_LABELS[proc]}
+                      </label>
+                    );
+                  })}
+                </div>
+                {createProcedures.length > 0 && (
+                  <p className="text-xs text-[#0D9488] mt-2 font-medium">
+                    {createProcedures.length} procedure
+                    {createProcedures.length > 1 ? "s" : ""} selected
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-3 bg-[#F8FAFC] rounded-lg p-3">
@@ -910,8 +1105,10 @@ export default function PatientHistoriesPage() {
                     </svg>
                     Creating...
                   </>
+                ) : isCheckUpVisit ? (
+                  "Create Check-up Record"
                 ) : (
-                  isCheckUpVisit ? 'Create Check-up Record' : 'Create'
+                  "Create"
                 )}
               </button>
             </div>

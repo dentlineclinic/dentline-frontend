@@ -9,6 +9,9 @@ import {
   searchPatientsForHistory,
   PatientSearchResult,
   PatientHistory,
+  // ✅ only procedures now
+  DentalProcedure,
+  DENTAL_PROCEDURE_LABELS,
 } from "@/services/patientHistoryService";
 
 const PatientHistoryModal = dynamicImport(
@@ -66,22 +69,18 @@ const buildInitials = (name: string): string =>
     .toUpperCase() || "NA";
 
 export default function DoctorPatientsPage() {
-  // Search mode
   const [searchMode, setSearchMode] = useState<SearchMode>("id");
 
-  // Search input
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("all");
 
-  // Patient name search results
   const [patientResults, setPatientResults] = useState<PatientSearchResult[]>([]);
   const [patientSearchTotalPages, setPatientSearchTotalPages] = useState(0);
   const [patientSearchCurrentPage, setPatientSearchCurrentPage] = useState(0);
   const [patientSearchTotalElements, setPatientSearchTotalElements] = useState(0);
   const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null);
 
-  // History results
   const [allResult, setAllResult] = useState<SearchResult | null>(null);
   const [individualResult, setIndividualResult] = useState<SearchResult | null>(null);
   const [familyResult, setFamilyResult] = useState<SearchResult | null>(null);
@@ -92,7 +91,6 @@ export default function DoctorPatientsPage() {
   const [selectedHistory, setSelectedHistory] = useState<PatientHistory | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // The patient ID we should use for history lookups
   const activePatientId = selectedPatient?.patientId || query.trim();
 
   const openHistoryModal = (history: PatientHistory) => {
@@ -111,8 +109,6 @@ export default function DoctorPatientsPage() {
     if (individualResult) searchIndividual(activePatientId, individualResult.currentPage);
     if (familyResult) searchFamily(activePatientId, familyResult.currentPage);
   };
-
-  // ── Reset helpers ─────────────────────────────────────────────────────────
 
   const resetHistoryResults = () => {
     setAllResult(null);
@@ -138,8 +134,6 @@ export default function DoctorPatientsPage() {
     setQuery("");
     resetAll();
   };
-
-  // ── Patient name search ───────────────────────────────────────────────────
 
   const searchPatientsByName = async (page = 0) => {
     const name = query.trim();
@@ -183,8 +177,6 @@ export default function DoctorPatientsPage() {
       setSearching(false);
     }
   };
-
-  // ── History fetchers (by patient ID) ──────────────────────────────────────
 
   const searchAll = async (patientId: string, page = 0) => {
     if (!patientId) return;
@@ -327,8 +319,6 @@ export default function DoctorPatientsPage() {
     }
   };
 
-  // ── Load all three history tabs at once (for a given patient ID) ──────────
-
   const loadAllHistories = async (patientId: string) => {
     setSearching(true);
     setError(null);
@@ -341,7 +331,6 @@ export default function DoctorPatientsPage() {
         fetchFamilyHistoriesById(patientId, 0, 100),
       ]);
 
-      // All
       if (allRes.success && allRes.data.content.length > 0) {
         const displayName = getPatientDisplayName(allRes.data.content[0]);
         setAllResult({
@@ -363,7 +352,6 @@ export default function DoctorPatientsPage() {
         setAllResult(null);
       }
 
-      // Individual
       if (individualRes.success && individualRes.data.content.length > 0) {
         const displayName =
           individualRes.data.content[0]?.patientName || "Unknown Patient";
@@ -386,7 +374,6 @@ export default function DoctorPatientsPage() {
         setIndividualResult(null);
       }
 
-      // Family
       if (familyRes.success && familyRes.data.content.length > 0) {
         const displayName =
           familyRes.data.content[0]?.patientName || "Unknown Patient";
@@ -422,14 +409,10 @@ export default function DoctorPatientsPage() {
     }
   };
 
-  // ── Select a patient from name search ─────────────────────────────────────
-
   const selectPatient = async (patient: PatientSearchResult) => {
     setSelectedPatient(patient);
     await loadAllHistories(patient.patientId);
   };
-
-  // ── Unified search handler ────────────────────────────────────────────────
 
   const handleSearch = async (page = 0) => {
     if (!query.trim()) return;
@@ -440,8 +423,6 @@ export default function DoctorPatientsPage() {
       await searchPatientsByName(page);
     }
   };
-
-  // ── Pagination ────────────────────────────────────────────────────────────
 
   const loadPage = (page: number, tab: TabType) => {
     const patientId = activePatientId;
@@ -477,7 +458,22 @@ export default function DoctorPatientsPage() {
   const individualCount = individualResult?.totalElements || 0;
   const familyCount = familyResult?.totalElements || 0;
 
-  // ── Render a history card ─────────────────────────────────────────────────
+  // ✅ procedures-only badge row
+  const renderProcedureBadges = (procedures: DentalProcedure[] | undefined) => {
+    if (!procedures || procedures.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-1">
+        {procedures.map((p) => (
+          <span
+            key={p}
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#E5EEFF] text-[#435B7E]"
+          >
+            {DENTAL_PROCEDURE_LABELS[p]}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   const renderHistories = (histories: PatientHistory[]) => {
     return histories.map((h) => {
@@ -523,6 +519,13 @@ export default function DoctorPatientsPage() {
                     Head Patient: {h.patientName}
                   </p>
                 )}
+
+              {/* ✅ ONLY procedures now */}
+              {h.procedures && h.procedures.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {renderProcedureBadges(h.procedures)}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span
@@ -619,8 +622,6 @@ export default function DoctorPatientsPage() {
     });
   };
 
-  // ── Main render ───────────────────────────────────────────────────────────
-
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-10 flex flex-col gap-6">
@@ -632,7 +633,6 @@ export default function DoctorPatientsPage() {
             Search for patient history records by patient ID or patient name.
           </p>
 
-          {/* Search mode toggle */}
           <div className="flex gap-2 mt-2">
             <button
               onClick={() => handleModeChange("id")}
@@ -642,18 +642,8 @@ export default function DoctorPatientsPage() {
                   : "bg-[#F1F5F9] text-[#3D4946] hover:bg-[#E2E8F0]"
               }`}
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"
-                />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0" />
               </svg>
               Search by ID
             </button>
@@ -665,24 +655,13 @@ export default function DoctorPatientsPage() {
                   : "bg-[#F1F5F9] text-[#3D4946] hover:bg-[#E2E8F0]"
               }`}
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               Search by Name
             </button>
           </div>
 
-          {/* Search input */}
           <div className="flex gap-3 mt-2">
             <div className="relative flex-1 max-w-lg">
               <svg
@@ -691,12 +670,7 @@ export default function DoctorPatientsPage() {
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
                 type="search"
@@ -717,38 +691,13 @@ export default function DoctorPatientsPage() {
               className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-[#008375] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {searching ? (
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v8H4z"
-                  />
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
               ) : (
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               )}
               {searching ? "Searching…" : "Search"}
@@ -760,39 +709,18 @@ export default function DoctorPatientsPage() {
 
         {error && (
           <div className="bg-[#FFDAD6] text-[#93000A] text-sm font-semibold px-4 py-3 rounded-xl flex items-center gap-3">
-            <svg
-              className="w-4 h-4 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             {error}
           </div>
         )}
 
-        {/* Empty state */}
         {!hasSearched && !error && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-16 h-16 bg-[#F0FDFA] rounded-full flex items-center justify-center">
-              <svg
-                className="w-8 h-8 text-[#00685C]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+              <svg className="w-8 h-8 text-[#00685C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <p className="text-base font-semibold text-[#0B1C30]">
@@ -806,7 +734,6 @@ export default function DoctorPatientsPage() {
           </div>
         )}
 
-        {/* Patient name search results list */}
         {searchMode === "name" &&
           patientResults.length > 0 &&
           !selectedPatient && (
@@ -842,18 +769,8 @@ export default function DoctorPatientsPage() {
                         ID: {patient.patientId.slice(0, 8)}...
                       </p>
                     </div>
-                    <svg
-                      className="w-5 h-5 text-[#94A3B8] flex-shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
+                    <svg className="w-5 h-5 text-[#94A3B8] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </button>
                 ))}
@@ -894,7 +811,6 @@ export default function DoctorPatientsPage() {
             </div>
           )}
 
-        {/* Selected patient banner */}
         {selectedPatient && (
           <div className="bg-[#F0FDFA] border border-[#00685C]/20 rounded-xl p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-[#CCFBF1] flex items-center justify-center text-sm font-bold text-[#0F766E] flex-shrink-0">
@@ -921,7 +837,6 @@ export default function DoctorPatientsPage() {
           </div>
         )}
 
-        {/* History results */}
         {currentResult && (
           <div className="flex flex-col gap-5">
             <div className="bg-white border border-[#F1F5F9] rounded-xl p-5 shadow-sm flex items-center gap-4">

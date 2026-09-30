@@ -15,12 +15,68 @@ export interface ToothObservation {
 }
 
 export interface AddToothObservationRequest {
-  fdiCode?: string;  // Legacy single tooth - optional now
-  fdiCodes?: string[]; // New multi-tooth support
+  fdiCode?: string;
+  fdiCodes?: string[];
   toothType: "PERMANENT" | "PRIMARY";
   diagnosis: string;
   treatment: string;
 }
+
+// ============================================
+// ✅ NEW: CLINIC LOCATION & DENTAL PROCEDURE TYPES
+// ============================================
+
+export type ClinicLocation = "IKEJA" | "GBAGADA";
+
+export type DentalProcedure =
+  | "S_AND_P"
+  | "CURETTAGE"
+  | "FILLING"
+  | "X_RAY"
+  | "EXTRACTION"
+  | "TEETH_WHITENING"
+  | "RCT"
+  | "METALLIC_BRACES"
+  | "IMPLANT"
+  | "CROWN"
+  | "BRIDGE";
+
+// Human-readable labels for the UI
+export const CLINIC_LOCATION_LABELS: Record<ClinicLocation, string> = {
+  IKEJA: "Ikeja",
+  GBAGADA: "Gbagada",
+};
+
+export const DENTAL_PROCEDURE_LABELS: Record<DentalProcedure, string> = {
+  S_AND_P: "S&P",
+  CURETTAGE: "Curettage",
+  FILLING: "Filling",
+  X_RAY: "X-ray",
+  EXTRACTION: "Extraction",
+  TEETH_WHITENING: "Teeth Whitening",
+  RCT: "RCT",
+  METALLIC_BRACES: "Metallic Braces",
+  IMPLANT: "Implant",
+  CROWN: "Crown",
+  BRIDGE: "Bridge",
+};
+
+// Ordered list for rendering checkboxes / selects
+export const DENTAL_PROCEDURE_OPTIONS: DentalProcedure[] = [
+  "S_AND_P",
+  "CURETTAGE",
+  "FILLING",
+  "X_RAY",
+  "EXTRACTION",
+  "TEETH_WHITENING",
+  "RCT",
+  "METALLIC_BRACES",
+  "IMPLANT",
+  "CROWN",
+  "BRIDGE",
+];
+
+export const CLINIC_LOCATION_OPTIONS: ClinicLocation[] = ["IKEJA", "GBAGADA"];
 
 // ============================================
 // PATIENT HISTORY TYPES
@@ -51,6 +107,10 @@ export interface PatientHistory {
   familyMemberName?: string;
   appointmentType?: "INDIVIDUAL" | "FAMILY";
   toothObservations?: ToothObservation[];
+
+  // ✅ NEW
+  location?: ClinicLocation | null;
+  procedures?: DentalProcedure[];
 }
 
 export interface PatientHistoryResponse {
@@ -111,10 +171,13 @@ export interface PaymentStatsResponse {
   };
 }
 
+// ✅ UPDATED: location required, procedures required (at least 1)
 export interface CreatePatientHistoryRequest {
   appointmentId: string;
   amount?: number | null;
   discount?: number;
+  location: ClinicLocation;
+  procedures: DentalProcedure[];
 }
 
 export interface UpdateObservationRequest {
@@ -131,10 +194,7 @@ export const fetchPatientHistories = async (
   search?: string,
   paymentStatus?: string
 ): Promise<PatientHistoryResponse> => {
-  const params: any = {
-    page,
-    size,
-  };
+  const params: any = { page, size };
 
   if (paymentStatus && paymentStatus !== "All") {
     params.paymentStatus = paymentStatus;
@@ -279,11 +339,7 @@ export const uploadHistoryImage = async (
   const res = await api.post(
     `/patient-history/${historyId}/upload/image`,
     formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
   return res.data;
 };
@@ -298,11 +354,7 @@ export const uploadHistoryVideo = async (
   const res = await api.post(
     `/patient-history/${historyId}/upload/video`,
     formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
   return res.data;
 };
@@ -348,8 +400,9 @@ export const deleteToothObservation = async (
   return res.data;
 };
 
-
-// Add this to patientHistoryService.ts after the existing types
+// ============================================
+// PATIENT SEARCH
+// ============================================
 
 export interface PatientSearchResult {
   patientId: string;
@@ -370,7 +423,6 @@ export interface PatientSearchResponse {
   };
 }
 
-// Add this API function
 export const searchPatientsForHistory = async (
   name: string,
   page = 0,

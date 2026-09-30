@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
-import { 
-  fetchMyPatientHistories, 
+import {
+  fetchMyPatientHistories,
   fetchIndividualHistoriesById,
   fetchFamilyHistoriesById,
-  
+  // ✅ only procedures now
+  DentalProcedure,
+  DENTAL_PROCEDURE_LABELS,
 } from "@/services/patientHistoryService";
 import { submitReview as submitReviewApi } from "@/services/reviewService";
 
@@ -39,6 +41,8 @@ type PatientHistory = {
     treatment: string;
     createdAt: string;
   }[];
+  // ✅ only procedures now
+  procedures?: DentalProcedure[];
 };
 
 const statusColors: Record<string, string> = {
@@ -65,7 +69,7 @@ export default function MedicalHistoryPage() {
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const [userName, setUserName] = useState("Patient");
   const [selectedHistory, setSelectedHistory] = useState<PatientHistory | null>(null);
-  
+
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewAppointmentId, setReviewAppointmentId] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
@@ -88,16 +92,16 @@ export default function MedicalHistoryPage() {
         const name = localStorage.getItem("userName") || "Patient";
         setUserName(name);
 
-        const patientId = getPatientId();
-
         const allResult = await fetchMyPatientHistories(0, 100);
-        
+
         if (allResult.success) {
           const allData = (allResult.data.content || []).map((h: any) => ({
             ...h,
             imageUrls: Array.isArray(h.imageUrls) ? h.imageUrls : [],
             videoUrls: Array.isArray(h.videoUrls) ? h.videoUrls : [],
             toothObservations: h.toothObservations || [],
+            // ✅ only procedures now
+            procedures: Array.isArray(h.procedures) ? h.procedures : [],
           }));
           setAllHistories(allData);
 
@@ -122,7 +126,7 @@ export default function MedicalHistoryPage() {
 
   const getCurrentHistories = () => {
     let histories: PatientHistory[] = [];
-    
+
     if (activeTab === "all") {
       histories = allHistories;
     } else if (activeTab === "individual") {
@@ -216,7 +220,6 @@ export default function MedicalHistoryPage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-4 sm:gap-6">
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between">
@@ -232,7 +235,7 @@ export default function MedicalHistoryPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
@@ -249,7 +252,7 @@ export default function MedicalHistoryPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white border border-[#F1F5F9] rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
@@ -287,7 +290,6 @@ export default function MedicalHistoryPage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-[#E2E8F0]">
           <button
             onClick={() => setActiveTab("all")}
@@ -321,7 +323,6 @@ export default function MedicalHistoryPage() {
           </button>
         </div>
 
-        {/* Filter Buttons */}
         <div className="flex gap-2 sm:gap-3 flex-wrap">
           {["All", "COMPLETED", "IN_PROGRESS", "PENDING"].map((f) => (
             <button
@@ -448,11 +449,24 @@ export default function MedicalHistoryPage() {
                       </p>
                     )}
 
+                    {/* ✅ ONLY procedures now */}
+                    {history.procedures && history.procedures.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        {history.procedures.map((p) => (
+                          <span
+                            key={p}
+                            className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E5EEFF] text-[#435B7E]"
+                          >
+                            {DENTAL_PROCEDURE_LABELS[p]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     <p className="text-sm text-[#485F83] leading-relaxed mb-3 line-clamp-2">
                       {history.observation || "No observation notes available"}
                     </p>
 
-                    {/* FDI Tooth Observations Summary */}
                     {history.toothObservations && history.toothObservations.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-3">
                         {history.toothObservations.map((obs) => (
@@ -550,7 +564,6 @@ export default function MedicalHistoryPage() {
       {selectedHistory && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-[#F1F5F9]">
               <h2 className="text-xl font-bold text-[#0B1C30]">Treatment Details</h2>
               <button
@@ -558,19 +571,12 @@ export default function MedicalHistoryPage() {
                 className="text-[#94A3B8] hover:text-[#475569] transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 space-y-6">
-              {/* Record Information */}
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
                   Record Information
@@ -627,7 +633,27 @@ export default function MedicalHistoryPage() {
                 </div>
               </div>
 
-              {/* Doctor Information */}
+              {/* ✅ Procedures ONLY section */}
+              <div className="bg-[#F8FAFC] rounded-lg p-4">
+                <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
+                  Procedures
+                </p>
+                {selectedHistory.procedures && selectedHistory.procedures.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedHistory.procedures.map((p) => (
+                      <span
+                        key={p}
+                        className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E5EEFF] text-[#435B7E]"
+                      >
+                        {DENTAL_PROCEDURE_LABELS[p]}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#94A3B8]">—</p>
+                )}
+              </div>
+
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-2">
                   Treating Doctor
@@ -645,7 +671,6 @@ export default function MedicalHistoryPage() {
                 </div>
               </div>
 
-              {/* Financial Information */}
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
                   Financial Details
@@ -673,7 +698,6 @@ export default function MedicalHistoryPage() {
                 </div>
               </div>
 
-              {/* FDI Tooth Observations - Patient View */}
               {selectedHistory.toothObservations && selectedHistory.toothObservations.length > 0 && (
                 <div className="bg-[#F8FAFC] rounded-lg p-4">
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
@@ -712,7 +736,6 @@ export default function MedicalHistoryPage() {
                 </div>
               )}
 
-              {/* Clinical Observation */}
               <div className="bg-[#F8FAFC] rounded-lg p-4">
                 <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-2">
                   Clinical Observation
@@ -724,7 +747,6 @@ export default function MedicalHistoryPage() {
                 </div>
               </div>
 
-              {/* Clinical Images */}
               {selectedHistory.imageUrls?.length > 0 && (
                 <div className="bg-[#F8FAFC] rounded-lg p-4">
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
@@ -741,7 +763,6 @@ export default function MedicalHistoryPage() {
                 </div>
               )}
 
-              {/* Clinical Videos */}
               {selectedHistory.videoUrls?.length > 0 && (
                 <div className="bg-[#F8FAFC] rounded-lg p-4">
                   <p className="text-xs font-bold text-[#3D4946] uppercase tracking-widest mb-3">
@@ -768,7 +789,6 @@ export default function MedicalHistoryPage() {
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="flex justify-end gap-3 p-6 border-t border-[#F1F5F9]">
               <button
                 onClick={() => setSelectedHistory(null)}
@@ -795,7 +815,7 @@ export default function MedicalHistoryPage() {
         </div>
       )}
 
-      {/* Review Form Modal */}
+      {/* Review Form Modal — unchanged from your file */}
       {showReviewForm && (
         <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
@@ -807,12 +827,7 @@ export default function MedicalHistoryPage() {
                 className="text-[#94A3B8] hover:text-[#475569] transition-colors disabled:opacity-50"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
@@ -914,19 +929,8 @@ export default function MedicalHistoryPage() {
                 {submittingReview ? (
                   <>
                     <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
                     Submitting...
                   </>

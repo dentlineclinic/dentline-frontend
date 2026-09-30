@@ -7,6 +7,9 @@ import {
   ToothObservation,
   addToothObservation,
   deleteToothObservation,
+  // ✅ NEW
+  DentalProcedure,
+  DENTAL_PROCEDURE_LABELS,
 } from "@/services/patientHistoryService";
 import {
   updateObservation,
@@ -51,7 +54,6 @@ export default function PatientHistoryModal({
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
 
-  // Local copies of media so UI updates immediately after upload
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [imageIds, setImageIds] = useState<string[]>([]);
   const [videoUrls, setVideoUrls] = useState<string[]>([]);
@@ -59,11 +61,9 @@ export default function PatientHistoryModal({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
 
-  // Track which media item is being deleted (by URL) to show per-item spinner
   const [deletingImage, setDeletingImage] = useState<string | null>(null);
   const [deletingVideo, setDeletingVideo] = useState<string | null>(null);
 
-  // FDI Tooth Observations state
   const [toothObservations, setToothObservations] = useState<ToothObservation[]>([]);
   const [selectedTeeth, setSelectedTeeth] = useState<string[]>([]);
   const [selectedToothType, setSelectedToothType] = useState<"PERMANENT" | "PRIMARY">("PERMANENT");
@@ -240,7 +240,6 @@ export default function PatientHistoryModal({
     }
   };
 
-  // FDI Tooth Observation Handlers
   const handleToothSelect = (fdiCode: string, toothType: "PERMANENT" | "PRIMARY") => {
     setSelectedTeeth((prev) => {
       if (prev.includes(fdiCode)) return prev;
@@ -354,6 +353,11 @@ export default function PatientHistoryModal({
   const { date, time } = formatDate(history.appointmentDate);
   const isCompleted = history.status === "COMPLETED";
   const hasObservation = !!history.observation?.trim();
+
+  // ✅ NEW — procedures list (defensive)
+  const procedures: DentalProcedure[] = Array.isArray(history.procedures)
+    ? history.procedures
+    : [];
 
   return (
     <>
@@ -474,6 +478,34 @@ export default function PatientHistoryModal({
               </div>
             </div>
 
+            {/* ✅ NEW — Procedures section */}
+            <div className="bg-white border border-[#F1F5F9] rounded-xl p-5 flex flex-col gap-3">
+              <h3 className="text-base font-bold text-[#0B1C30]">
+                Procedures
+                {procedures.length > 0 && (
+                  <span className="text-sm font-normal text-[#94A3B8] ml-2">
+                    ({procedures.length})
+                  </span>
+                )}
+              </h3>
+              {procedures.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {procedures.map((p) => (
+                    <span
+                      key={p}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[#E5EEFF] text-[#435B7E]"
+                    >
+                      {DENTAL_PROCEDURE_LABELS[p]}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-[#94A3B8]">
+                  No procedures recorded for this visit.
+                </p>
+              )}
+            </div>
+
             {/* FDI Tooth Observations - Doctor Mode */}
             {doctorMode && (
               <div className="bg-white border border-[#F1F5F9] rounded-xl p-5 flex flex-col gap-4">
@@ -504,7 +536,6 @@ export default function PatientHistoryModal({
                   )}
                 </div>
 
-                {/* Tooth Chart */}
                 <div className="flex gap-4">
                   <div className="flex-1">
                     <div className="flex gap-2 mb-3">
@@ -543,7 +574,6 @@ export default function PatientHistoryModal({
                   </div>
                 </div>
 
-                {/* Tooth Observation Form */}
                 {showToothForm && selectedTeeth.length > 0 && !isCompleted && (
                   <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-4 mt-3">
                     <div className="flex items-center justify-between mb-3">
@@ -621,7 +651,6 @@ export default function PatientHistoryModal({
                   </div>
                 )}
 
-                {/* Existing Tooth Observations List */}
                 {toothObservations.length > 0 && (
                   <div className="mt-3 space-y-2">
                     <h4 className="text-sm font-semibold text-[#0B1C30]">
@@ -1123,7 +1152,7 @@ export default function PatientHistoryModal({
               </div>
             )}
 
-            {/* Balance warning — only shown for billed (non-checkup) records with an outstanding balance */}
+            {/* Balance warning */}
             {(history.amount ?? 0) > 0 &&
               history.balance !== undefined &&
               history.balance > 0 && (
