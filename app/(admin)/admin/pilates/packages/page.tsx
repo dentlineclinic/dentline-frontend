@@ -1,159 +1,135 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { toast } from "react-toastify";
 import TopBar from "@/components/layout/TopBar";
 import Modal from "@/components/ui/Modal";
 import {
   useAllPackages,
-  useActivePackages,
   useCreatePackage,
   useUpdatePackage,
   useDeactivatePackage,
 } from "@/hooks/usePilates";
-import type { PilatesPackage } from "@/services/pilatesService";
+import type {
+  PilatesPackage,
+  CreatePilatesPackageRequest,
+} from "@/services/pilatesService";
 
 export const dynamic = "force-dynamic";
 
 const DEFAULT_PAGE_SIZE = 10;
 
-const formatCurrency = (n: number) =>
-  new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 0,
-  }).format(n);
+const emptyForm = (): CreatePilatesPackageRequest => ({
+  name: "",
+  description: "",
+  creditCount: 5,
+  price: 0,
+  validityDays: 30,
+  isActive: true,
+});
+
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(
+    amount
+  );
 
 export default function AdminPilatesPackagesPage() {
   const [page, setPage] = useState(0);
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<PilatesPackage | null>(null);
 
-  // Form state
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [creditCount, setCreditCount] = useState("");
-  const [price, setPrice] = useState("");
-  const [validityDays, setValidityDays] = useState("");
-  const [isActive, setIsActive] = useState(true);
+  // ── Modal state ────────────────────────────────────────────────────────────
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<PilatesPackage | null>(null);
+  const [deactivateTarget, setDeactivateTarget] =
+    useState<PilatesPackage | null>(null);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
 
-  // Queries
+  // ── Form state ─────────────────────────────────────────────────────────────
+  const [form, setForm] = useState<CreatePilatesPackageRequest>(emptyForm());
+
+  // ── Data ───────────────────────────────────────────────────────────────────
   const { data, isLoading, error: queryError } = useAllPackages(page, DEFAULT_PAGE_SIZE);
-  const { data: activeData } = useActivePackages();
-
-  const packages = data?.data?.content ?? [];
+  const packages: PilatesPackage[] = data?.data?.content ?? [];
   const totalPages = data?.data?.totalPages ?? 1;
   const currentPage = data?.data?.number ?? 0;
-  const totalElements = data?.data?.totalElements ?? packages.length;
-  const activeCount = activeData?.data?.length ?? 0;
+  const totalElements = data?.data?.totalElements ?? 0;
 
-  // Mutations
   const createPackage = useCreatePackage();
   const updatePackage = useUpdatePackage();
   const deactivatePackage = useDeactivatePackage();
 
-  const error = queryError
-    ? typeof queryError === "string"
-      ? queryError
-      : (queryError as Error).message || "Failed to load packages."
-    : null;
+  const error = queryError ? (queryError as Error).message || "Failed to load packages." : null;
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const openCreateModal = () => {
-    setEditing(null);
-    setName("");
-    setDescription("");
-    setCreditCount("");
-    setPrice("");
-    setValidityDays("");
-    setIsActive(true);
-    setShowModal(true);
+    setForm(emptyForm());
+    setEditTarget(null);
+    setShowCreateModal(true);
   };
 
   const openEditModal = (pkg: PilatesPackage) => {
-    setEditing(pkg);
-    setName(pkg.name);
-    setDescription(pkg.description ?? "");
-    setCreditCount(pkg.creditCount.toString());
-    setPrice(pkg.price.toString());
-    setValidityDays(pkg.validityDays.toString());
-    setIsActive(pkg.isActive);
-    setShowModal(true);
+    setForm({
+      name: pkg.name,
+      description: pkg.description ?? "",
+      creditCount: pkg.creditCount,
+      price: pkg.price,
+      validityDays: pkg.validityDays,
+      isActive: pkg.isActive,
+    });
+    setEditTarget(pkg);
+    setShowCreateModal(true);
+  };
+
+  const validateForm = (): boolean => {
+    if (!form.name.trim()) { toast.error("Package name is required"); return false; }
+    if (form.creditCount < 1) { toast.error("Credits must be at least 1"); return false; }
+    if (form.price < 0) { toast.error("Price cannot be negative"); return false; }
+    if (form.validityDays < 1) { toast.error("Validity must be at least 1 day"); return false; }
+    return true;
   };
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      toast.error("Package name is required");
-      return;
-    }
-    const credit = parseInt(creditCount, 10);
-    if (isNaN(credit) || credit <= 0) {
-      toast.error("Credit count must be a positive number");
-      return;
-    }
-    const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum < 0) {
-      toast.error("Price must be zero or greater");
-      return;
-    }
-    const validity = parseInt(validityDays, 10);
-    if (isNaN(validity) || validity <= 0) {
-      toast.error("Validity days must be a positive number");
-      return;
-    }
-
-    const payload = {
-      name: name.trim(),
-      description: description.trim() || undefined,
-      creditCount: credit,
-      price: priceNum,
-      validityDays: validity,
-      isActive,
-    };
-
+    if (!validateForm()) return;
     try {
-      if (editing) {
-        await updatePackage.mutateAsync({ id: editing.id, payload });
+      if (editTarget) {
+        await updatePackage.mutateAsync({ id: editTarget.id, payload: form });
         toast.success("Package updated");
       } else {
-        await createPackage.mutateAsync(payload);
+        await createPackage.mutateAsync(form);
         toast.success("Package created");
       }
-      setShowModal(false);
+      setShowCreateModal(false);
     } catch (err: any) {
       toast.error(err?.message || "Failed to save package");
     }
   };
 
-  const handleDeactivate = async (id: string, pkgName: string) => {
-    if (!confirm(`Deactivate "${pkgName}"? Patients will no longer be able to purchase it.`)) return;
+  const handleDeactivate = async () => {
+    if (!deactivateTarget) return;
     try {
-      await deactivatePackage.mutateAsync(id);
+      await deactivatePackage.mutateAsync(deactivateTarget.id);
       toast.success("Package deactivated");
+      setShowDeactivateModal(false);
+      setDeactivateTarget(null);
     } catch (err: any) {
       toast.error(err?.message || "Failed to deactivate package");
     }
   };
 
-  const goToPreviousPage = () => {
-    setPage((current) => Math.max(current - 1, 0));
-  };
-
-  const goToNextPage = () => {
-    setPage((current) => Math.min(current + 1, totalPages - 1));
-  };
+  const isPending = createPackage.isPending || updatePackage.isPending;
 
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar
         title="Pilates Packages"
-        subtitle={`${totalElements} package${totalElements === 1 ? "" : "s"} · ${activeCount} active`}
+        subtitle={`${totalElements} package${totalElements === 1 ? "" : "s"}`}
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6">
-        {/* Actions bar */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm text-[#3D4946]">
-            Packages are credit bundles. E.g. "10 classes for ₦50,000, valid 90 days".
+            Manage credit packs patients can purchase.
           </p>
           <button
             onClick={openCreateModal}
@@ -175,10 +151,10 @@ export default function AdminPilatesPackagesPage() {
         {/* Table */}
         <div className="bg-white border border-[#F1F5F9] rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+            <table className="w-full min-w-[800px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {["NAME", "CREDITS", "PRICE", "VALIDITY", "STATUS", "ACTIONS"].map((h) => (
+                  {["NAME", "CREDITS", "PRICE (NGN)", "VALIDITY", "STATUS", "ACTIONS"].map((h) => (
                     <th
                       key={h}
                       className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest"
@@ -190,7 +166,7 @@ export default function AdminPilatesPackagesPage() {
               </thead>
               <tbody>
                 {isLoading ? (
-                  [...Array(5)].map((_, i) => (
+                  [...Array(4)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
                       {[...Array(6)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
@@ -201,10 +177,7 @@ export default function AdminPilatesPackagesPage() {
                   ))
                 ) : packages.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-12 text-center text-sm text-[#94A3B8]"
-                    >
+                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#94A3B8]">
                       No packages yet. Click "New Package" to create one.
                     </td>
                   </tr>
@@ -215,19 +188,17 @@ export default function AdminPilatesPackagesPage() {
                       className="border-t border-[#F8FAFC] hover:bg-[#F8FAFC] transition-colors"
                     >
                       <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-[#0B1C30]">
-                          {pkg.name}
-                        </p>
+                        <p className="text-sm font-semibold text-[#0B1C30]">{pkg.name}</p>
                         {pkg.description && (
                           <p className="text-xs text-[#94A3B8] mt-0.5 line-clamp-1">
                             {pkg.description}
                           </p>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-[#3D4946]">
-                        {pkg.creditCount} credit{pkg.creditCount === 1 ? "" : "s"}
+                      <td className="px-6 py-4 text-sm text-[#3D4946] font-semibold">
+                        {pkg.creditCount}
                       </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-[#0B1C30]">
+                      <td className="px-6 py-4 text-sm font-bold text-[#00685C]">
                         {formatCurrency(pkg.price)}
                       </td>
                       <td className="px-6 py-4 text-sm text-[#3D4946]">
@@ -254,7 +225,10 @@ export default function AdminPilatesPackagesPage() {
                           </button>
                           {pkg.isActive && (
                             <button
-                              onClick={() => handleDeactivate(pkg.id, pkg.name)}
+                              onClick={() => {
+                                setDeactivateTarget(pkg);
+                                setShowDeactivateModal(true);
+                              }}
                               className="text-sm font-semibold text-[#93000A] hover:underline"
                             >
                               Deactivate
@@ -274,8 +248,7 @@ export default function AdminPilatesPackagesPage() {
         {!isLoading && totalPages > 1 && (
           <div className="flex items-center justify-between gap-3">
             <button
-              type="button"
-              onClick={goToPreviousPage}
+              onClick={() => setPage((p) => Math.max(p - 1, 0))}
               disabled={currentPage === 0}
               className="bg-gray-100 text-[#3D4946] font-semibold text-sm px-6 py-2.5 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -285,8 +258,7 @@ export default function AdminPilatesPackagesPage() {
               Page {currentPage + 1} of {totalPages}
             </span>
             <button
-              type="button"
-              onClick={goToNextPage}
+              onClick={() => setPage((p) => Math.min(p + 1, totalPages - 1))}
               disabled={currentPage >= totalPages - 1}
               className="bg-[#00685C] text-white font-semibold text-sm px-6 py-2.5 rounded-lg hover:bg-[#008375] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -296,113 +268,147 @@ export default function AdminPilatesPackagesPage() {
         )}
       </main>
 
-      {/* Create/Edit Modal */}
+      {/* ── Create / Edit modal ──────────────────────────────────────── */}
       <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editing ? "Edit Package" : "New Package"}
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title={editTarget ? "Edit Package" : "New Package"}
+        subtitle={editTarget ? `Editing: ${editTarget.name}` : "Create a credit pack for patients"}
         size="md"
         footer={
           <>
             <button
-              onClick={() => setShowModal(false)}
+              onClick={() => setShowCreateModal(false)}
               className="text-sm font-semibold text-[#3D4946] px-4 py-2 rounded-lg hover:bg-[#F8FAFC]"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              disabled={createPackage.isPending || updatePackage.isPending}
+              disabled={isPending}
               className="bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] disabled:opacity-50"
             >
-              {createPackage.isPending || updatePackage.isPending
-                ? "Saving…"
-                : editing
-                ? "Save Changes"
-                : "Create Package"}
+              {isPending ? "Saving…" : editTarget ? "Save Changes" : "Create Package"}
             </button>
           </>
         }
       >
         <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-[#0B1C30] mb-1.5">
-              Name <span className="text-[#93000A]">*</span>
-            </label>
+          <Field label="Package Name" required>
             <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="e.g. 10-Class Pack"
               className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-[#0B1C30] mb-1.5">
-              Description
-            </label>
+          </Field>
+          <Field label="Description">
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={2}
-              placeholder="Brief description of the package..."
+              placeholder="Optional description"
               className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] resize-none"
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-[#0B1C30] mb-1.5">
-                Credits <span className="text-[#93000A]">*</span>
-              </label>
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field label="Credits" required>
               <input
                 type="number"
-                min="1"
-                value={creditCount}
-                onChange={(e) => setCreditCount(e.target.value)}
-                placeholder="10"
+                min={1}
+                value={form.creditCount}
+                onChange={(e) =>
+                  setForm({ ...form, creditCount: Number(e.target.value) })
+                }
                 className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-[#0B1C30] mb-1.5">
-                Validity (days) <span className="text-[#93000A]">*</span>
-              </label>
+            </Field>
+            <Field label="Price (NGN)" required>
               <input
                 type="number"
-                min="1"
-                value={validityDays}
-                onChange={(e) => setValidityDays(e.target.value)}
-                placeholder="90"
+                min={0}
+                step={100}
+                value={form.price}
+                onChange={(e) =>
+                  setForm({ ...form, price: Number(e.target.value) })
+                }
                 className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
               />
-            </div>
+            </Field>
+            <Field label="Validity (days)" required>
+              <input
+                type="number"
+                min={1}
+                value={form.validityDays}
+                onChange={(e) =>
+                  setForm({ ...form, validityDays: Number(e.target.value) })
+                }
+                className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+              />
+            </Field>
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-[#0B1C30] mb-1.5">
-              Price (₦) <span className="text-[#93000A]">*</span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="50000"
-              className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
-            />
-          </div>
-          <label className="flex items-center gap-3 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="w-4 h-4 text-[#00685C] rounded border-[#E2E8F0] focus:ring-[#00685C]"
+              checked={form.isActive}
+              onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+              className="w-4 h-4 accent-[#00685C]"
             />
-            <span className="text-sm font-semibold text-[#0B1C30]">
-              Active (patients can purchase this package)
-            </span>
+            <span className="text-sm font-semibold text-[#0B1C30]">Active</span>
+            <span className="text-xs text-[#94A3B8]">(visible to patients)</span>
           </label>
         </div>
       </Modal>
+
+      {/* ── Deactivate confirmation ──────────────────────────────────── */}
+      <Modal
+        isOpen={showDeactivateModal}
+        onClose={() => setShowDeactivateModal(false)}
+        title="Deactivate Package"
+        subtitle="Patients will no longer be able to purchase this"
+        size="sm"
+        footer={
+          <>
+            <button
+              onClick={() => setShowDeactivateModal(false)}
+              className="text-sm font-semibold text-[#3D4946] px-4 py-2 rounded-lg hover:bg-[#F8FAFC]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeactivate}
+              disabled={deactivatePackage.isPending}
+              className="bg-[#93000A] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-red-800 disabled:opacity-50"
+            >
+              {deactivatePackage.isPending ? "Deactivating…" : "Deactivate"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-[#3D4946]">
+          Deactivate <strong>{deactivateTarget?.name}</strong>? Existing
+          subscriptions won't be affected.
+        </p>
+      </Modal>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-[#0B1C30] mb-1.5">
+        {label} {required && <span className="text-[#93000A]">*</span>}
+      </label>
+      {children}
     </div>
   );
 }

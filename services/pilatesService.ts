@@ -590,10 +590,53 @@ export const markAttendance = async (
 // SUBSCRIPTIONS
 // ============================================
 
+// ── Admin-only manual grant ─────────────────────────────────────────────
 export const purchaseSubscription = async (
   payload: PurchaseSubscriptionRequest
 ): Promise<SingleResponse<Subscription>> => {
   const res = await api.post("/pilates/subscriptions", payload);
+  return res.data;
+};
+
+// ── Patient checkout (Flutterwave) ──────────────────────────────────────
+
+export interface CheckoutRequest {
+  packageId: string;
+}
+
+export interface CheckoutResponse {
+  checkoutUrl: string;
+  txRef: string;
+}
+
+export interface CheckoutStatusResponse {
+  status: "PENDING" | "SUCCESSFUL" | "FAILED" | "CANCELLED";
+  packageName: string | null;
+  credits: number | null;
+  subscriptionId: string | null;
+}
+
+/**
+ * Initiates Flutterwave checkout for a package.
+ * Backend: POST /api/pilates/subscriptions/checkout
+ * Response: { checkoutUrl, txRef } (no envelope wrapper)
+ */
+export const initiateCheckout = async (
+  payload: CheckoutRequest
+): Promise<CheckoutResponse> => {
+  const res = await api.post("/pilates/subscriptions/checkout", payload);
+  return res.data;
+};
+
+/**
+ * Polls payment status after returning from Flutterwave.
+ * Backend: GET /api/pilates/subscriptions/checkout/:txRef
+ * Response: { status, packageName, credits, subscriptionId } (no envelope wrapper)
+ */
+export const pollCheckoutStatus = async (
+  txRef: string
+): Promise<CheckoutStatusResponse> => {
+  const res = await api.get(`/pilates/subscriptions/checkout/${txRef}`);
   return res.data;
 };
 

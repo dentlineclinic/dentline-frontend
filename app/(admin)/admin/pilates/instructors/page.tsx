@@ -8,8 +8,13 @@ import Modal from "@/components/ui/Modal";
 import {
   usePilatesInstructorAccounts,
   useCreatePilatesInstructorAccount,
+  useUpdateInstructor,
+  useDeactivateInstructor,
 } from "@/hooks/usePilates";
-import type { PilatesInstructor } from "@/services/pilatesService";
+import type {
+  PilatesInstructor,
+  UpdatePilatesInstructorRequest,
+} from "@/services/pilatesService";
 
 export const dynamic = "force-dynamic";
 
@@ -19,15 +24,26 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function AdminPilatesInstructorsPage() {
   const [page, setPage] = useState(0);
 
+  // ── Create modal state ─────────────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState(false);
-
-  // Create form state
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newBio, setNewBio] = useState("");
   const [newCertifications, setNewCertifications] = useState("");
 
+  // ── Edit modal state ───────────────────────────────────────────────────────
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<PilatesInstructor | null>(null);
+  const [editBio, setEditBio] = useState("");
+  const [editCertifications, setEditCertifications] = useState("");
+  const [editName, setEditName] = useState("");
+
+  // ── Deactivate modal state ─────────────────────────────────────────────────
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<PilatesInstructor | null>(null);
+
+  // ── Data ───────────────────────────────────────────────────────────────────
   const { data, isLoading, error: queryError } =
     usePilatesInstructorAccounts(page, DEFAULT_PAGE_SIZE);
 
@@ -35,23 +51,30 @@ export default function AdminPilatesInstructorsPage() {
   const totalPages = data?.data?.totalPages ?? 1;
   const currentPage = data?.data?.number ?? 0;
   const totalElements = data?.data?.totalElements ?? instructors.length;
-  const activeOnPage = instructors.filter((i) => i.status === "ACTIVE").length;
+  const activeCount = instructors.filter((i) => i.status === "ACTIVE").length;
 
   const createInstructor = useCreatePilatesInstructorAccount();
+  const updateInstructor = useUpdateInstructor();
+  const deactivateInstructor = useDeactivateInstructor();
 
   const error = queryError
-    ? typeof queryError === "string"
-      ? queryError
-      : (queryError as Error).message || "Failed to load instructors."
+    ? (queryError as Error).message || "Failed to load instructors."
     : null;
 
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
   const openCreateModal = () => {
-    setNewName("");
-    setNewEmail("");
-    setNewPassword("");
-    setNewBio("");
-    setNewCertifications("");
+    setNewName(""); setNewEmail(""); setNewPassword("");
+    setNewBio(""); setNewCertifications("");
     setShowCreateModal(true);
+  };
+
+  const openEditModal = (instructor: PilatesInstructor) => {
+    setEditTarget(instructor);
+    setEditName(instructor.name);
+    setEditBio(instructor.bio ?? "");
+    setEditCertifications(instructor.certifications ?? "");
+    setShowEditModal(true);
   };
 
   const handleCreate = async () => {
@@ -77,16 +100,48 @@ export default function AdminPilatesInstructorsPage() {
     }
   };
 
+  const handleEdit = async () => {
+    if (!editTarget) return;
+    if (!editName.trim()) return toast.error("Name is required");
+
+    const payload: UpdatePilatesInstructorRequest = {
+      name: editName.trim(),
+      bio: editBio.trim() || undefined,
+      certifications: editCertifications.trim() || undefined,
+    };
+
+    try {
+      await updateInstructor.mutateAsync({ id: editTarget.id, payload });
+      toast.success("Instructor updated");
+      setShowEditModal(false);
+      setEditTarget(null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update instructor");
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!deactivateTarget) return;
+    try {
+      await deactivateInstructor.mutateAsync(deactivateTarget.id);
+      toast.success("Instructor deactivated");
+      setShowDeactivateModal(false);
+      setDeactivateTarget(null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to deactivate instructor");
+    }
+  };
+
   const goToPreviousPage = () => setPage((c) => Math.max(c - 1, 0));
   const goToNextPage = () => setPage((c) => Math.min(c + 1, totalPages - 1));
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar
         title="Pilates Instructors"
-        subtitle={`${totalElements} instructor${
-          totalElements === 1 ? "" : "s"
-        } · ${activeOnPage} active on this page`}
+        subtitle={`${totalElements} instructor${totalElements === 1 ? "" : "s"} · ${activeCount} active on this page`}
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6">
@@ -98,18 +153,8 @@ export default function AdminPilatesInstructorsPage() {
             onClick={openCreateModal}
             className="flex items-center gap-2 bg-[#00685C] text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-[#008375] transition-colors"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             New Instructor
           </button>
@@ -127,13 +172,7 @@ export default function AdminPilatesInstructorsPage() {
             <table className="w-full min-w-[900px]">
               <thead className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
                 <tr>
-                  {[
-                    "NAME",
-                    "EMAIL",
-                    "BIO",
-                    "CERTIFICATIONS",
-                    "STATUS",
-                  ].map((h) => (
+                  {["NAME", "EMAIL", "BIO", "CERTIFICATIONS", "STATUS", "ACTIONS"].map((h) => (
                     <th
                       key={h}
                       className="text-left px-6 py-4 text-xs font-bold text-[#3D4946] tracking-widest"
@@ -147,7 +186,7 @@ export default function AdminPilatesInstructorsPage() {
                 {isLoading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i} className="border-t border-[#F8FAFC]">
-                      {[...Array(5)].map((__, j) => (
+                      {[...Array(6)].map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 bg-[#F1F5F9] rounded animate-pulse" />
                         </td>
@@ -156,10 +195,7 @@ export default function AdminPilatesInstructorsPage() {
                   ))
                 ) : instructors.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-6 py-12 text-center text-sm text-[#94A3B8]"
-                    >
+                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#94A3B8]">
                       No instructors yet. Click "New Instructor" to add one.
                     </td>
                   </tr>
@@ -189,10 +225,10 @@ export default function AdminPilatesInstructorsPage() {
                         <td className="px-6 py-4 text-sm text-[#3D4946]">
                           {instructor.email}
                         </td>
-                        <td className="px-6 py-4 text-sm text-[#3D4946] max-w-[200px] truncate">
+                        <td className="px-6 py-4 text-sm text-[#3D4946] max-w-[180px] truncate">
                           {instructor.bio || "—"}
                         </td>
-                        <td className="px-6 py-4 text-sm text-[#3D4946] max-w-[200px] truncate">
+                        <td className="px-6 py-4 text-sm text-[#3D4946] max-w-[180px] truncate">
                           {instructor.certifications || "—"}
                         </td>
                         <td className="px-6 py-4">
@@ -203,8 +239,29 @@ export default function AdminPilatesInstructorsPage() {
                                 : "bg-[#F1F5F9] text-[#64748B]"
                             }`}
                           >
-                            {isActive ? "Active" : "Suspended"}
+                            {isActive ? "Active" : "Inactive"}
                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => openEditModal(instructor)}
+                              className="text-sm font-semibold text-[#00685C] hover:underline"
+                            >
+                              Edit
+                            </button>
+                            {isActive && (
+                              <button
+                                onClick={() => {
+                                  setDeactivateTarget(instructor);
+                                  setShowDeactivateModal(true);
+                                }}
+                                className="text-sm font-semibold text-[#93000A] hover:underline"
+                              >
+                                Deactivate
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -214,11 +271,6 @@ export default function AdminPilatesInstructorsPage() {
             </table>
           </div>
         </div>
-
-        <p className="text-xs text-[#94A3B8]">
-          Editing and suspending instructors from this page will be enabled once
-          the account-management endpoints are available.
-        </p>
 
         {/* Pagination */}
         {!isLoading && totalPages > 1 && (
@@ -321,11 +373,94 @@ export default function AdminPilatesInstructorsPage() {
           </Field>
         </div>
       </Modal>
+
+      {/* ── Edit Modal ────────────────────────────────────────────────── */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="Edit Instructor"
+        subtitle={editTarget ? `Editing: ${editTarget.name}` : ""}
+        size="md"
+        footer={
+          <>
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="text-sm font-semibold text-[#3D4946] px-4 py-2 rounded-lg hover:bg-[#F8FAFC]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleEdit}
+              disabled={updateInstructor.isPending}
+              className="bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] disabled:opacity-50"
+            >
+              {updateInstructor.isPending ? "Saving…" : "Save Changes"}
+            </button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Field label="Full Name" required>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+            />
+          </Field>
+          <Field label="Bio">
+            <textarea
+              value={editBio}
+              onChange={(e) => setEditBio(e.target.value)}
+              rows={2}
+              placeholder="Short professional bio"
+              className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C] resize-none"
+            />
+          </Field>
+          <Field label="Certifications">
+            <input
+              value={editCertifications}
+              onChange={(e) => setEditCertifications(e.target.value)}
+              placeholder="e.g. BASI, STOTT"
+              className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+            />
+          </Field>
+        </div>
+      </Modal>
+
+      {/* ── Deactivate Modal ─────────────────────────────────────────── */}
+      <Modal
+        isOpen={showDeactivateModal}
+        onClose={() => setShowDeactivateModal(false)}
+        title="Deactivate Instructor"
+        subtitle="Their login will be disabled"
+        size="sm"
+        footer={
+          <>
+            <button
+              onClick={() => setShowDeactivateModal(false)}
+              className="text-sm font-semibold text-[#3D4946] px-4 py-2 rounded-lg hover:bg-[#F8FAFC]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeactivate}
+              disabled={deactivateInstructor.isPending}
+              className="bg-[#93000A] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-red-800 disabled:opacity-50"
+            >
+              {deactivateInstructor.isPending ? "Deactivating…" : "Deactivate"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-[#3D4946]">
+          Deactivate <strong>{deactivateTarget?.name}</strong>? They will no
+          longer be able to log in to their instructor account.
+        </p>
+      </Modal>
     </div>
   );
 }
 
-// ── Small helper for consistent labels ────────────────────────────────────
 function Field({
   label,
   required,

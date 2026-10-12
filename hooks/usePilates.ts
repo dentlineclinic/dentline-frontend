@@ -64,6 +64,8 @@ import {
   fetchSubscriptionsByPatient,
   fetchActiveSubscriptionsForPatient,
   cancelSubscription,
+  initiateCheckout,
+  pollCheckoutStatus,
   fetchActiveClassesPublic,
   fetchPilatesSessionCalendar,
   fetchPilatesSessionsByDate,
@@ -78,6 +80,7 @@ import {
   type MarkAttendanceRequest,
   type PurchaseSubscriptionRequest,
   type CreatePilatesInstructorAccountRequest,
+  type CheckoutRequest,
 } from "@/services/pilatesService";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -671,6 +674,24 @@ export const usePurchaseSubscription = () => {
     },
   });
 };
+
+export const useInitiateCheckout = () =>
+  useMutation({
+    mutationFn: (payload: CheckoutRequest) => initiateCheckout(payload),
+  });
+
+export const usePollCheckoutStatus = (txRef: string | null) =>
+  useQuery({
+    queryKey: ["subscriptions", "checkout", txRef ?? ""],
+    queryFn: () => pollCheckoutStatus(txRef!),
+    enabled: !!txRef,
+    // Poll every 3 seconds while status is PENDING
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return !status || status === "PENDING" ? 3000 : false;
+    },
+    staleTime: 0,
+  });
 
 export const useCancelSubscription = () => {
   const queryClient = useQueryClient();
