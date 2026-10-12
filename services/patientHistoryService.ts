@@ -59,7 +59,9 @@ export const CLINIC_LOCATION_LABELS: Record<ClinicLocation, string> = {
   IKEJA: "Ikeja",
   GBAGADA: "Gbagada",
 };
+//ubgsdoihds
 
+//ugsi
 export const DENTAL_PROCEDURE_LABELS: Record<DentalProcedure, string> = {
   S_AND_P: "S&P",
   CURETTAGE: "Curettage",
