@@ -283,7 +283,11 @@ export default function PatientHistoriesPage() {
       return;
     }
 
-
+    // ✅ NEW: at least one procedure required
+    if (createProcedures.length === 0) {
+      setCreateError("Please select at least one procedure.");
+      return;
+    }
 
     let amount: number | null = null;
     if (!isCheckUpVisit) {

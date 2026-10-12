@@ -37,22 +37,9 @@ export type DentalProcedure =
   | "TEETH_WHITENING"
   | "RCT"
   | "METALLIC_BRACES"
-  | "RETAINER"
-  | "CONSULTATION"
-  | "ORTHODONTIC_CONSULT"
-  | "ALIGNERS"
-  | "VENEERS"
-  | "DENTURES"
   | "IMPLANT"
   | "CROWN"
-  | "BRIDGE"
-  | "PULPECTOMY"
-  | "PULPOTOMY"
-  | "HABIT_BREAKER"
-  | "SPACE_MAINTAINER"
-  | "BRACKET_REPLACEMENT"
-  | "NIGHT_GUARD"
-  | "BONE_AUGMENTATION";
+  | "BRIDGE";
 
 // Human-readable labels for the UI
 export const CLINIC_LOCATION_LABELS: Record<ClinicLocation, string> = {
@@ -69,28 +56,13 @@ export const DENTAL_PROCEDURE_LABELS: Record<DentalProcedure, string> = {
   TEETH_WHITENING: "Teeth Whitening",
   RCT: "RCT",
   METALLIC_BRACES: "Metallic Braces",
-  RETAINER: "Retainer",
-  CONSULTATION: "Consultation",
-  ORTHODONTIC_CONSULT: "Orthodontic Consult",
-  ALIGNERS: "Aligners",
-  VENEERS: "Veneers",
-  DENTURES: "Dentures",
   IMPLANT: "Implant",
   CROWN: "Crown",
   BRIDGE: "Bridge",
-  PULPECTOMY: "Pulpectomy",
-  PULPOTOMY: "Pulpotomy",
-  HABIT_BREAKER: "Habit Breaker",
-  SPACE_MAINTAINER: "Space Maintainer",
-  BRACKET_REPLACEMENT: "Bracket Replacement",
-  NIGHT_GUARD: "Night Guard",
-  BONE_AUGMENTATION: "Bone Augmentation",
 };
 
 // Ordered list for rendering checkboxes / selects
 export const DENTAL_PROCEDURE_OPTIONS: DentalProcedure[] = [
-  "CONSULTATION",
-  "ORTHODONTIC_CONSULT",
   "S_AND_P",
   "CURETTAGE",
   "FILLING",
@@ -98,21 +70,10 @@ export const DENTAL_PROCEDURE_OPTIONS: DentalProcedure[] = [
   "EXTRACTION",
   "TEETH_WHITENING",
   "RCT",
-  "PULPECTOMY",
-  "PULPOTOMY",
   "METALLIC_BRACES",
-  "RETAINER",
-  "ALIGNERS",
-  "BRACKET_REPLACEMENT",
-  "HABIT_BREAKER",
-  "SPACE_MAINTAINER",
-  "VENEERS",
-  "DENTURES",
   "IMPLANT",
   "CROWN",
   "BRIDGE",
-  "NIGHT_GUARD",
-  "BONE_AUGMENTATION",
 ];
 
 export const CLINIC_LOCATION_OPTIONS: ClinicLocation[] = ["IKEJA", "GBAGADA"];
