@@ -39,7 +39,20 @@ export type DentalProcedure =
   | "METALLIC_BRACES"
   | "IMPLANT"
   | "CROWN"
-  | "BRIDGE";
+  | "BRIDGE"
+  | "RETAINER"
+  | "CONSULTATION"
+  | "ORTHODONTIC_CONSULT"
+  | "ALIGNERS"
+  | "VENEERS"
+  | "DENTURES"
+  | "PULPECTOMY"
+  | "PULPOTOMY"
+  | "HABIT_BREAKER"
+  | "SPACE_MAINTAINER"
+  | "BRACKET_REPLACEMENT"
+  | "NIGHT_GUARD"
+  | "BONE_AUGMENTATION";
 
 // Human-readable labels for the UI
 export const CLINIC_LOCATION_LABELS: Record<ClinicLocation, string> = {
@@ -59,10 +72,25 @@ export const DENTAL_PROCEDURE_LABELS: Record<DentalProcedure, string> = {
   IMPLANT: "Implant",
   CROWN: "Crown",
   BRIDGE: "Bridge",
+  RETAINER: "Retainer",
+  CONSULTATION: "Consultation",
+  ORTHODONTIC_CONSULT: "Orthodontic Consult",
+  ALIGNERS: "Aligners",
+  VENEERS: "Veneers",
+  DENTURES: "Dentures",
+  PULPECTOMY: "Pulpectomy",
+  PULPOTOMY: "Pulpotomy",
+  HABIT_BREAKER: "Habit Breaker",
+  SPACE_MAINTAINER: "Space Maintainer",
+  BRACKET_REPLACEMENT: "Bracket Replacement",
+  NIGHT_GUARD: "Night Guard",
+  BONE_AUGMENTATION: "Bone Augmentation",
 };
 
 // Ordered list for rendering checkboxes / selects
 export const DENTAL_PROCEDURE_OPTIONS: DentalProcedure[] = [
+  "CONSULTATION",
+  "ORTHODONTIC_CONSULT",
   "S_AND_P",
   "CURETTAGE",
   "FILLING",
@@ -71,9 +99,20 @@ export const DENTAL_PROCEDURE_OPTIONS: DentalProcedure[] = [
   "TEETH_WHITENING",
   "RCT",
   "METALLIC_BRACES",
+  "ALIGNERS",
+  "RETAINER",
+  "BRACKET_REPLACEMENT",
   "IMPLANT",
   "CROWN",
   "BRIDGE",
+  "VENEERS",
+  "DENTURES",
+  "PULPECTOMY",
+  "PULPOTOMY",
+  "HABIT_BREAKER",
+  "SPACE_MAINTAINER",
+  "NIGHT_GUARD",
+  "BONE_AUGMENTATION",
 ];
 
 export const CLINIC_LOCATION_OPTIONS: ClinicLocation[] = ["IKEJA", "GBAGADA"];
@@ -171,13 +210,13 @@ export interface PaymentStatsResponse {
   };
 }
 
-// ✅ UPDATED: location required, procedures required (at least 1)
+// procedures is optional — omit or leave empty for check-up visits
 export interface CreatePatientHistoryRequest {
   appointmentId: string;
   amount?: number | null;
   discount?: number;
   location: ClinicLocation;
-  procedures: DentalProcedure[];
+  procedures?: DentalProcedure[];
 }
 
 export interface UpdateObservationRequest {

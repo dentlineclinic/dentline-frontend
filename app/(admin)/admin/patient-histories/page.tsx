@@ -283,11 +283,8 @@ export default function PatientHistoriesPage() {
       return;
     }
 
-    // ✅ NEW: at least one procedure required
-    if (createProcedures.length === 0) {
-      setCreateError("Please select at least one procedure.");
-      return;
-    }
+    // Procedures are optional — checkup visits may have none
+    // (no hard error if empty)
 
     let amount: number | null = null;
     if (!isCheckUpVisit) {
@@ -319,8 +316,12 @@ export default function PatientHistoriesPage() {
         appointmentId: createApptId,
         discount,
         location: createLocation,          // ✅ NEW
-        procedures: createProcedures,      // ✅ NEW
       };
+
+      // Only include procedures if at least one is selected
+      if (createProcedures.length > 0) {
+        payload.procedures = createProcedures;
+      }
 
       if (!isCheckUpVisit && amount !== null) {
         payload.amount = amount;
@@ -962,8 +963,9 @@ export default function PatientHistoriesPage() {
 
               {/* ✅ NEW: Procedures multi-select */}
               <div>
-                <label className="block text-sm font-semibold text-[#0B1C30] mb-2">
-                  Procedures <span className="text-[#93000A]">*</span>
+                <label className="block text-sm font-semibold text-[#0B1C30] mb-1">
+                  Procedures{" "}
+                  <span className="text-xs font-normal text-[#94A3B8]">(optional for check-up visits)</span>
                 </label>
                 <div className="grid grid-cols-2 gap-2 bg-[#F8FAFC] rounded-lg p-3 max-h-60 overflow-y-auto">
                   {DENTAL_PROCEDURE_OPTIONS.map((proc) => {
@@ -989,10 +991,14 @@ export default function PatientHistoriesPage() {
                     );
                   })}
                 </div>
-                {createProcedures.length > 0 && (
+                {createProcedures.length > 0 ? (
                   <p className="text-xs text-[#0D9488] mt-2 font-medium">
                     {createProcedures.length} procedure
                     {createProcedures.length > 1 ? "s" : ""} selected
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#94A3B8] mt-2">
+                    No procedures selected — this will be recorded as a check-up visit.
                   </p>
                 )}
               </div>
