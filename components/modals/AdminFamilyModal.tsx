@@ -20,10 +20,17 @@ import {
 
 const GENDER_OPTIONS: Gender[] = ["MALE", "FEMALE", "OTHER"];
 const RELATIONSHIP_OPTIONS: FamilyRelationship[] = [
+  "HEAD",
+  "SPOUSE",
   "SON",
   "DAUGHTER",
-  "SPOUSE",
-  "PARENT",
+  "FATHER",
+  "MOTHER",
+  "BROTHER",
+  "SISTER",
+  "GRANDMOTHER",
+  "GRANDFATHER",
+  "GUARDIAN",
   "OTHER",
 ];
 

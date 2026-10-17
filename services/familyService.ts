@@ -4,10 +4,17 @@ import api from "@/lib/axios";
 
 export type Gender = "MALE" | "FEMALE" | "OTHER" | string;
 export type FamilyRelationship =
+  | "HEAD"
+  | "SPOUSE"
   | "SON"
   | "DAUGHTER"
-  | "SPOUSE"
-  | "PARENT"
+  | "FATHER"
+  | "MOTHER"
+  | "BROTHER"
+  | "SISTER"
+  | "GRANDMOTHER"
+  | "GRANDFATHER"
+  | "GUARDIAN"
   | "OTHER"
   | string;
 
