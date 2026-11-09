@@ -3,7 +3,6 @@
 import { toast } from "react-toastify";
 import {
   usePilatesSessionsByDate,
-  useCancelSession,
 } from "@/hooks/usePilates";
 import type { PilatesSession } from "@/services/pilatesService";
 import {
@@ -18,6 +17,7 @@ interface Props {
   onClose: () => void;
   onRefresh: () => void;
   onCancelSession: (session: PilatesSession) => void;
+  onRescheduleSession: (session: PilatesSession) => void;
 }
 
 function Spinner() {
@@ -49,6 +49,7 @@ export default function SessionDayDrawer({
   onClose,
   onRefresh,
   onCancelSession,
+  onRescheduleSession,
 }: Props) {
   const { data, isLoading, isError } = usePilatesSessionsByDate(date);
 
@@ -130,6 +131,7 @@ export default function SessionDayDrawer({
             const isFull = session.bookedCount >= session.capacity;
             const available = Math.max(0, session.capacity - session.bookedCount);
             const isCancellable = session.status === "SCHEDULED";
+            const isReschedulable = session.status === "SCHEDULED";
 
             return (
               <div
@@ -177,14 +179,26 @@ export default function SessionDayDrawer({
                   )}
                 </div>
 
-                {/* Action */}
-                {isCancellable && (
-                  <button
-                    onClick={() => onCancelSession(session)}
-                    className="text-xs font-semibold text-[#93000A] hover:underline"
-                  >
-                    Cancel session →
-                  </button>
+                {/* Actions */}
+                {(isCancellable || isReschedulable) && (
+                  <div className="flex items-center gap-3 pt-2 border-t border-[#F8FAFC]">
+                    {isReschedulable && (
+                      <button
+                        onClick={() => onRescheduleSession(session)}
+                        className="text-xs font-semibold text-[#1E40AF] hover:underline"
+                      >
+                        Reschedule →
+                      </button>
+                    )}
+                    {isCancellable && (
+                      <button
+                        onClick={() => onCancelSession(session)}
+                        className="text-xs font-semibold text-[#93000A] hover:underline"
+                      >
+                        Cancel →
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             );

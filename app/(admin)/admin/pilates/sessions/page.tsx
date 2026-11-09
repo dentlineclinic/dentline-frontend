@@ -8,6 +8,7 @@ import {
   useSessionsByDateRange,
   usePilatesSessionCalendar,
   useCancelSession,
+  useRescheduleSession,
 } from "@/hooks/usePilates";
 import type { PilatesSession } from "@/services/pilatesService";
 import CalendarHeader from "./CalendarHeader";
@@ -50,6 +51,12 @@ export default function AdminPilatesSessionsPage() {
   const [cancelTarget, setCancelTarget] = useState<PilatesSession | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
+  // ── SHARED: Reschedule session modal ─────────────────────────────────────
+  const [rescheduleTarget, setRescheduleTarget] = useState<PilatesSession | null>(null);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+
   // ── Data fetching ────────────────────────────────────────────────────────
   const {
     data: tableData,
@@ -66,6 +73,7 @@ export default function AdminPilatesSessionsPage() {
   } = usePilatesSessionCalendar(year, month);
 
   const cancelSession = useCancelSession();
+  const rescheduleSession = useRescheduleSession();
 
   // ── Table derived values ─────────────────────────────────────────────────
   const sessions = tableData?.data?.content ?? [];
@@ -101,6 +109,13 @@ export default function AdminPilatesSessionsPage() {
     setShowCancelModal(true);
   };
 
+  const openRescheduleModal = (session: PilatesSession) => {
+    setRescheduleTarget(session);
+    setRescheduleDate(session.sessionDate);
+    setRescheduleTime(session.startTime.slice(0, 5)); // HH:mm
+    setShowRescheduleModal(true);
+  };
+
   const handleCancel = async () => {
     if (!cancelTarget) return;
     try {
@@ -113,6 +128,29 @@ export default function AdminPilatesSessionsPage() {
       else refetchCalendar();
     } catch (err: any) {
       toast.error(err?.message || "Failed to cancel session");
+    }
+  };
+
+  const handleReschedule = async () => {
+    if (!rescheduleTarget) return;
+    if (!rescheduleDate) { toast.error("New date is required"); return; }
+    if (!rescheduleTime) { toast.error("New time is required"); return; }
+    try {
+      await rescheduleSession.mutateAsync({
+        id: rescheduleTarget.id,
+        payload: {
+          newSessionDate: rescheduleDate,
+          newStartTime: rescheduleTime.length === 5 ? rescheduleTime + ":00" : rescheduleTime,
+        },
+      });
+      toast.success("Session rescheduled. Booked patients will be notified.");
+      setShowRescheduleModal(false);
+      setRescheduleTarget(null);
+      if (viewMode === "table") refetchTable();
+      else refetchCalendar();
+    } catch (err: any) {
+      // Show the backend's error message directly (e.g. conflict, past date)
+      toast.error(err?.response?.data?.message || err?.message || "Failed to reschedule session");
     }
   };
 
@@ -354,12 +392,20 @@ export default function AdminPilatesSessionsPage() {
                             </td>
                             <td className="px-6 py-4">
                               {session.status === "SCHEDULED" ? (
-                                <button
-                                  onClick={() => openCancelModal(session)}
-                                  className="text-sm font-semibold text-[#93000A] hover:underline"
-                                >
-                                  Cancel
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => openRescheduleModal(session)}
+                                    className="text-sm font-semibold text-[#1E40AF] hover:underline"
+                                  >
+                                    Reschedule
+                                  </button>
+                                  <button
+                                    onClick={() => openCancelModal(session)}
+                                    className="text-sm font-semibold text-[#93000A] hover:underline"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="text-sm text-[#94A3B8]">—</span>
                               )}
@@ -470,8 +516,76 @@ export default function AdminPilatesSessionsPage() {
             refetchCalendar();
           }}
           onCancelSession={openCancelModal}
+          onRescheduleSession={openRescheduleModal}
         />
       )}
+
+      {/* ── Reschedule Modal ─────────────────────────────────────────── */}
+      <Modal
+        isOpen={showRescheduleModal}
+        onClose={() => setShowRescheduleModal(false)}
+        title="Reschedule Session"
+        size="sm"
+        footer={
+          <>
+            <button
+              onClick={() => setShowRescheduleModal(false)}
+              className="text-sm font-semibold text-[#3D4946] px-4 py-2 rounded-lg hover:bg-[#F8FAFC]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReschedule}
+              disabled={rescheduleSession.isPending}
+              className="bg-[#1E40AF] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#1E3A8A] disabled:opacity-50"
+            >
+              {rescheduleSession.isPending ? "Rescheduling…" : "Confirm Reschedule"}
+            </button>
+          </>
+        }
+      >
+        {rescheduleTarget && (
+          <div className="flex flex-col gap-4">
+            <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-4">
+              <p className="text-sm font-bold text-[#1E40AF] mb-1">
+                {rescheduleTarget.className ?? "Session"}
+              </p>
+              <p className="text-xs text-[#3D4946]">
+                Current: {formatDisplayDate(rescheduleTarget.sessionDate)} at{" "}
+                {formatTime(rescheduleTarget.startTime)}
+              </p>
+              {rescheduleTarget.bookedCount > 0 && (
+                <p className="text-xs text-[#92400E] mt-1">
+                  ⚠ {rescheduleTarget.bookedCount} patient
+                  {rescheduleTarget.bookedCount === 1 ? "" : "s"} booked — they will be notified automatically.
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[#0B1C30] mb-1.5">
+                New Date <span className="text-[#93000A]">*</span>
+              </label>
+              <input
+                type="date"
+                value={rescheduleDate}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#1E40AF]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[#0B1C30] mb-1.5">
+                New Time <span className="text-[#93000A]">*</span>
+              </label>
+              <input
+                type="time"
+                value={rescheduleTime}
+                onChange={(e) => setRescheduleTime(e.target.value)}
+                className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#1E40AF]"
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ── Cancel Confirmation Modal ─────────────────────────────────── */}
       <Modal

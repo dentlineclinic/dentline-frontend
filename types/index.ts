@@ -615,7 +615,6 @@ export interface GenerateSessionsRequest {
 
 export interface BookPilatesSessionRequest {
   sessionId: string;
-  patientId: string;
   subscriptionId?: string;
 }
 

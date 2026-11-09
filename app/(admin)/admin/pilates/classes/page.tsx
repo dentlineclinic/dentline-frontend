@@ -10,14 +10,12 @@ import {
   useCreateClass,
   useUpdateClass,
   useDeactivateClass,
-  useGenerateClassSessions,
   useActivePrograms,
   useActiveInstructors,
 } from "@/hooks/usePilates";
 import type {
   PilatesClass,
   CreatePilatesClassRequest,
-  GenerateSessionsRequest,
 } from "@/services/pilatesService";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +41,7 @@ const emptyClassForm = (): Omit<CreatePilatesClassRequest, "programId" | "instru
   name: "",
   description: "",
   dayOfWeek: 1,
+  startDate: new Date().toISOString().slice(0, 10),
   startTime: "09:00",
   durationMinutes: 60,
   defaultCapacity: 10,
@@ -57,15 +56,9 @@ export default function AdminPilatesClassesPage() {
   const [editTarget, setEditTarget] = useState<PilatesClass | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<PilatesClass | null>(null);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
-  const [generateTarget, setGenerateTarget] = useState<PilatesClass | null>(null);
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const [classForm, setClassForm] = useState(emptyClassForm());
-  const [genForm, setGenForm] = useState<{ startDate: string; endDate: string }>({
-    startDate: new Date().toISOString().slice(0, 10),
-    endDate: "",
-  });
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const { data, isLoading, error: queryError } = useAllClasses(page, DEFAULT_PAGE_SIZE);
@@ -83,7 +76,6 @@ export default function AdminPilatesClassesPage() {
   const createClass = useCreateClass();
   const updateClass = useUpdateClass();
   const deactivateClass = useDeactivateClass();
-  const generateSessions = useGenerateClassSessions();
 
   const error = queryError ? (queryError as Error).message || "Failed to load classes." : null;
 
@@ -102,10 +94,11 @@ export default function AdminPilatesClassesPage() {
       name: cls.name,
       description: cls.description ?? "",
       dayOfWeek: cls.dayOfWeek,
+      startDate: cls.startDate ?? new Date().toISOString().slice(0, 10),
       startTime: cls.startTime.slice(0, 5), // HH:mm
       durationMinutes: cls.durationMinutes,
       defaultCapacity: cls.defaultCapacity,
-      isActive: cls.isActive,
+      isActive: (cls.isActive ?? cls.active) ?? true,
     });
     setEditTarget(cls);
     setShowClassModal(true);
@@ -115,8 +108,9 @@ export default function AdminPilatesClassesPage() {
     if (!classForm.name.trim()) { toast.error("Class name is required"); return false; }
     if (!classForm.programId) { toast.error("Program is required"); return false; }
     if (!classForm.instructorId) { toast.error("Instructor is required"); return false; }
-    if (classForm.durationMinutes < 1) { toast.error("Duration must be at least 1 minute"); return false; }
-    if (classForm.defaultCapacity < 1) { toast.error("Capacity must be at least 1"); return false; }
+    if (!classForm.startDate) { toast.error("Start date is required"); return false; }
+    if ((classForm.durationMinutes ?? 0) < 1) { toast.error("Duration must be at least 1 minute"); return false; }
+    if ((classForm.defaultCapacity ?? 0) < 1) { toast.error("Capacity must be at least 1"); return false; }
     return true;
   };
 
@@ -153,32 +147,6 @@ export default function AdminPilatesClassesPage() {
     }
   };
 
-  const handleGenerateSessions = async () => {
-    if (!generateTarget) return;
-    if (!genForm.startDate) { toast.error("Start date is required"); return; }
-    if (!genForm.endDate) { toast.error("End date is required"); return; }
-    if (genForm.endDate < genForm.startDate) {
-      toast.error("End date must be after start date");
-      return;
-    }
-    try {
-      const res = await generateSessions.mutateAsync({
-        classId: generateTarget.id,
-        payload: {
-          classId: generateTarget.id,
-          startDate: genForm.startDate,
-          endDate: genForm.endDate,
-        } as GenerateSessionsRequest,
-      });
-      const count = (res as any)?.data?.length ?? 0;
-      toast.success(`${count} session${count === 1 ? "" : "s"} generated`);
-      setShowGenerateModal(false);
-      setGenerateTarget(null);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to generate sessions");
-    }
-  };
-
   const isClassPending = createClass.isPending || updateClass.isPending;
 
   return (
@@ -191,7 +159,7 @@ export default function AdminPilatesClassesPage() {
       <main className="flex-1 p-4 sm:p-6 lg:p-10 flex flex-col gap-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm text-[#3D4946]">
-            Create classes then generate sessions for specific date ranges.
+            Sessions are auto-generated from the start date when a class is created.
           </p>
           <button
             onClick={openCreateModal}
@@ -270,6 +238,11 @@ export default function AdminPilatesClassesPage() {
                         <p className="text-xs text-[#94A3B8]">
                           {cls.startTime.slice(0, 5)} · {cls.durationMinutes}min
                         </p>
+                        {cls.startDate && (
+                          <p className="text-xs text-[#0D9488] mt-0.5">
+                            From {cls.startDate}
+                          </p>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-[#3D4946]">
                         {cls.defaultCapacity}
@@ -277,12 +250,12 @@ export default function AdminPilatesClassesPage() {
                       <td className="px-6 py-4">
                         <span
                           className={`text-xs font-bold px-3 py-1 rounded-full ${
-                            cls.isActive
+                            (cls.isActive ?? cls.active)
                               ? "bg-[#DCFCE7] text-[#166534]"
                               : "bg-[#F1F5F9] text-[#64748B]"
                           }`}
                         >
-                          {cls.isActive ? "Active" : "Inactive"}
+                          {(cls.isActive ?? cls.active) ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -293,31 +266,16 @@ export default function AdminPilatesClassesPage() {
                           >
                             Edit
                           </button>
-                          {cls.isActive && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  setGenerateTarget(cls);
-                                  setGenForm({
-                                    startDate: new Date().toISOString().slice(0, 10),
-                                    endDate: "",
-                                  });
-                                  setShowGenerateModal(true);
-                                }}
-                                className="text-sm font-semibold text-[#1E40AF] hover:underline"
-                              >
-                                Generate Sessions
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setDeactivateTarget(cls);
-                                  setShowDeactivateModal(true);
-                                }}
-                                className="text-sm font-semibold text-[#93000A] hover:underline"
-                              >
-                                Deactivate
-                              </button>
-                            </>
+                          {(cls.isActive ?? cls.active) && (
+                            <button
+                              onClick={() => {
+                                setDeactivateTarget(cls);
+                                setShowDeactivateModal(true);
+                              }}
+                              className="text-sm font-semibold text-[#93000A] hover:underline"
+                            >
+                              Deactivate
+                            </button>
                           )}
                         </div>
                       </td>
@@ -422,7 +380,18 @@ export default function AdminPilatesClassesPage() {
               </select>
             </Field>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Start Date" required>
+              <input
+                type="date"
+                value={classForm.startDate}
+                onChange={(e) => setClassForm({ ...classForm, startDate: e.target.value })}
+                className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
+              />
+              <p className="text-xs text-[#94A3B8] mt-1">
+                Sessions are auto-generated from this date for the program's duration.
+              </p>
+            </Field>
             <Field label="Day of Week" required>
               <select
                 value={classForm.dayOfWeek}
@@ -434,6 +403,8 @@ export default function AdminPilatesClassesPage() {
                 ))}
               </select>
             </Field>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Start Time" required>
               <input
                 type="time"
@@ -472,59 +443,6 @@ export default function AdminPilatesClassesPage() {
             <span className="text-sm font-semibold text-[#0B1C30]">Active</span>
             <span className="text-xs text-[#94A3B8]">(visible to patients)</span>
           </label>
-        </div>
-      </Modal>
-
-      {/* ── Generate sessions modal ──────────────────────────────────── */}
-      <Modal
-        isOpen={showGenerateModal}
-        onClose={() => setShowGenerateModal(false)}
-        title="Generate Sessions"
-        subtitle={generateTarget ? `For: ${generateTarget.name}` : ""}
-        size="sm"
-        footer={
-          <>
-            <button
-              onClick={() => setShowGenerateModal(false)}
-              className="text-sm font-semibold text-[#3D4946] px-4 py-2 rounded-lg hover:bg-[#F8FAFC]"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleGenerateSessions}
-              disabled={generateSessions.isPending}
-              className="bg-[#00685C] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#008375] disabled:opacity-50"
-            >
-              {generateSessions.isPending ? "Generating…" : "Generate"}
-            </button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-[#3D4946]">
-            Sessions will be created for every{" "}
-            <strong>
-              {generateTarget ? DAY_LABELS[generateTarget.dayOfWeek] : ""}
-            </strong>{" "}
-            between the two dates.
-          </p>
-          <Field label="Start Date" required>
-            <input
-              type="date"
-              value={genForm.startDate}
-              onChange={(e) => setGenForm({ ...genForm, startDate: e.target.value })}
-              className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
-            />
-          </Field>
-          <Field label="End Date" required>
-            <input
-              type="date"
-              value={genForm.endDate}
-              min={genForm.startDate}
-              onChange={(e) => setGenForm({ ...genForm, endDate: e.target.value })}
-              className="w-full bg-white border border-[#F1F5F9] rounded-lg px-3 py-2.5 text-sm text-[#0B1C30] outline-none focus:border-[#00685C]"
-            />
-          </Field>
         </div>
       </Modal>
 

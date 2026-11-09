@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import TopBar from "@/components/layout/TopBar";
@@ -54,7 +54,6 @@ const getInitials = (name?: string | null) => {
 };
 
 export default function PatientPilatesPage() {
-  const [patientId, setPatientId] = useState<string>("");
   const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
 
   // Booking modal state
@@ -62,10 +61,6 @@ export default function PatientPilatesPage() {
   const [bookingClassName, setBookingClassName] = useState<string>("");
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>("");
   const [showBookingModal, setShowBookingModal] = useState(false);
-
-  useEffect(() => {
-    setPatientId(localStorage.getItem("userId") ?? "");
-  }, []);
 
   // Load active classes
   const {
@@ -111,15 +106,10 @@ export default function PatientPilatesPage() {
 
   const handleBook = async () => {
     if (!bookingSession) return;
-    if (!patientId) {
-      toast.error("Please log in again");
-      return;
-    }
 
     try {
       await bookSession.mutateAsync({
         sessionId: bookingSession.id,
-        patientId,
         subscriptionId: selectedSubscriptionId || undefined,
       });
       toast.success("Session booked!");

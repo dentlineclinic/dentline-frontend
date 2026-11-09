@@ -75,7 +75,7 @@ export default function AdminPilatesPackagesPage() {
       creditCount: pkg.creditCount,
       price: pkg.price,
       validityDays: pkg.validityDays,
-      isActive: pkg.isActive,
+      isActive: (pkg.isActive ?? pkg.active) ?? true,
     });
     setEditTarget(pkg);
     setShowCreateModal(true);
@@ -207,12 +207,12 @@ export default function AdminPilatesPackagesPage() {
                       <td className="px-6 py-4">
                         <span
                           className={`text-xs font-bold px-3 py-1 rounded-full ${
-                            pkg.isActive
+                            (pkg.isActive ?? pkg.active)
                               ? "bg-[#DCFCE7] text-[#166534]"
                               : "bg-[#F1F5F9] text-[#64748B]"
                           }`}
                         >
-                          {pkg.isActive ? "Active" : "Inactive"}
+                          {(pkg.isActive ?? pkg.active) ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -223,7 +223,7 @@ export default function AdminPilatesPackagesPage() {
                           >
                             Edit
                           </button>
-                          {pkg.isActive && (
+                          {(pkg.isActive ?? pkg.active) && (
                             <button
                               onClick={() => {
                                 setDeactivateTarget(pkg);

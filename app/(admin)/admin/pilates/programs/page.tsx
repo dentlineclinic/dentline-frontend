@@ -65,7 +65,7 @@ export default function AdminPilatesProgramsPage() {
     setName(program.name);
     setDescription(program.description ?? "");
     setDurationWeeks(program.durationWeeks?.toString() ?? "");
-    setIsActive(program.isActive);
+    setIsActive((program.isActive ?? program.active) ?? true);
     setShowModal(true);
   };
 
@@ -206,12 +206,12 @@ export default function AdminPilatesProgramsPage() {
                       <td className="px-6 py-4">
                         <span
                           className={`text-xs font-bold px-3 py-1 rounded-full ${
-                            program.isActive
+                            (program.isActive ?? program.active)
                               ? "bg-[#DCFCE7] text-[#166534]"
                               : "bg-[#F1F5F9] text-[#64748B]"
                           }`}
                         >
-                          {program.isActive ? "Active" : "Inactive"}
+                          {(program.isActive ?? program.active) ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-[#3D4946]">
@@ -225,7 +225,7 @@ export default function AdminPilatesProgramsPage() {
                           >
                             Edit
                           </button>
-                          {program.isActive && (
+                          {(program.isActive ?? program.active) && (
                             <button
                               onClick={() => handleDeactivate(program.id, program.name)}
                               className="text-sm font-semibold text-[#93000A] hover:underline"

@@ -20,18 +20,28 @@ export default function Navbar({ activePage = "Home" }: { activePage?: string })
       className="fixed top-0 left-0 right-0 z-50 bg-white/90 border-b border-[#F1F5F9] shadow-sm"
       style={{ backdropFilter: "blur(12px)" }}
     >
-      <div className="max-w-[1280px] mx-auto px-10 py-4 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center">
+      <div className="max-w-[1280px] mx-auto px-10 py-1 flex items-center justify-between">
+        {/* Logos — Dentline + Mainlnd Derma */}
+        <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center">
+            <Image
+              src="https://res.cloudinary.com/da00pceww/image/upload/v1778415626/DENTLINE_logo_new-transparent-01_dms7y1.png"
+              alt="Dentline Clinic"
+              width={180}
+              height={60}
+              className="h-10 w-auto object-contain"
+              priority
+            />
+          </Link>
+          <span className="hidden sm:block w-px h-8 bg-[#BDC9C5]" />
           <Image
-            src="https://res.cloudinary.com/da00pceww/image/upload/v1778415626/DENTLINE_logo_new-transparent-01_dms7y1.png"
-            alt="Dentline Clinic"
-            width={180}
+            src="https://res.cloudinary.com/da00pceww/image/upload/v1793360167/mainlnd_derma_transparent_n9yjx2.png"
+            alt="Mainlnd Derma"
+            width={220}
             height={60}
-            className="h-10 w-auto object-contain"
-            priority
+            className="h-20 w-auto object-contain"
           />
-        </Link>
+        </div>
 
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-8">
@@ -62,7 +72,7 @@ export default function Navbar({ activePage = "Home" }: { activePage?: string })
             href="/register"
             className="bg-[#00685C] text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-[#008375] transition-colors"
           >
-            Book Appointment
+            Book Now
           </Link>
         </div>
 
@@ -100,7 +110,7 @@ export default function Navbar({ activePage = "Home" }: { activePage?: string })
             className="bg-[#00685C] text-white text-sm font-semibold px-6 py-2.5 rounded-lg text-center"
             onClick={() => setMenuOpen(false)}
           >
-            Book Appointment
+            Book Now
           </Link>
         </div>
       )}

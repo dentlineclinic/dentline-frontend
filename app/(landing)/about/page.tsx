@@ -15,11 +15,12 @@ export default function AboutPage() {
           <div className="max-w-[1200px] mx-auto text-center">
             <p className="text-sm font-semibold text-[#00685C] tracking-widest mb-3">ABOUT US</p>
             <h1 className="text-5xl font-bold text-[#0B1C30] mb-6">
-              Redefining Dental Excellence
+              Redefining Clinical &amp; Wellness Excellence
             </h1>
             <p className="text-lg text-[#485F83] max-w-2xl mx-auto">
               Founded on the principles of clinical precision and patient empathy, Dentline Clinic
-              has been transforming smiles and lives for over a decade.
+              has been transforming smiles, skin, and lives for over a decade — now expanding into
+              dermatology and pilates wellness.
             </p>
           </div>
         </section>
@@ -40,9 +41,10 @@ export default function AboutPage() {
             <div className="flex flex-col gap-6">
               <h2 className="text-4xl font-bold text-[#0B1C30]">Our Mission</h2>
               <p className="text-base text-[#485F83] leading-relaxed">
-                We believe that exceptional dental care goes beyond clinical procedures. It's
+                We believe that exceptional care goes beyond clinical procedures. It's
                 about creating an environment where patients feel safe, informed, and cared for at
-                every step of their journey.
+                every step of their journey — whether they're visiting for dental treatment,
+                dermatology, or pilates wellness.
               </p>
               <p className="text-base text-[#485F83] leading-relaxed">
                 Our team of 50+ specialists combines cutting-edge technology with compassionate
@@ -75,38 +77,66 @@ export default function AboutPage() {
     <div className="text-center mb-12">
       <p className="text-sm font-semibold text-[#00685C] tracking-widest mb-2">OUR TEAM</p>
       <h2 className="text-4xl font-bold text-[#0B1C30]">Meet Our Specialists</h2>
+      <p className="text-base text-[#485F83] max-w-2xl mx-auto mt-4">
+        Our multidisciplinary team brings together dental clinicians, dermatologists, and
+        certified pilates instructors — all dedicated to your health and wellness.
+      </p>
     </div>
     <div className="grid md:grid-cols-3 gap-8">
       {[
         { 
-          name: "Dr. kenny", 
+          name: "Dr. Kenny", 
           role: "Orthodontist", 
+          sector: "Dental",
           image: "https://res.cloudinary.com/da00pceww/image/upload/v1776973741/WhatsApp_Image_2026-04-23_at_3.52.30_PM_2_v3kivw.jpg"
         },
         { 
-          name: "Dr. yinka", 
+          name: "Dr. Yinka", 
           role: "Oral Surgeon", 
+          sector: "Dental",
           image: "https://res.cloudinary.com/da00pceww/image/upload/v1776973740/WhatsApp_Image_2026-04-23_at_3.42.29_PM_uiclax.jpg"
         },
         { 
-          name: "Dr. tawio", 
+          name: "Dr. Tawio", 
           role: "Periodontist", 
+          sector: "Dental",
           image: "https://res.cloudinary.com/da00pceww/image/upload/v1776973740/WhatsApp_Image_2026-04-23_at_3.42.30_PM_bqnnea.jpg"
         },
-      ].map((doctor) => (
+        { 
+          name: "Dr. Amina", 
+          role: "Consultant Dermatologist", 
+          sector: "Dermatology",
+          image: null as string | null
+        },
+        { 
+          name: "Coach Funmi", 
+          role: "Senior Pilates Instructor", 
+          sector: "Pilates",
+          image: null as string | null
+        },
+      ].map((member) => (
         <div
-          key={doctor.name}
+          key={member.name}
           className="bg-white border border-[#F1F5F9] rounded-xl p-8 text-center shadow-sm hover:shadow-md transition-shadow"
         >
           <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-4">
-            <img
-              src={doctor.image}
-              alt={`Dr. ${doctor.name} - ${doctor.role}`}
-              className="w-full h-full object-cover"
-            />
+            {member.image ? (
+              <img
+                src={member.image}
+                alt={`${member.name} - ${member.role}`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-[#F0FDFA] text-2xl font-bold text-[#0F766E]">
+                {member.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+              </div>
+            )}
           </div>
-          <h3 className="text-lg font-semibold text-[#0B1C30]">{doctor.name}</h3>
-          <p className="text-sm text-[#485F83] mt-1">{doctor.role}</p>
+          <h3 className="text-lg font-semibold text-[#0B1C30]">{member.name}</h3>
+          <p className="text-sm text-[#485F83] mt-1">{member.role}</p>
+          <span className="inline-block mt-2 text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0FDFA] text-[#0F766E]">
+            {member.sector}
+          </span>
         </div>
       ))}
     </div>

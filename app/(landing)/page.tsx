@@ -16,12 +16,12 @@ export default function LandingPage() {
             
 
             <h1 className="text-5xl font-bold text-[#0B1C30] leading-tight">
-              Precision Care for Your <span className="text-[#00685C]">Everlasting</span> Smile
+              Precision Care for Your <span className="text-[#00685C]">Smile</span>, <span className="text-[#00685C]">Skin</span> & <span className="text-[#00685C]">Wellness</span>
             </h1>
 
             <p className="text-lg text-[#485F83] leading-relaxed max-w-lg">
               Bridging rigorous clinical professionalism with human-centric empathy. Experience
-              dental care redesigned for your comfort and long-term health.
+              dental, dermatology, and pilates care redesigned for your comfort and long-term health.
             </p>
 
             <div className="flex gap-4 pt-2">
@@ -69,8 +69,8 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-[#0B1C30]">15+ Expert Clinicians</span>
-                <span className="text-xs text-[#485F83]">Ready to assist you today</span>
+                <span className="text-sm font-semibold text-[#0B1C30]">15+ Expert Specialists</span>
+                <span className="text-xs text-[#485F83]">Across dental, dermatology & pilates</span>
               </div>
             </div>
           </div>
@@ -106,56 +106,61 @@ export default function LandingPage() {
         <div className="max-w-[1200px] mx-auto">
           <div className="text-center mb-10">
             <p className="text-base text-[#00685C] tracking-widest mb-2">OUR SPECIALIZATIONS</p>
-            <h2 className="text-4xl font-bold text-[#0B1C30]">Comprehensive Clinical Care</h2>
+            <h2 className="text-4xl font-bold text-[#0B1C30]">Comprehensive Clinical & Wellness Care</h2>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Major Card */}
-            <div className="bg-white border border-[#F1F5F9] rounded-xl p-10 flex flex-col justify-between">
-              <div className="flex flex-col gap-3">
-                {/* Full Arch Restoration Icon - Teeth emoji */}
-                <div className="w-7 h-7 flex items-center justify-center">
-                  <span className="text-5xl text-[#00685C]">🦷</span>
-                </div>
-                <h3 className="text-2xl font-semibold text-[#0B1C30] pt-3">Full Arch Restoration</h3>
-                <p className="text-base text-[#485F83]">
-                  Using state-of-the-art 3D imaging to rebuild confidence through permanent,
-                  natural-looking tooth replacement.
-                </p>
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Dental Care Card */}
+            <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 flex flex-col gap-3">
+              <div className="w-7 h-7 flex items-center justify-center">
+                <span className="text-5xl text-[#00685C]">🦷</span>
               </div>
-              <div className="pt-5">
-                <div className="w-full max-w-md h-64 rounded-lg overflow-hidden shadow-md">
-                  <img
-                    src="https://images.squarespace-cdn.com/content/v1/66a8f47a3910612f6c7fcc88/966ea665-0f79-4351-a540-9891332af953/panoramic-dental-x-ray-2023-11-27-05-05-48-utc.jpg"
-                    alt="Panoramic dental X-ray for full arch restoration"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+              <h3 className="text-2xl font-semibold text-[#0B1C30] pt-3">Dental Care</h3>
+              <p className="text-base text-[#485F83]">
+                From full arch restoration to cosmetic whitening and periodontal care — comprehensive dental services using state-of-the-art 3D imaging.
+              </p>
+              <div className="pt-3 flex flex-wrap gap-2">
+                {["Restorative", "Cosmetic", "Orthodontics", "Pediatric"].map((tag) => (
+                  <span key={tag} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0FDFA] text-[#0F766E]">
+                    {tag}
+                  </span>
+                ))}
               </div>
             </div>
 
-            {/* Small Cards */}
-            <div className="grid grid-rows-2 gap-6">
-              <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 flex flex-col gap-3">
-                {/* Cosmetic Whitening Icon - Laughing emoji */}
-                <div className="w-7 h-7 flex items-center justify-center">
-                  <span className="text-5xl text-[#00685C]">😁</span>
-                </div>
-                <h3 className="text-2xl font-semibold text-[#0B1C30]">Cosmetic Whitening</h3>
-                <p className="text-base text-[#485F83]">
-                  Advanced laser technology for safe, lasting brightness.
-                </p>
+            {/* Dermatology Card */}
+            <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 flex flex-col gap-3">
+              <div className="w-7 h-7 flex items-center justify-center">
+                <span className="text-5xl text-[#00685C]">✨</span>
               </div>
+              <h3 className="text-2xl font-semibold text-[#0B1C30] pt-3">Dermatology</h3>
+              <p className="text-base text-[#485F83]">
+                Advanced skin treatments and cosmetic dermatology — from laser therapy to personalized skincare, delivered by certified specialists.
+              </p>
+              <div className="pt-3 flex flex-wrap gap-2">
+                {["Skin Consultation", "Laser Therapy", "Cosmetic", "Skincare"].map((tag) => (
+                  <span key={tag} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0FDFA] text-[#0F766E]">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
 
-              <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 flex flex-col gap-3">
-                {/* Periodontal Care Icon - First aid emoji */}
-                <div className="w-7 h-7 flex items-center justify-center">
-                  <span className="text-5xl text-[#00685C]">🩺</span>
-                </div>
-                <h3 className="text-2xl font-semibold text-[#0B1C30]">Periodontal Care</h3>
-                <p className="text-base text-[#485F83]">
-                  Specialized treatments for gum health and stability.
-                </p>
+            {/* Pilates & Wellness Card */}
+            <div className="bg-white border border-[#F1F5F9] rounded-xl p-8 flex flex-col gap-3">
+              <div className="w-7 h-7 flex items-center justify-center">
+                <span className="text-5xl text-[#00685C]">🧘</span>
+              </div>
+              <h3 className="text-2xl font-semibold text-[#0B1C30] pt-3">Pilates & Wellness</h3>
+              <p className="text-base text-[#485F83]">
+                Group classes and private sessions with certified instructors. Flexible subscription packages to support your strength, mobility, and recovery.
+              </p>
+              <div className="pt-3 flex flex-wrap gap-2">
+                {["Group Classes", "Private Sessions", "Subscriptions", "Recovery"].map((tag) => (
+                  <span key={tag} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0FDFA] text-[#0F766E]">
+                    {tag}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -206,9 +211,9 @@ export default function LandingPage() {
               Experience the Serenity of Professionalism
             </h2>
             <p className="text-base text-[#485F83]">
-              We've engineered every touchpoint of our clinic to reduce anxiety and increase
-              clinical outcomes. From our silent surgical drills to our calming Navy-toned
-              interiors.
+              We've engineered every touchpoint of our clinics to reduce anxiety and increase
+              clinical outcomes. From advanced equipment to calming interiors across dental,
+              dermatology, and pilates.
             </p>
             <ul className="flex flex-col gap-2">
               {[
@@ -218,11 +223,11 @@ export default function LandingPage() {
                 },
                 {
                   title: "Transparent Pricing",
-                  desc: "Clear, upfront digital quotes with no hidden clinical fees.",
+                  desc: "Clear, upfront digital quotes with no hidden fees.",
                 },
                 {
                   title: "Same-Day Results",
-                  desc: "On-site dental lab for immediate restorations.",
+                  desc: "On-site labs and studios for immediate restorations.",
                 },
               ].map((item) => (
                 <li key={item.title} className="flex gap-4">

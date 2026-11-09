@@ -5,42 +5,117 @@ import Link from "next/link";
 
 export const metadata: Metadata = { title: "Services" };
 
-const services = [
+const serviceCategories = [
   {
-    title: "Full Arch Restoration",
-    desc: "Using state-of-the-art 3D imaging to rebuild confidence through permanent, natural-looking tooth replacement.",
+    name: "Dental Care",
     icon: "🦷",
-    features: ["3D Imaging", "Permanent Solution", "Natural Look"],
+    accent: "#00685C",
+    services: [
+      {
+        title: "Full Arch Restoration",
+        desc: "Using state-of-the-art 3D imaging to rebuild confidence through permanent, natural-looking tooth replacement.",
+        icon: "🦷",
+        features: ["3D Imaging", "Permanent Solution", "Natural Look"],
+      },
+      {
+        title: "Cosmetic Whitening",
+        desc: "Advanced laser technology for safe, lasting brightness that transforms your smile.",
+        icon: "✨",
+        features: ["Laser Technology", "Safe & Effective", "Long-lasting"],
+      },
+      {
+        title: "Periodontal Care",
+        desc: "Specialized treatments for gum health and stability, preventing long-term complications.",
+        icon: "🩺",
+        features: ["Gum Health", "Preventive Care", "Long-term Stability"],
+      },
+      {
+        title: "Pediatric Dentistry",
+        desc: "Creating a calm, fearless environment for our youngest patients through empathetic clinical practices.",
+        icon: "👶",
+        features: ["Child-friendly", "Fear-Free Environment", "Preventive Care"],
+      },
+      {
+        title: "Orthodontics",
+        desc: "Comprehensive orthodontic solutions including Invisalign and traditional braces for all ages.",
+        icon: "😁",
+        features: ["Invisalign", "Traditional Braces", "All Ages"],
+      },
+      {
+        title: "Emergency Dental Care",
+        desc: "24/7 emergency dental services for urgent situations requiring immediate clinical attention.",
+        icon: "🚨",
+        features: ["24/7 Available", "Immediate Response", "Urgent Care"],
+      },
+    ],
   },
   {
-    title: "Cosmetic Whitening",
-    desc: "Advanced laser technology for safe, lasting brightness that transforms your smile.",
+    name: "Dermatology",
     icon: "✨",
-    features: ["Laser Technology", "Safe & Effective", "Long-lasting"],
+    accent: "#0D9488",
+    services: [
+      {
+        title: "Skin Consultations",
+        desc: "Comprehensive skin assessments with certified dermatologists to diagnose and personalize your treatment plan.",
+        icon: "🔍",
+        features: ["Expert Diagnosis", "Personalized Plan", "Skin Analysis"],
+      },
+      {
+        title: "Laser Therapy",
+        desc: "Advanced laser treatments for skin resurfacing, pigmentation, and scar reduction.",
+        icon: "🔬",
+        features: ["Skin Resurfacing", "Pigmentation", "Scar Reduction"],
+      },
+      {
+        title: "Cosmetic Dermatology",
+        desc: "Non-surgical aesthetic treatments including chemical peels, facials, and skin rejuvenation.",
+        icon: "💆",
+        features: ["Chemical Peels", "Rejuvenation", "Non-surgical"],
+      },
+      {
+        title: "Acne & Blemish Treatment",
+        desc: "Targeted treatments for acne, blemishes, and skin texture improvement.",
+        icon: "🌿",
+        features: ["Acne Care", "Texture Improvement", "Ongoing Support"],
+      },
+      {
+        title: "Skin Cancer Screening",
+        desc: "Early detection and screening for skin cancer and other dermatological conditions.",
+        icon: "🛡️",
+        features: ["Early Detection", "Full-body Screening", "Preventive"],
+      },
+    ],
   },
   {
-    title: "Periodontal Care",
-    desc: "Specialized treatments for gum health and stability, preventing long-term complications.",
-    icon: "🩺",
-    features: ["Gum Health", "Preventive Care", "Long-term Stability"],
-  },
-  {
-    title: "Pediatric Dentistry",
-    desc: "Creating a calm, fearless environment for our youngest patients through empathetic clinical practices.",
-    icon: "👶",
-    features: ["Child-friendly", "Fear-Free Environment", "Preventive Care"],
-  },
-  {
-    title: "Orthodontics",
-    desc: "Comprehensive orthodontic solutions including Invisalign and traditional braces for all ages.",
-    icon: "😁",
-    features: ["Invisalign", "Traditional Braces", "All Ages"],
-  },
-  {
-    title: "Emergency Care",
-    desc: "24/7 emergency dental services for urgent situations requiring immediate clinical attention.",
-    icon: "🚨",
-    features: ["24/7 Available", "Immediate Response", "Urgent Care"],
+    name: "Pilates & Wellness",
+    icon: "🧘",
+    accent: "#1E40AF",
+    services: [
+      {
+        title: "Group Pilates Classes",
+        desc: "Join structured group sessions led by certified instructors, tailored to all fitness levels.",
+        icon: "👥",
+        features: ["All Levels", "Certified Instructors", "Structured Programs"],
+      },
+      {
+        title: "Private Sessions",
+        desc: "One-on-one sessions with dedicated instructors for personalized attention and faster progress.",
+        icon: "🧑‍🏫",
+        features: ["1-on-1", "Personalized", "Flexible Scheduling"],
+      },
+      {
+        title: "Subscription Packages",
+        desc: "Flexible credit-based packages that let you book sessions at your own pace.",
+        icon: "🎟️",
+        features: ["Credit System", "Flexible Booking", "No Expiry Pressure"],
+      },
+      {
+        title: "Recovery & Mobility",
+        desc: "Specialized sessions focused on injury recovery, mobility, and rehabilitation.",
+        icon: "💪",
+        features: ["Rehabilitation", "Mobility Focus", "Recovery Support"],
+      },
+    ],
   },
 ];
 
@@ -51,7 +126,7 @@ export default function ServicesPage() {
 
       <main className="pt-20">
         {/* Hero Section with Image Background */}
-        <section 
+        <section
           className="py-20 px-6 md:px-10 relative"
           style={{
             backgroundImage: `url("https://res.cloudinary.com/da00pceww/image/upload/v1776973741/WhatsApp_Image_2026-04-23_at_3.52.30_PM_ts3rim.jpg")`,
@@ -61,17 +136,17 @@ export default function ServicesPage() {
           }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-black/60 to-[#00685C]/40" />
-          
+
           <div className="relative max-w-[1200px] mx-auto text-center z-10">
             <p className="text-sm font-semibold text-[#8EF5E2] tracking-widest mb-3 uppercase">
               OUR SPECIALIZATIONS
             </p>
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-              Comprehensive Clinical Care
+              Comprehensive Clinical &amp; Wellness Care
             </h1>
             <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
-              From routine check-ups to complex restorative procedures, we offer a full spectrum
-              of dental services delivered with precision and care.
+              From routine dental check-ups to advanced dermatology and pilates wellness programs —
+              we offer a full spectrum of services delivered with precision and care.
             </p>
             <div className="mt-8">
               <Link
@@ -84,7 +159,7 @@ export default function ServicesPage() {
           </div>
         </section>
 
-        {/* Services Grid */}
+        {/* Services by Category */}
         <section className="py-20 px-6 md:px-10">
           <div className="max-w-[1200px] mx-auto">
             {/* Section Header */}
@@ -93,66 +168,85 @@ export default function ServicesPage() {
                 WHAT WE OFFER
               </p>
               <h2 className="text-3xl md:text-4xl font-bold text-[#0B1C30] mb-4">
-                Expert Dental Services
+                Our Services
               </h2>
               <p className="text-base text-[#485F83] max-w-2xl mx-auto">
-                Discover our comprehensive range of dental treatments designed to meet all your oral health needs
+                Explore our comprehensive range of treatments across dental, dermatology, and
+                pilates — all designed to meet your health and wellness needs.
               </p>
             </div>
 
-            {/* Services Cards */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {services.map((service, index) => (
-                <div
-                  key={service.title}
-                  className="group bg-white border border-[#F1F5F9] rounded-xl p-8 flex flex-col gap-4 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                >
-                  <div className="text-4xl group-hover:scale-110 transition-transform duration-300">
-                    {service.icon}
-                  </div>
-                  <h3 className="text-xl font-semibold text-[#0B1C30] group-hover:text-[#00685C] transition-colors">
-                    {service.title}
-                  </h3>
-                  <p className="text-base text-[#485F83] leading-relaxed">{service.desc}</p>
-                  
-                  {/* Features List */}
-                  <div className="pt-4 mt-2 border-t border-[#F1F5F9]">
-                    <div className="flex flex-wrap gap-2">
-                      {service.features.map((feature) => (
-                        <span
-                          key={feature}
-                          className="text-xs px-2 py-1 bg-[#F0FDFA] text-[#00685C] rounded-full"
-                        >
-                          {feature}
-                        </span>
-                      ))}
-                    </div>
+            {/* Category sections */}
+            <div className="flex flex-col gap-16">
+              {serviceCategories.map((category) => (
+                <div key={category.name}>
+                  {/* Category header */}
+                  <div className="flex items-center gap-3 mb-6">
+                    <span className="text-3xl">{category.icon}</span>
+                    <h3 className="text-2xl font-bold text-[#0B1C30]">
+                      {category.name}
+                    </h3>
+                    <span className="text-sm text-[#94A3B8] font-medium">
+                      {category.services.length} services
+                    </span>
+                    <div className="flex-1 h-px bg-[#F1F5F9]" />
                   </div>
 
-                  
+                  {/* Service cards */}
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {category.services.map((service) => (
+                      <div
+                        key={service.title}
+                        className="group bg-white border border-[#F1F5F9] rounded-xl p-8 flex flex-col gap-4 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                      >
+                        <div className="text-4xl group-hover:scale-110 transition-transform duration-300">
+                          {service.icon}
+                        </div>
+                        <h4 className="text-xl font-semibold text-[#0B1C30] group-hover:text-[#00685C] transition-colors">
+                          {service.title}
+                        </h4>
+                        <p className="text-base text-[#485F83] leading-relaxed">
+                          {service.desc}
+                        </p>
+
+                        {/* Features List */}
+                        <div className="pt-4 mt-2 border-t border-[#F1F5F9]">
+                          <div className="flex flex-wrap gap-2">
+                            {service.features.map((feature) => (
+                              <span
+                                key={feature}
+                                className="text-xs px-2 py-1 bg-[#F0FDFA] text-[#00685C] rounded-full"
+                              >
+                                {feature}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-       
-
         {/* CTA Section */}
         <section className="py-20 px-6 md:px-10 bg-gradient-to-r from-[#435B7E] to-[#2C4A6E]">
           <div className="max-w-[1200px] mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Ready to Transform Your Smile?
+              Ready to Begin Your Journey?
             </h2>
             <p className="text-base text-white/80 mb-8 max-w-xl mx-auto">
-              Book your consultation today and experience the Dentline difference. Our expert team is ready to help you achieve the smile you deserve.
+              Book your consultation today and experience the Dentline difference. Our expert team
+              is ready to help you across dental, dermatology, and wellness.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/register"
                 className="inline-block bg-[#00685C] text-white font-semibold text-sm px-8 py-4 rounded-lg hover:bg-[#008375] transition-colors shadow-lg"
               >
-                Book Appointment
+                Book Now
               </Link>
               <Link
                 href="/contact"

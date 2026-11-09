@@ -29,11 +29,11 @@ export default function InstructorClassesPage() {
 
   const filteredClasses = useMemo(() => {
     if (filter === "ALL") return classes;
-    if (filter === "ACTIVE") return classes.filter((c) => c.isActive);
-    return classes.filter((c) => !c.isActive);
+    if (filter === "ACTIVE") return classes.filter((c) => c.isActive ?? c.active);
+    return classes.filter((c) => !(c.isActive ?? c.active));
   }, [classes, filter]);
 
-  const activeCount = classes.filter((c) => c.isActive).length;
+  const activeCount = classes.filter((c) => c.isActive ?? c.active).length;
   const inactiveCount = classes.length - activeCount;
 
   const error = queryError
@@ -153,12 +153,12 @@ export default function InstructorClassesPage() {
                   </div>
                   <span
                     className={`text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 ${
-                      cls.isActive
+                      (cls.isActive ?? cls.active)
                         ? "bg-[#DCFCE7] text-[#166534]"
                         : "bg-[#F1F5F9] text-[#64748B]"
                     }`}
                   >
-                    {cls.isActive ? "Active" : "Inactive"}
+                    {(cls.isActive ?? cls.active) ? "Active" : "Inactive"}
                   </span>
                 </div>
 

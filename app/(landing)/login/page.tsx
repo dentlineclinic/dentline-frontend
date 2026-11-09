@@ -140,7 +140,7 @@ export default function LoginPage() {
                 <label className="text-sm font-semibold text-[#3D4946]">
                   Login as
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <RoleButton
                     active={selectedRole === "PATIENT"}
                     onClick={() => setSelectedRole("PATIENT")}
@@ -155,9 +155,11 @@ export default function LoginPage() {
                     }
                   />
                   <RoleButton
-                    active={selectedRole === "DOCTOR"}
-                    onClick={() => setSelectedRole("DOCTOR")}
-                    label="Doctor"
+                    active={selectedRole === "DOCTOR" || selectedRole === "PILATES_INSTRUCTOR"}
+                    onClick={() => {
+                      if (selectedRole === "PATIENT") setSelectedRole("DOCTOR");
+                    }}
+                    label="Staff"
                     icon={
                       <>
                         <path
@@ -175,20 +177,56 @@ export default function LoginPage() {
                       </>
                     }
                   />
-                  <RoleButton
-                    active={selectedRole === "PILATES_INSTRUCTOR"}
-                    onClick={() => setSelectedRole("PILATES_INSTRUCTOR")}
-                    label="Pilates"
-                    icon={
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    }
-                  />
                 </div>
+
+                {/* Staff sub-role dropdown */}
+                {selectedRole !== "PATIENT" && (
+                  <div className="relative mt-3">
+                    <label className="text-xs font-semibold text-[#3D4946] mb-1.5 block">
+                      Staff Type
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none">
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 00-2 2m6 4l-4 4m0 0l-4-4m4 4V9"
+                          />
+                        </svg>
+                      </span>
+                      <select
+                        value={selectedRole}
+                        onChange={(e) => setSelectedRole(e.target.value as LoginRole)}
+                        className="w-full appearance-none bg-[#EFF4FF] border border-[#BDC9C5] rounded-lg pl-12 pr-10 py-3 text-base text-[#0B1C30] outline-none focus:border-[#00685C] focus:ring-1 focus:ring-[#00685C] transition-colors cursor-pointer"
+                      >
+                        <option value="DOCTOR">Doctor</option>
+                        <option value="PILATES_INSTRUCTOR">Pilates Instructor</option>
+                      </select>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7280] pointer-events-none">
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Identifier */}

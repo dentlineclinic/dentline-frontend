@@ -48,6 +48,7 @@ import {
   fetchSessionsByDateRange,
   fetchSessionsByClass,
   cancelSession,
+  rescheduleSession,
   // Bookings
   bookSession,
   fetchMyBookings,
@@ -75,6 +76,7 @@ import {
   type CreatePilatesInstructorRequest,
   type UpdatePilatesInstructorRequest,
   type CreatePilatesClassRequest,
+  type RescheduleSessionRequest,
   type GenerateSessionsRequest,
   type BookPilatesSessionRequest,
   type MarkAttendanceRequest,
@@ -518,6 +520,19 @@ export const useCancelSession = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => cancelSession(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pilatesSessions.root,
+      });
+    },
+  });
+};
+
+export const useRescheduleSession = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: RescheduleSessionRequest }) =>
+      rescheduleSession(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.pilatesSessions.root,

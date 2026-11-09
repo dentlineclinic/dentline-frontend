@@ -20,8 +20,8 @@ export default function Footer() {
           <div className="flex flex-col gap-6">
             <h2 className="text-lg font-bold text-white">Dentline Clinic</h2>
             <p className="text-xs text-[#94A3B8] leading-relaxed">
-              Clinical excellence guaranteed through precision restoration and
-              patient-first protocols. Leading the standard in modern dental care.
+              Clinical excellence guaranteed through precision care and patient-first protocols.
+              Leading the standard in modern dental, dermatology, and pilates wellness.
             </p>
             <div className="flex gap-3">
               <a

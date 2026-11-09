@@ -18,6 +18,7 @@ export interface PilatesProgram {
   description?: string | null;
   durationWeeks?: number | null;
   isActive: boolean;
+  active?: boolean; // Spring Boot may serialize isActive → active
   createdAt: string;
   updatedAt?: string | null;
 }
@@ -67,10 +68,12 @@ export interface PilatesClass {
   name: string;
   description?: string | null;
   dayOfWeek: number; // ISO 1-7
+  startDate?: string | null; // YYYY-MM-DD — when sessions begin
   startTime: string; // "HH:mm:ss"
   durationMinutes: number;
   defaultCapacity: number;
   isActive: boolean;
+  active?: boolean; // Spring Boot may serialize isActive → active
   createdAt: string;
   updatedAt?: string | null;
   instructorProfilePhotoUrl?: string | null; 
@@ -125,6 +128,7 @@ export interface PilatesPackage {
   price: number;
   validityDays: number;
   isActive: boolean;
+  active?: boolean; // Spring Boot may serialize isActive → active
   createdAt: string;
   updatedAt?: string | null;
 }
@@ -200,6 +204,7 @@ export interface CreatePilatesClassRequest {
   name: string;
   description?: string;
   dayOfWeek: number;
+  startDate: string; // YYYY-MM-DD — backend auto-generates sessions from this date
   startTime: string;
   durationMinutes?: number;
   defaultCapacity?: number;
@@ -215,6 +220,11 @@ export interface CreatePilatesPackageRequest {
   isActive: boolean;
 }
 
+export interface RescheduleSessionRequest {
+  newSessionDate: string; // YYYY-MM-DD
+  newStartTime: string;   // HH:mm:ss
+}
+
 export interface GenerateSessionsRequest {
   classId: string;
   startDate: string; // YYYY-MM-DD
@@ -223,7 +233,6 @@ export interface GenerateSessionsRequest {
 
 export interface BookPilatesSessionRequest {
   sessionId: string;
-  patientId: string;
   subscriptionId?: string;
 }
 
@@ -517,6 +526,14 @@ export const cancelSession = async (
   id: string
 ): Promise<SingleResponse<PilatesSession>> => {
   const res = await api.patch(`/admin/pilates/sessions/${id}/cancel`);
+  return res.data;
+};
+
+export const rescheduleSession = async (
+  id: string,
+  payload: RescheduleSessionRequest
+): Promise<SingleResponse<PilatesSession>> => {
+  const res = await api.patch(`/admin/pilates/sessions/${id}/reschedule`, payload);
   return res.data;
 };
 
